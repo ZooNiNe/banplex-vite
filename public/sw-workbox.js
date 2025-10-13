@@ -6,14 +6,15 @@ if (workbox) {
   workbox.core.clientsClaim();
   self.skipWaiting();
 
+  // Perbaikan di sini: Gunakan path relatif
   workbox.precaching.precacheAndRoute([
     { url: './', revision: null },
     { url: 'index.html', revision: null },
-    { url: 'script.js', revision: null },
+    { url: 'script.js', revision: null }, // <-- DIUBAH
     { url: 'style.css', revision: null },
+    { url: 'desktop-styles.css', revision: null }, // <-- DITAMBAHKAN
     { url: 'manifest.json', revision: null },
     { url: 'logo-data.js', revision: null },
-
     { url: 'icons-logo.png', revision: null },
     { url: 'logo-main.png', revision: null },
   ]);
@@ -35,7 +36,7 @@ if (workbox) {
     })
   );
 
-  // Never cache API calls; use Background Sync to ensure delivery when offline
+  // ... sisa kode tetap sama ...
   try {
     const bgSyncPlugin = new workbox.backgroundSync.BackgroundSyncPlugin('banplex-api-queue', {
       maxRetentionTime: 24 * 60 // Retry for up to 24 hours
