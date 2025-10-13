@@ -1,0 +1,1140 @@
+/* desktop-styles.css (Unified min-width:600px) */
+@media (min-width: 600px) {
+:root {
+        --list-pane-width: 450px;
+    }
+
+    html, body {
+        overflow: hidden;
+        height: 100vh;
+    }
+    body.is-resizing {
+        cursor: col-resize;
+        user-select: none;
+    }
+
+    #app-shell {
+        height: 100vh;
+    }
+    .bottom-nav {
+        display: none !important;
+    }
+
+    .sidebar {
+        display: flex !important;
+        width: 250px;
+        position: fixed; left: 0; top: 0;
+        height: 100vh;
+        z-index: 100;
+        transition: width .25s ease, padding .25s ease;
+        flex-direction: column;
+        background-color: var(--panel);
+        border-right: 1px solid var(--line);
+        padding: 1.5rem 1rem;
+        overflow: hidden;
+    }
+    .sidebar .sidebar-app-name, .sidebar .nav-text, .sidebar .profile-text { display: block !important; }
+    .sidebar-header, .sidebar-nav-item, .sidebar-profile-info { justify-content: flex-start !important; gap: 1rem !important; }
+
+    .content-wrapper {
+        margin-left: 250px;
+        display: grid;
+        grid-template-columns: 1fr 0;
+        height: 100vh;
+        width: calc(100% - 250px);
+        transition: margin-left .25s ease, width .25s ease, grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    body.detail-pane-open .content-wrapper {
+        grid-template-columns: var(--list-pane-width) 5px 1fr;
+    }
+
+    .list-pane, .detail-pane {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+    }
+    .list-pane { border-right: 1px solid var(--line); }
+    .detail-pane { background-color: var(--surface-muted); }
+
+    .page-container, .detail-pane-body {
+        flex: 1;
+        overflow-y: auto;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    .page-container::-webkit-scrollbar, .detail-pane-body::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .list-pane .page-container { padding: 0 1rem 2rem 1rem; }
+    .list-pane .toolbar, .list-pane .sub-nav { flex-shrink: 0; margin: 0.75rem 1rem; }
+
+    .resizer {
+        cursor: col-resize;
+        background-color: var(--line);
+        width: 5px;
+        transition: background-color 0.2s ease;
+    }
+    body.detail-pane-open .resizer {
+        display: block;
+    }
+    .resizer:hover, body.is-resizing .resizer {
+        background-color: var(--primary);
+    }
+    .detail-pane-header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); flex-shrink: 0;
+    }
+    .detail-pane-header h4 { margin: 0; font-size: 1.1rem; }
+    .detail-pane-body { padding: 1.5rem; }
+    .detail-pane-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--line);
+      background-color: var(--panel);
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end; /* Kunci: Membuat tombol rata kanan */
+      flex-shrink: 0;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+  }
+  
+  .dark-theme .detail-pane-footer {
+      background-color: #1e293b; /* Warna untuk tema gelap */
+  }
+    .detail-pane-empty-state {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        height: 100%; text-align: center; color: var(--text-dim); padding: 2rem;
+    }
+    .detail-pane-empty-state .material-symbols-outlined { font-size: 48px; margin-bottom: 1rem; }
+
+    .modal-bg {
+        align-items: center;
+        padding-bottom: 0 !important;
+    }
+    .modal-content {
+        max-width: 550px;
+        border-radius: var(--radius) !important;
+        height: auto;
+        max-height: 90vh;
+    }
+
+    .desktop-form-layout form .form-group {
+      margin-bottom: 0.5rem; /* Mengurangi margin bawah standar */
+  }
+  
+  /* [BARU] Aturan grid untuk container 2 kolom kita */
+  .desktop-form-layout .form-grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr; /* Membuat dua kolom dengan lebar yang sama */
+      gap: 0.75rem 1.5rem; /* Memberi jarak antar baris dan kolom */
+      grid-column: 1 / -1; /* Pastikan grid ini mengambil lebar penuh form */
+  }
+  
+  /* Aturan untuk elemen yang harus membentang selebar form (1 baris penuh) */
+    .desktop-form-layout form .full-width,
+    .desktop-form-layout form .master-data-select,
+    .desktop-form-layout form #invoice-items-container,
+    .desktop-form-layout form .add-item-action,
+    .desktop-form-layout form .invoice-total,
+    .desktop-form-layout form #payment-status-wrapper,
+    .desktop-form-layout form .section-header-flex,
+    .desktop-form-layout form h5,
+    .desktop-form-layout form .upload-buttons,
+    .desktop-form-layout form .file-name-display,
+    .desktop-form-layout form .form-footer-actions,
+    .desktop-form-layout form button[type="submit"] {
+        grid-column: 1 / -1;
+    }
+
+    #manual-attendance-form .card-pad {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem 1.5rem;
+    }
+.custom-select-wrapper.active .custom-select-options {
+      position: fixed;
+      z-index: 1250;
+      flex-direction: column;
+      background-color: var(--panel, #ffffff);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+  
+    .dark-theme .custom-select-wrapper.active .custom-select-options {
+      background-color: #1e293b;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+  
+
+  
+    .custom-select-wrapper .custom-select-options {
+      display: none !important;
+    }
+  
+  
+  
+    .desktop-form-layout .custom-select-wrapper,
+    .desktop-form-layout .custom-select-trigger {
+      width: 100%;
+    }
+  
+
+  
+    .desktop-form-layout .sort-direction {
+      background-color: var(--surface-muted);
+      border: 1px solid var(--line);
+      border-radius: 8px; /* Sudut sedikit lebih tumpul */
+      padding: 4px;
+      display: flex;
+    }
+  
+    .desktop-form-layout .sort-direction button {
+      flex: 1;
+      border: none;
+      background-color: transparent;
+      padding: 0.4rem 0.5rem;
+      border-radius: 6px;
+      color: var(--text-dim);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+    }
+  
+    .desktop-form-layout .sort-direction button.active {
+      background-color: var(--panel);
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+  
+
+  
+    .project-wage-group {
+      border: 1px solid var(--line);
+      background-color: var(--surface-muted);
+      border-radius: var(--radius-lg);
+      margin-bottom: 1.25rem;
+      padding: 0;
+      overflow: hidden;
+    }
+  
+    .project-wage-group legend {
+      display: block;
+      width: 100%;
+      background-color: transparent;
+      padding: 0.85rem 1.25rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      border-bottom: 1px solid var(--line);
+    }
+  
+    /* Atur padding untuk konten di dalam kartu */
+    .role-wage-list {
+      padding: 1rem 1.25rem 0 1.25rem;
+    }
+  
+    .project-wage-group .btn-secondary {
+      margin: 1rem 1.25rem 1.25rem 1.25rem;
+    }
+  
+
+/* [IMPROVE] Mendesain ulang list master data menjadi "Card" di Desktop */
+
+    /* Memberi jarak antar kartu secara konsisten */
+    .detail-pane .master-data-list,
+    .modal-content .master-data-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem; /* Jarak antar kartu 12px */
+    }
+  
+    .detail-pane .master-data-item,
+    .modal-content .master-data-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      
+      /* Style "Card" */
+      background-color: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 0.85rem 1rem;
+      box-shadow: var(--shadow-sm);
+      
+      /* Efek Transisi Halus */
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+  
+    /* Efek Interaktif saat mouse di atas kartu */
+    .detail-pane .master-data-item:hover,
+    .modal-content .master-data-item:hover {
+      transform: translateY(-2px); /* Efek terangkat */
+      box-shadow: var(--shadow-md);
+    }
+  
+    /* Penyesuaian untuk Dark Theme agar kartu menonjol */
+    .dark-theme .detail-pane .master-data-item,
+    .dark-theme .modal-content .master-data-item {
+      /* Gunakan warna garis sebagai latar belakang kartu agar kontras */
+      background-color: var(--line); 
+    }
+  
+    .master-data-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+  
+
+  
+    .project-wage-group .btn-secondary[data-action="add-role-wage-row"] {
+      width: 100%;
+      justify-content: center; /* Pastikan ikon dan teks tetap di tengah */
+    }
+  
+    /* Atur kembali padding & margin di dalam kartu agar rapi */
+    .role-wage-list {
+      padding: 1rem 1.25rem 0 1.25rem;
+    }
+    .project-wage-group .btn-secondary {
+      margin: 1rem 1.25rem 1.25rem 1.25rem;
+    }
+  
+
+  
+
+    /* 1. Menyeragamkan ukuran form input dan dropdown trigger */
+    .desktop-form-layout input,
+    .desktop-form-layout select,
+    .desktop-form-layout textarea,
+    .desktop-form-layout .custom-select-trigger {
+      height: 42px; /* Tinggi standar untuk semua form di desktop */
+      font-size: 0.9rem;
+      padding: 0.5rem 0.85rem;
+      border-radius: 8px;
+    }
+    
+    .desktop-form-layout .custom-select-trigger {
+      display: flex;
+      align-items: center; /* Pastikan teks dan ikon di tengah vertikal */
+    }
+  
+    /* 2. Mendesain ulang list di dalam dropdown */
+    .cloned-select-options .custom-select-options-list {
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+    }
+  
+    .cloned-select-options .custom-select-option {
+      padding: 0.75rem; /* Padding di dalam setiap opsi agar lebih lega */
+      border-radius: 6px; /* Sudut melengkung untuk setiap opsi */
+      transition: background-color 0.2s ease;
+    }
+  
+    /* 3. Memperbaiki desain badge agar lebih jelas */
+    .badge, .status-badge, .category-badge, .user-badge {
+      padding: 0.3rem 0.65rem; /* Padding sedikit lebih besar */
+      font-size: 0.75rem;     /* Ukuran font sedikit lebih besar */
+      font-weight: 500;       /* Teks sedikit lebih tebal */
+      border-radius: 6px;     /* Sudut yang lebih modern */
+      line-height: 1;         /* Memastikan teks tetap di tengah */
+    }
+  
+
+  
+
+    /* 1. Memindahkan Ikon Search ke Dalam Form */
+    .cloned-select-options .custom-select-search-wrapper {
+      position: relative; /* Menjadi jangkar untuk ikon */
+    }
+  
+    .cloned-select-options .custom-select-search-wrapper .material-symbols-outlined {
+      position: absolute;
+      left: 1.25rem; /* Posisikan 1rem dari kiri (0.75rem padding + 0.5rem) */
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      font-size: 20px;
+      pointer-events: none; /* Agar ikon tidak bisa diklik */
+    }
+  
+    .cloned-select-options .custom-select-search {
+      /* Beri padding kiri agar teks tidak tumpang tindih dengan ikon */
+      padding-left: 2.25rem !important; 
+    }
+  
+    /* 2. Mengaktifkan Scroll Tersembunyi untuk List Panjang */
+    .cloned-select-options .custom-select-options-list {
+      overflow-y: auto; /* Aktifkan scroll vertikal jika konten meluber */
+  
+      /* Sembunyikan scrollbar untuk Firefox */
+      scrollbar-width: none;
+      /* Sembunyikan scrollbar untuk IE, Edge */
+      -ms-overflow-style: none;
+    }
+  
+    /* Sembunyikan scrollbar untuk Chrome, Safari, dan Opera */
+    .cloned-select-options .custom-select-options-list::-webkit-scrollbar {
+      display: none;
+    }
+  
+    /* 3. Menambahkan Efek Saat Opsi Dipilih */
+    .cloned-select-options .custom-select-option:active {
+      transform: scale(0.98); /* Efek menekan saat diklik */
+      background-color: color-mix(in srgb, var(--primary) 15%, transparent);
+    }
+    
+    .dark-theme .cloned-select-options .custom-select-option:active {
+        background-color: color-mix(in srgb, var(--primary) 30%, #334155);
+    }
+  
+    /* 4. Memastikan Lebar Dropdown Tidak Melebar (Responsif) */
+    .cloned-select-options .custom-select-option {
+      white-space: nowrap;      /* Mencegah teks turun baris */
+      text-overflow: ellipsis;  /* Tampilkan "..." untuk teks yang terlalu panjang */
+      display: block;           /* Pastikan text-overflow bekerja dengan baik */
+    }
+  
+
+  
+    .desktop-form-layout .invoice-item-row {
+      /* 1. Gunakan flexbox untuk tata letak satu baris */
+      display: flex;
+      align-items: center;
+      gap: 0.75rem; /* Jarak antar elemen */
+      
+      /* 2. Hapus style grid dari mobile */
+      grid-template-columns: none;
+      padding: 0.5rem 0; /* Kurangi padding vertikal */
+      border: none;
+      border-bottom: 1px solid var(--line); /* Gunakan border bawah sebagai pemisah */
+      border-radius: 0;
+      background-color: transparent;
+    }
+    .desktop-form-layout #invoice-items-container {
+        border-top: 1px solid var(--line);
+    }
+  
+    /* 3. Atur lebar setiap elemen di dalam baris */
+    .desktop-form-layout .invoice-item-row .item-name-wrapper {
+      flex: 3; /* Kolom nama material paling lebar */
+    }
+    .desktop-form-layout .invoice-item-row .item-price {
+      flex: 1.5; /* Kolom harga */
+      text-align: right;
+    }
+    .desktop-form-layout .invoice-item-row .item-qty {
+      flex: 0.75; /* Kolom jumlah */
+      text-align: center;
+    }
+    .desktop-form-layout .invoice-item-row .item-total {
+      flex: 1.5; /* Kolom total */
+      text-align: right;
+      font-weight: 600;
+      padding-right: 0.5rem;
+    }
+    
+    /* 4. Hapus elemen yang tidak perlu di desktop (jika masih ada) */
+    .desktop-form-layout .invoice-item-row .add-master-btn {
+      display: none;
+    }
+  
+    /* Pastikan semua elemen input dan tombol terlihat dan berukuran sesuai */
+    .desktop-form-layout .invoice-item-row input,
+    .desktop-form-layout .invoice-item-row .custom-select-trigger {
+        height: 38px; /* Buat lebih ramping */
+        font-size: 0.85rem;
+    }
+    .desktop-form-layout .invoice-item-row .remove-item-btn {
+      display: inline-flex;
+      flex-shrink: 0;
+    }
+
+
+
+    .section-header-flex {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    .section-header-flex .invoice-section-title {
+      margin: 0; /* Menghapus margin default dari judul */
+      padding: 0;
+      border: none;
+    }
+    
+    .section-header-flex .btn {
+      flex-shrink: 0; /* Mencegah tombol mengecil */
+      font-size: 0.8rem;
+      padding: 0.4rem 0.8rem;
+    }
+  
+/* Sembunyikan Aksi Cepat di Tampilan Desktop */
+.quick-actions-section {
+  display: none !important;
+}
+
+/* [IMPROVE-UI/UX] Style Baru untuk Detail Pane yang Profesional */
+
+.detail-pane-body {
+  padding: 1rem 1.5rem; /* Padding standar */
+}
+
+/* Pembungkus untuk setiap seksi (Ringkasan, Detail Proyek, Lampiran, dll.) */
+.detail-section {
+  margin-bottom: 2rem; /* Memberi jarak antar seksi */
+}
+.detail-section:last-child {
+  margin-bottom: 0;
+}
+
+/* Judul untuk setiap seksi */
+.detail-section-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Grid untuk ringkasan di bagian atas (Total, Dibayar, Sisa) */
+.detail-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  background-color: var(--surface-muted);
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-item .label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+
+.summary-item .value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.summary-item .value.positive { color: var(--success); }
+.summary-item .value.negative { color: var(--danger); }
+.summary-item .value.warn { color: var(--warn); }
+
+
+/* Kartu untuk setiap item dalam daftar (Riwayat Absensi/Pembayaran) */
+.detail-list-item-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--surface-muted);
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--line);
+}
+
+.detail-list-item-card .item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.detail-list-item-card .item-main .item-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.detail-list-item-card .item-main .item-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.detail-list-item-card .item-secondary {
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: right;
+}
+/* Style untuk tombol header di dalam form */
+.desktop-form-layout .section-header-flex {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.desktop-form-layout .section-header-flex .btn-sm {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.7rem;
+}
+
+.dashboard-balance-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+/* Atur agar tombol aksi di footer form rata kanan di desktop */
+.desktop-form-layout .form-footer-actions {
+  justify-content: flex-end; /* Rata kanan */
+  grid-column: 1 / -1; /* Pastikan mengambil lebar penuh jika di dalam grid */
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+
+/* =======================================================
+ * [IMPROVE-UI/UX] Harmonisasi Tombol & List di Desktop
+ * ======================================================= */
+
+/* --- 1. Perbaikan Tombol Footer di Form Panel Kiri --- */
+/* Targetkan form-footer-actions yang ada di dalam list-pane */
+.list-pane .form-footer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* Bagi jadi 2 kolom sama rata */
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.list-pane .form-footer-actions .btn {
+  width: 100%; /* Pastikan tombol mengisi penuh kolomnya */
+  justify-content: center; /* Posisikan konten tombol di tengah */
+}
+
+/* --- 2. Desain Ulang Daftar Master Data di Panel Kanan --- */
+/* Targetkan master-data-item yang ada di dalam detail-pane */
+.detail-pane .master-data-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-muted);
+  border: 1px solid var(--line);
+  transition: background-color 0.2s;
+  margin-bottom: 0.5rem; /* Beri jarak antar item */
+}
+
+.detail-pane .master-data-item:hover {
+  background-color: var(--panel);
+}
+
+.detail-pane .master-data-item-info {
+  font-weight: 500;
+}
+
+.detail-pane .master-data-item-actions {
+  display: flex;
+  gap: 0.5rem; /* Beri jarak antar tombol ikon */
+}
+
+/* Beri style pada tombol ikon agar terlihat lebih jelas */
+.detail-pane .master-data-item .btn-icon {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  background-color: var(--panel);
+  border-radius: 8px;
+}
+
+.detail-pane .master-data-item .btn-icon:hover {
+  background-color: var(--surface-muted);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+/* --- Membuat Tombol Aksi Utama Menjadi Lebar Penuh di Desktop --- */
+.desktop-form-layout form button[type="submit"],
+.detail-pane #add-master-item-form button[type="submit"],
+.list-pane .form-footer-actions {
+    width: 100%;
+    grid-column: 1 / -1; /* Pastikan mengambil lebar penuh jika di dalam grid */
+}
+
+/* Pastikan tombol di dalam footer form juga mengisi ruang */
+.list-pane .form-footer-actions .btn {
+    flex-grow: 1;
+}
+
+/* =======================================================
+ * [PERBAIKAN UI] Konsistensi Tata Letak Tombol & Form
+ * ======================================================= */
+
+/* 1. Memastikan tombol di footer panel detail rata kanan dan rapi */
+.detail-pane-footer {
+  justify-content: flex-end; /* Rata kanan */
+  flex-wrap: wrap; /* Izinkan tombol turun baris jika tidak muat */
+}
+
+/* 2. Merapikan tata letak tombol di form filter Jurnal */
+.recap-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end; /* Membuat tombol dan input sejajar di bawah */
+  gap: 0.75rem;
+}
+
+.recap-filters .form-group {
+  flex-grow: 1; /* Biarkan input tanggal mengisi ruang */
+}
+
+.recap-filters .btn {
+  flex-shrink: 0; /* Jangan biarkan tombol mengecil */
+}
+
+/* 3. Merapikan tata letak checkbox dan label di tabel Jurnal */
+.recap-table td, .recap-table th {
+  vertical-align: middle; /* Sejajarkan semua konten di tengah secara vertikal */
+}
+
+.recap-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-right: 0.5rem; /* Beri jarak antara checkbox dan teks */
+}
+
+/* =======================================================
+ * [DESKTOP] Desain Ulang Blok Total Faktur menjadi Kartu
+ * ======================================================= */
+
+ .desktop-form-layout .invoice-total {
+  /* 1. Ubah menjadi kartu */
+  background-color: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+
+  /* 2. Atur tata letak (label kiri, jumlah kanan) */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 3. Style untuk label "Total Faktur:" */
+.desktop-form-layout .invoice-total span {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+/* 4. Style untuk jumlah nominal (Rp 0) */
+.desktop-form-layout .invoice-total strong {
+  font-size: 1.5rem; /* Dibuat jauh lebih besar */
+  font-weight: 700;
+  color: var(--primary); /* Warna primer agar menonjol */
+}
+/* [REDESAIN] Tombol Header Halaman Absensi di Desktop */
+.list-pane .attendance-header {
+  display: flex;
+  justify-content: center; /* Posisikan di tengah */
+  gap: 0.5rem;
+  padding: 0 1rem;
+  margin-bottom: 1rem;
+}
+
+.list-pane .attendance-header .btn {
+  flex: 0 1 auto;
+  /* Ubah style agar mirip seperti tab nav */
+  background-color: var(--surface-muted);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-sm);
+}
+
+.list-pane .attendance-header .btn:hover {
+  background-color: var(--panel);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+/* =======================================================
+ * [DESAIN ULANG GLOBAL] Style Empty State untuk Desktop
+ * ======================================================= */
+ .empty-state {
+  padding: 3rem;
+}
+
+.empty-state-icon {
+  font-size: 56px;
+}
+
+.empty-state-title {
+  font-size: 1.25rem;
+}
+
+.empty-state-description {
+  font-size: 1rem;
+}
+
+/* KUNCI: Aturan agar empty state mengisi penuh panel di desktop */
+.list-pane .page-container .empty-state,
+.detail-pane-body .empty-state,
+.modal-body .empty-state {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.detail-pane .empty-state {
+  background-color: var(--surface-muted);
+}
+
+/* =======================================================
+ * [UI/UX] Perbaikan Panel Detail, Footer, & Form
+ * ======================================================= */
+
+/* 1. Membuat footer selalu menempel di bawah panel */
+.detail-pane-footer {
+  position: sticky; /* KUNCI: Membuat footer menempel */
+  bottom: 0;      /* Posisikan di paling bawah */
+  z-index: 10;    /* Pastikan di atas konten yang di-scroll */
+  
+  /* Style yang sudah ada (dengan sedikit penyesuaian) */
+  padding: 0.85rem 1.5rem;
+  border-top: 1px solid var(--line);
+  background-color: var(--panel);
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+}
+
+.dark-theme .detail-pane-footer {
+  background-color: #1e293b; /* Warna lebih gelap agar menonjol di dark mode */
+}
+
+/* 2. Style untuk tombol-tombol di dalam footer */
+.detail-pane-footer .btn {
+  min-width: 100px; /* Lebar minimum untuk setiap tombol */
+}
+
+/* 3. Merapikan form di dalam panel detail (seperti form filter) */
+.detail-pane-body form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; /* Jarak antar form-group */
+}
+.detail-pane-body form .form-group {
+    margin-bottom: 0; /* Hapus margin bawah default */
+}
+
+/* 4. [BARU] Style untuk teks pemberitahuan di form */
+.form-notice {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    text-align: center;
+    color: var(--text-dim);
+    background-color: var(--surface-muted);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+}
+/* =======================================================
+ * [PERBAIKAN FINAL] Reset Total Tata Letak Desktop di Halaman Login
+ * ======================================================= */
+
+ 
+  /* Saat mode login atau pending aktif... */
+  body.guest-mode .content-wrapper,
+  body.pending-mode .content-wrapper {
+    /* Hentikan semua tata letak grid & margin sidebar */
+    display: block !important;
+    grid-template-columns: 1fr !important;
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Jadikan .list-pane sebagai satu-satunya elemen yang aktif dan bertugas menengahkan konten */
+  body.guest-mode .list-pane,
+  body.pending-mode .list-pane {
+    /* KUNCI: Hapus garis pemisah */
+    border-right: none !important;
+
+    /* Jadikan panel ini sebagai flex container untuk menengahkan */
+    display: flex;
+    align-items: center; /* Tengahkan vertikal */
+    justify-content: center; /* Tengahkan horizontal */
+    height: 100vh; /* Tinggi penuh */
+    width: 100%;  /* Lebar penuh */
+  }
+
+  /* Pastikan elemen lain yang tidak perlu benar-benar hilang */
+  body.guest-mode #sidebar-nav,
+  body.pending-mode #sidebar-nav,
+  body.guest-mode .resizer,
+  body.pending-mode .resizer,
+  body.guest-mode .detail-pane,
+  body.pending-mode .detail-pane,
+  body.guest-mode .title-group,
+  body.pending-mode .header-right {
+    display: none !important;
+  }
+
+
+/* [REVISI] Penyesuaian Empty State untuk Detail Pane Desktop */
+.detail-pane {
+  display: flex;
+  flex-direction: column;
+}
+  .detail-pane .empty-state {
+    height: 100%;
+    margin: 0;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    background-color: var(--surface-muted);
+  }
+
+  /* Override mobile absolute/slide styles for desktop layout */
+  .list-pane,
+  .detail-pane {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  body.detail-view-active .list-pane,
+  body.detail-view-active .detail-pane {
+    transform: none !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+/* [PERBAIKAN] Tata Letak untuk Form Upah Pekerja Dinamis */
+
+  /* Atur agar judul dan tombol hapus di legend sejajar */
+  .project-wage-group legend {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  /* Styling untuk tombol hapus proyek dari form */
+  .remove-project-wage-btn {
+    width: 32px;
+    height: 32px;
+  }
+  
+  /* Styling untuk baris input peran dan upah */
+  .role-wage-row {
+    display: grid;
+    grid-template-columns: 1fr 150px auto; /* Kolom nama, upah, dan tombol hapus */
+    gap: 0.75rem;
+    align-items: center;
+  }
+  
+  /* Wadah untuk menambah proyek baru */
+  .add-project-wage-section {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem;
+    align-items: flex-end; /* Sejajarkan tombol dengan bagian bawah dropdown */
+    margin-bottom: 1.5rem;
+  }
+
+  .add-project-wage-section .btn {
+    padding: 0.5rem 1rem; /* Sesuaikan padding tombol */
+    height: 42px; /* Samakan tinggi dengan form input */
+  }
+
+/* Aksi di Header Detail Pane Desktop */
+.detail-pane-header {
+  position: relative;
+}
+.detail-pane-header .header-actions {
+  position: absolute;
+  right: 60px; /* Beri jarak dari tombol close */
+  top: 50%;
+  transform: translateY(-50%);
+}
+/* 2. Di desktop (layar > 600px), SEMBUNYIKAN tombol 'Simpan' di header */
+
+  .detail-pane-header .header-actions button[type="submit"] {
+    display: none;
+  }
+
+  /* Sidebar toggle and collapsed mode */
+  .sidebar-header { position: relative; }
+  /* Keep header visible while list scrolls */
+  .sidebar { display: flex !important; flex-direction: column; }
+  .sidebar-header { flex: 0 0 auto; }
+  .sidebar-nav-list { flex: 1 1 auto; min-height: 0; }
+  .sidebar-toggle {
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 4px;
+  }
+  .sidebar-toggle:hover { background-color: var(--surface-muted); color: var(--text); }
+  .sidebar-toggle .material-symbols-outlined { font-size: 20px; }
+
+  body.sidebar-collapsed .sidebar {
+    width: 72px;
+    padding: 1rem 0.5rem;
+  }
+  body.sidebar-collapsed .content-wrapper {
+    margin-left: 72px;
+    width: calc(100% - 72px);
+  }
+  body.sidebar-collapsed .sidebar .sidebar-app-name,
+  body.sidebar-collapsed .sidebar .nav-text,
+  body.sidebar-collapsed .sidebar .profile-text {
+    display: none !important;
+  }
+  body.sidebar-collapsed .sidebar-header { justify-content: center !important; gap: 0.5rem !important; }
+  body.sidebar-collapsed .sidebar-toggle { margin-left: 0; }
+  body.sidebar-collapsed .sidebar-nav-item { justify-content: center; align-items: center; padding: 0.6rem 0; }
+  body.sidebar-collapsed .sidebar-nav-item .material-symbols-outlined { margin: 0 auto; display: block; }
+  body.sidebar-collapsed .sidebar-nav-item .notification-badge { display: none; }
+
+  /* Show page name on desktop */
+  #page-label .page-name { display: inline !important; }
+  /* Breadcrumb removed */
+
+  /* Hide logo when collapsed */
+  body.sidebar-collapsed .sidebar .sidebar-logo { display: none; }
+
+  /* Header app name toggles with sidebar state */
+  body:not(.sidebar-collapsed) .page-label .app-name { display: none !important; }
+  body.sidebar-collapsed .page-label .app-name { display: inline !important; }
+
+  /* Make sidebar list scrollable; hide scrollbar */
+  .sidebar-nav-list { overflow-y: auto; -ms-overflow-style: none; scrollbar-width: none; }
+  .sidebar-nav-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+  /* Desktop header spacing for page name + breadcrumb */
+  #page-label .title-group { line-height: 1.05; }
+  #page-label .page-name { margin: 0 0 2px 0; font-size: 1.05rem; font-weight: 600; }
+  /* Breadcrumb removed */
+}
+/* 2. Aturan khusus untuk layar besar (Desktop) */
+@media (min-width: 600px) {
+  /* Kembalikan gaya "pop-up" di tengah layar untuk desktop */
+  .modal-bg.is-simple-dialog {
+    align-items: center;
+    padding-bottom: 0;
+  }
+
+  .modal-bg.is-simple-dialog .modal-content {
+    max-width: 380px; /* Sedikit lebih lebar di desktop */
+    width: 90%;
+    border-radius: var(--radius-lg); /* Semua sudut melengkung */
+    
+    /* Animasi fade-in & scale-up untuk desktop */
+    transform: scale(0.95);
+    opacity: 0;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+  }
+
+  .modal-bg.is-simple-dialog.show .modal-content {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  /* Sembunyikan grabber di desktop */
+  .modal-bg.is-simple-dialog .modal-header::before {
+    display: none;
+  }
+
+  /* Kembalikan judul ke tengah di desktop */
+  .modal-bg.is-simple-dialog .modal-header h4 {
+    padding-top: 0;
+    text-align: center;
+  }
+}
+/* 4. Override untuk tampilan desktop agar kembali normal */
+@media (min-width: 600px) {
+  .modal-bg .modal-footer {
+      position: static;
+      display: flex;
+      justify-content: flex-end;
+      box-shadow: none;
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+  .modal-footer .btn {
+     flex-grow: 0;
+     padding: .6rem 1rem;
+  }
+}
+/* On larger screens (desktop), revert to standard footer layout */
+@media (min-width: 600px) {
+  .modal-bg > .modal-content > .modal-footer {
+    position: static; /* Revert to normal flow */
+    display: flex;
+    justify-content: flex-end;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+}
+/* =======================================================
+ * [DESKTOP] Tombol Aksi Langsung pada List Item
+ * ======================================================= */
+
+ @media (min-width: 600px) {
+  .wa-card-v2 {
+    position: relative; /* Diperlukan untuk memposisikan tombol aksi */
+    padding-right: 4rem; /* Beri ruang di kanan untuk tombol */
+  }
+
+  .wa-card-v2 .item-actions {
+    display: flex; /* Tampilkan container tombol */
+    align-items: center;
+    position: absolute; /* Posisikan di atas kartu */
+    top: 50%;
+    right: 1rem;
+    transform: translateY(-50%);
+    background-color: var(--panel); /* Latar belakang agar tidak transparan */
+    opacity: 0; /* Sembunyikan secara default */
+    transition: opacity 0.2s ease;
+  }
+
+  /* Tampilkan tombol saat kursor mouse di atas item */
+  .wa-card-v2-wrapper:hover .item-actions {
+    opacity: 1;
+  }
+
+  .wa-card-v2 .item-actions .btn-icon {
+    border-radius: 50%;
+  }
+  .wa-card-v2 .item-actions .btn-icon:hover {
+    background-color: var(--surface-muted);
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "name": "BanPlex",
+  "short_name": "BanPlex",
+  "description": "Portal Keuangan Proyek untuk manajemen transaksi, absensi, dan laporan secara efisien.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f0f4f8",
+  "theme_color": "#f0f4f8",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icons-logo.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons-logo.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Input Transaksi Baru",
+      "short_name": "Input Baru",
+      "description": "Membuka halaman untuk input data transaksi baru.",
+      "url": "/index.html?page=pengeluaran"
+    },
+    {
+      "name": "Lihat Laporan",
+      "short_name": "Laporan",
+      "description": "Membuka halaman monitoring dan laporan.",
+      "url": "/index.html?page=laporan"
+    },
+    {
+      "name": "Lihat Tagihan",
+      "short_name": "Tagihan",
+      "description": "Melihat daftar tagihan yang belum dibayar.",
+      "url": "/index.html?page=tagihan"
+    }
+  ]
+}

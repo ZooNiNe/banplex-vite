@@ -1,0 +1,86 @@
+      return 0;
+    }
+  }
+
+  function _renderCommentsView(parentId, parentType, prefilledText = '') {
+    const commentsForThisItem = (appState.comments || [])
+        .filter(c => c.parentId === parentId && !c.isDeleted)
+        .sort((a, b) => _getJSDate(a.createdAt) - _getJSDate(b.createdAt));
+
+    let lastUserId = null;
+    const commentsHTML = commentsForThisItem.map(c => {
+        const isCurrentUser = appState.currentUser && appState.currentUser.uid === c.userId;
+        const when = _getJSDate(c.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        const canDelete = !!appState.currentUser && (isCurrentUser || appState.userRole === 'Owner');
+        const safeText = String(c.content || '').replace(/</g, '&lt;');
+        const initials = (c.userName || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        
+        const isConsecutive = lastUserId === c.userId;
+        lastUserId = c.userId;
+        
+        const showAvatar = !isCurrentUser && !isConsecutive;
+        const showUser = !isCurrentUser && !isConsecutive;
+
+        return `
+            <div class="comment-item ${isCurrentUser ? 'is-current-user' : ''}" data-id="${c.id}" data-user-id="${c.userId}">
+                ${showAvatar ? `<div class="comment-avatar">${initials}</div>` : ''}
+                <div class="comment-bubble">
+                    <div class="comment-meta">
+                        ${showUser ? `<span class="comment-user">${c.userName || 'Pengguna'}</span>` : ''}
+                        ${canDelete ? `<button class="btn-icon btn-icon-danger comment-delete" data-action="delete-comment" data-id="${c.id}" title="Hapus"><span class="material-symbols-outlined">delete</span></button>` : ''}
+                    </div>
+                    <div class="comment-text">${safeText}</div>
+                    <div class="comment-date">${when}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const disabled = isViewer();
+    const content = `<div class="comments-view"><div class="comments-view-list" id="comments-list-container">${commentsHTML}</div></div>`;
+    
+    const emojiList = ['😀','😁','😂','🤣','😊','😍','😎','🤔','🙌','👍','🔥','🎉','✨','💯','❤️','🥳','🚀','🎯','💡','😅'];
+    const emojiButtons = emojiList.map(ch => `<button type="button" class="emoji-btn" data-action="insert-emoji" data-char="${ch}">${ch}</button>`).join('');
+    
+    const footer = `
+    <div class="comment-input-row">
+        <div class="comment-input-capsule">
+            <button class="btn-icon" data-action="toggle-emoji-picker" title="Emoji" ${disabled ? 'disabled' : ''}><span class="material-symbols-outlined">mood</span></button>
+            <textarea rows="1" placeholder="Tulis komentar..." ${disabled ? 'disabled' : ''}
+              oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'; const btn=this.closest('.comment-input-row').querySelector('.comment-submit'); if(btn) btn.disabled=(this.value.trim().length===0);"
+              onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); const btn=this.closest('.comment-input-row').querySelector('.comment-submit'); if(btn && !btn.disabled) btn.click(); }">${prefilledText}</textarea>
+        </div>
+        <button class="comment-submit" data-action="post-comment" aria-label="Kirim" data-parent-id="${parentId}" data-parent-type="${parentType}" ${disabled ? 'disabled' : ''} disabled>
+            <span class="material-symbols-outlined">send</span>
+        </button>
+        <div class="emoji-picker">${emojiButtons}</div>
+    </div>
+    `;
+    
+    return { content, footer };
+}
+
+function animateNumber(element, to) {
+      if (!element || to == null || isNaN(Number(to))) return;
+      const currentText = element.textContent || '0';
+      let from = parseFormattedNumber(currentText);
+      if (from === to && !element.dataset.animated) {
+          from = 0;
+      }
+      if (from === to) return;
+      const duration = 600;
+      const startTime = performance.now();
+      element.dataset.animated = '1';
+  
+      function step(now) {
+          const elapsed = now - startTime;
+          if (elapsed >= duration) {
+              element.textContent = fmtIDR(to);
+              return;
+          }
+          const progress = elapsed / duration;
+          const current = Math.round(from + (to - from) * progress);
+          element.textContent = fmtIDR(current);
+          requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
