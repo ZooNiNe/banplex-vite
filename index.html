@@ -63,12 +63,74 @@
     <div id="popup-container"></div>
     <input type="file" id="attachment-uploader" accept="image/*" class="hidden">
     
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-    <script src="https://unpkg.com/dexie@3/dist/dexie.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script> 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js" defer></script>
+    <script src="https://unpkg.com/dexie@3/dist/dexie.js" defer></script>
+    <script defer>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw-workbox.js', { scope: './' }).then(reg => {
+            // ... (logika service worker tetap sama) ...
+            const showUpdateNotice = () => {
+              const card = document.getElementById('update-notification');
+              if (card) card.style.display = 'block';
+              const btn = document.getElementById('reload-app-btn');
+              if (btn) {
+                btn.onclick = () => {
+                  if (reg.waiting) reg.waiting.postMessage({ action: 'skipWaiting' });
+                };
+              }
+            };
+            if (reg.waiting) showUpdateNotice();
+            reg.addEventListener('updatefound', () => {
+              const nw = reg.installing;
+              if (!nw) return;
+              nw.addEventListener('statechange', () => {
+                if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                  showUpdateNotice();
+                }
+              });
+            });
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              window.location.reload();
+            });
+            const poke = () => reg.update && reg.update();
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') poke(); });
+            window.addEventListener('online', poke);
+            setInterval(poke, 5 * 60 * 1000);
+            if ('SyncManager' in window) {
+              navigator.serviceWorker.ready.then(swReg => swReg.sync.register('banplex-sync')).catch(()=>{});
+            }
+            (async () => {
+              try {
+                if (reg.periodicSync) {
+                  const status = await navigator.permissions.query({ name: 'periodic-background-sync' });
+                  if (status.state === 'granted') {
+                    await reg.periodicSync.register('banplex-periodic-sync', { minInterval: 15 * 60 * 1000 });
+                  }
+                }
+              } catch (_) {}
+            })();
+          }).catch(err => console.error('SW register failed', err));
+        });
+      }
+    </script>
 
+    <!-- Notification endpoint configuration -->
+    <script>
+      (function() {
+        const h = location.hostname;
+        if (h === 'localhost' || h === '127.0.0.1') {
+          // Local dev server proxy for /api/notify
+          window.NOTIFY_ENDPOINT = 'http://localhost:3000/api/notify';
+        } else {
+          // Production / hosted API on Vercel
+          window.NOTIFY_ENDPOINT = 'https://ban-plex-develop.vercel.app/api/notify';
+        }
+      })();
+    </script>
     <script type="module" src="script.js" defer></script>
 </body>
 </html>

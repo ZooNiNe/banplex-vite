@@ -234,12 +234,12 @@ function setLastSyncTimestamp() {
 // -----------------------------------------------------------------------------
 
 async function main() {
-    localDB.version(14).stores({
+    localDB.version(15).stores({
         expenses: '&id, projectId, date, type, status, isDeleted, attachmentNeedsSync, syncState, category',
         bills: '&id, expenseId, status, dueDate, type, isDeleted, syncState',
         incomes: '&id, projectId, date, isDeleted, syncState',
         funding_sources: '&id, creditorId, status, isDeleted, syncState',
-        attendance_records: '&id, workerId, date, isPaid, isDeleted, syncState',
+        attendance_records: '&id, [workerId+isDeleted], workerId, date, isPaid, isDeleted, syncState',
         stock_transactions: '&id, materialId, date, type, isDeleted, syncState',
         comments: '&id, parentId, parentType, createdAt, isDeleted, syncState, [parentId+parentType]',
         files: 'id',
@@ -328,7 +328,8 @@ const _terbilang = (n) => {
     if (n < 1000000000) return _terbilang(Math.floor(n / 1000000)) + " juta " + _terbilang(n % 1000000);
     return "";
 };
-  const createMasterDataSelect = (id, label, options, selectedValue = '', masterType = null) => {
+
+function createMasterDataSelect(id, label, options, selectedValue = '', masterType = null) {
     const selectedOption = options.find(opt => opt.value === selectedValue);
     const selectedText = selectedOption ? selectedOption.text : 'Pilih...';
     const finalSelectedValue = selectedOption ? selectedValue : '';
@@ -346,7 +347,6 @@ const _terbilang = (n) => {
                     </button>
                     <div class="custom-select-options">
                         <div class="custom-select-search-wrapper">
-                            <span class="material-symbols-outlined">search</span>
                             <input type="search" class="custom-select-search" placeholder="Cari..." autocomplete="off">
                         </div>
                         <div class="custom-select-options-list">
@@ -361,7 +361,8 @@ const _terbilang = (n) => {
         </div>
     `;
 };
-  const centerTextPlugin = {
+
+const centerTextPlugin = {
       id: 'centerText',
       afterDraw: function(chart) {
           if (chart.config.type !== 'doughnut') return;
@@ -1812,21 +1813,24 @@ function upsertCommentInUI(commentData, changeType) {
             return;
         }
 
+        // --- BLOK PERBAIKAN UTAMA ADA DI SINI ---
         if (existing) {
+            // Jika elemen komentar sudah ada di layar...
             const isSynced = !commentData.syncState || commentData.syncState === 'synced';
             const isMyMessage = commentData.userId === appState.currentUser?.uid;
 
+            // Periksa apakah ini pesan kita yang baru saja berhasil terkirim ke server
             if (isMyMessage && isSynced) {
                 const ticksIcon = existing.querySelector('.ticks .material-symbols-outlined');
+                // Ganti ikon 'mengirim' (schedule) menjadi 'terkirim' (done_all)
                 if (ticksIcon && ticksIcon.textContent !== 'done_all') {
                     ticksIcon.textContent = 'done_all';
                 }
             }
-            // PENTING: Hentikan fungsi di sini untuk mencegah duplikasi.
-            // Kita hanya perlu update status 'sent' ke 'delivered', yang sudah dilakukan di atas.
-            return;
+            return; 
         }
         
+        // Kode di bawah ini hanya akan berjalan jika komentar belum ada di layar
         const currentUid = appState.currentUser?.uid || 'user-guest';
         const ts = _getJSDate(commentData.createdAt).getTime();
         const dir = (commentData.userId === currentUid) ? 'outgoing' : 'incoming';
@@ -1849,11 +1853,10 @@ function upsertCommentInUI(commentData, changeType) {
         }
         newHtmlParts.push(`<article class="msg ${dir} ${isJumbo ? 'is-jumbo-emoji' : ''}" data-id="${commentData.id}"><div class="bubble">`);
         if (dir === 'incoming' && !isGrouped) newHtmlParts.push(`<div class="sender">${commentData.userName || 'Pengguna'}</div>`);
-        if (commentData.content) newHtmlParts.push(`<div class="content">${contentWithMentions}</div>`);
+        if (commentData.content) newHtmlParts.push(`<div class="content selectable-text">${contentWithMentions}</div>`); // Menambahkan kembali kelas selectable-text
         if (commentData.attachments) newHtmlParts.push(_getAttachmentHTML(commentData.attachments));
         newHtmlParts.push(`<div class="meta"><time>${timeStr}</time>`);
         if (dir === 'outgoing') {
-            // [PERBAIKAN KUNCI] Tampilkan ikon 'schedule' (jam) untuk pesan yang belum sinkron
             const syncIcon = commentData.syncState === 'pending_create' ? 'schedule' : 'done_all';
             newHtmlParts.push(`<span class="ticks"><span class="material-symbols-outlined">${syncIcon}</span></span>`);
         }
@@ -1861,19 +1864,17 @@ function upsertCommentInUI(commentData, changeType) {
         
         list.insertAdjacentHTML('beforeend', newHtmlParts.join(''));
         const newItem = list.lastElementChild;
-        // Animasi muncul yang halus
         requestAnimationFrame(() => {
             newItem.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
             newItem.style.opacity = '1';
             newItem.style.transform = 'translateY(0)';
-            try { list.scrollTop = list.scrollHeight; } catch(_) {} // Auto-scroll ke bawah
+            try { list.scrollTop = list.scrollHeight; } catch(_) {}
         });
 
     } catch (e) {
         console.warn('upsertCommentInUI error', e);
     }
 }
-
 function _setLastCommentViewTimestamp(parentId) {
     if (!parentId) return;
     try {
@@ -3702,7 +3703,6 @@ async function _uploadFileToFirebaseStorage(file, folder = 'attachments') {
       }
   }
   
-// GANTI SELURUH FUNGSI INI DI script.js
 function _initSelectionMode(containerSelector, pageContext) {
     const container = $(containerSelector);
     if (!container) return;
@@ -3719,7 +3719,7 @@ function _initSelectionMode(containerSelector, pageContext) {
 
     const handlePointerDown = (e) => {
         const cardWrapper = e.target.closest('.wa-card-v2-wrapper');
-        // Abaikan jika bukan di kartu atau jika tombol aksi yang ditekan
+        // Abaikan jika bukan di kartu atau jika tombol aksi/centang yang ditekan
         if (!cardWrapper || e.target.closest('.item-actions, .swipe-actions, .selection-checkmark')) {
             return;
         }
@@ -3729,8 +3729,10 @@ function _initSelectionMode(containerSelector, pageContext) {
         startY = e.pageY;
 
         const handlePointerMove = (moveEvent) => {
+            // Jika jari bergerak lebih dari 10px, ini dianggap swipe/drag
             if (Math.abs(moveEvent.pageX - startX) > 10 || Math.abs(moveEvent.pageY - startY) > 10) {
                 hasMoved = true;
+                // [KUNCI 1] Batalkan timer jika jari bergerak, mencegah swipe jadi seleksi.
                 if (pressTimer) clearTimeout(pressTimer);
             }
         };
@@ -3739,30 +3741,32 @@ function _initSelectionMode(containerSelector, pageContext) {
             // Bersihkan semua listener sementara
             document.removeEventListener('pointermove', handlePointerMove);
             document.removeEventListener('pointerup', handlePointerUp);
+            // [KUNCI 2] Batalkan timer jika jari sudah diangkat (ini adalah tap).
             if (pressTimer) clearTimeout(pressTimer);
 
-            // Jika tidak ada pergerakan (ini adalah tap atau press)
+            // Aksi hanya jika jari tidak bergerak (ini adalah tap atau long-press)
             if (!hasMoved) {
-                // *** INI PERBAIKAN UTAMANYA ***
                 // Jika mode seleksi sudah aktif, tap biasa akan toggle item
                 if (appState.selectionMode.active) {
-                    e.preventDefault(); // Mencegah aksi lain seperti navigasi
+                    e.preventDefault(); // Mencegah aksi klik lain (seperti membuka modal)
                     _toggleCardSelection(cardWrapper);
                 }
+                // Jika mode seleksi TIDAK aktif, JANGAN LAKUKAN APA-APA.
+                // Biarkan event 'click' standar yang menangani pembukaan modal/detail.
             }
         };
 
         document.addEventListener('pointermove', handlePointerMove);
         document.addEventListener('pointerup', handlePointerUp, { once: true });
 
-        // Jika mode seleksi BELUM aktif, atur timer untuk long-press
+        // Atur timer untuk long-press HANYA jika mode seleksi belum aktif
         if (!appState.selectionMode.active) {
             pressTimer = setTimeout(() => {
-                // Jika pointer tidak bergerak, aktifkan mode seleksi
+                // Jika jari tidak bergerak setelah 500ms, aktifkan mode seleksi
                 if (!hasMoved) {
                     _activateSelectionMode(pageContext, cardWrapper);
                 }
-            }, 500); // Durasi long-press 500ms
+            }, 500); // Durasi long-press 500 milidetik
         }
     };
     
@@ -4484,11 +4488,17 @@ async function handleOpenConflictsPanel() {
   //          SEKSI 2.5: FUNGSI MODAL & AUTENTIKASI
   // =======================================================
 
-const simpleModalTypes = ['confirmDelete', 'confirmPayment', 'confirmEdit', 'confirmPayBill', 'confirmGenerateBill', 'confirmUserAction', 'confirmDeleteAttachment', 'confirmDeleteRecap', 'login', 'confirmLogout', 'uploadSource', 'confirmExpense'];
-const bottomSheetTypes = ['actionsPopup'];
+  function createModal(type, data = {}) {
+    // PERBAIKAN BUG 2 (BAGIAN 1): Sembunyikan FAB setiap kali modal dibuka.
+    const fabContainer = $('#fab-container');
+    if (fabContainer) {
+        fabContainer.innerHTML = '';
+    }
 
-function createModal(type, data = {}) {
-    const detailPageTypes = [ 'dataDetail', 'payment', 'manageMaster', 'editMaster', 'editItem', 'editAttendance', 'manageUsers', 'invoiceItemsDetail', 'billActionsModal', 'reportGenerator' ];
+    // PERBAIKAN BUG 1: Pindahkan 'reportGenerator' dari detailPageTypes ke bottomSheetTypes
+    const detailPageTypes = [ 'dataDetail', 'payment', 'manageMaster', 'editMaster', 'editItem', 'editAttendance', 'manageUsers', 'invoiceItemsDetail', 'billActionsModal' ];
+    const simpleModalTypes = ['confirmDelete', 'confirmPayment', 'confirmEdit', 'confirmPayBill', 'confirmGenerateBill', 'confirmUserAction', 'confirmDeleteAttachment', 'confirmDeleteRecap', 'login', 'confirmLogout', 'uploadSource', 'confirmExpense'];
+    const bottomSheetTypes = ['actionsPopup', 'reportGenerator']; // <-- 'reportGenerator' dipindahkan ke sini
 
     if (detailPageTypes.includes(type)) {
         const modalHTML = getModalContent(type, data);
@@ -4564,14 +4574,19 @@ function _closeModalImmediate(modalEl) {
         modalEl.remove();
         if (document.querySelectorAll('.modal-bg.show').length === 0) {
             document.body.classList.remove('modal-open');
+            // PERBAIKAN BUG 2 (BAGIAN 2): Kembalikan FAB saat modal terakhir ditutup.
+            _restorePageFab();
         }
     }, 300);
 }
-
 function showMobileDetailPage({ title, subtitle, content, footer, headerActions, fabHTML }, isGoingBack = false) {
     const detailPane = $('.detail-pane');
     if (!detailPane) return;
-    
+    if (!isGoingBack) {
+        try {
+            history.pushState({ detailView: true, page: appState.activePage }, '');
+        } catch (_) {}
+    }
     if (!isGoingBack && document.body.classList.contains('detail-view-active')) {
         const currentFabHTML = detailPane.querySelector('.fab')?.outerHTML || '';
         const previousState = {
@@ -4626,6 +4641,7 @@ function showMobileDetailPage({ title, subtitle, content, footer, headerActions,
 
 function hideMobileDetailPage() {
     document.body.classList.remove('detail-view-active');
+    document.body.classList.remove('comments-view-active'); // <-- BARIS KUNCI PERBAIKAN
     appState.detailPaneHistory = []; // Also clear history on full close
     _restorePageFab(); // Restore the main FAB
 }
@@ -6623,150 +6639,101 @@ function _createDetailContentHTML(item, type) {
 
 function _initCustomSelects(context = document) {
     const closeAllSelects = () => {
-        document.querySelectorAll('.custom-select-wrapper.active').forEach(wrapper => {
-            wrapper.classList.remove('active');
-        });
-        document.querySelectorAll('.cloned-select-options').forEach(clone => {
-            clone.remove();
-        });
+        document.querySelectorAll('.cloned-select-options').forEach(clone => clone.remove());
     };
 
+    // Listener global untuk menutup dropdown saat klik di luar
     document.removeEventListener('mousedown', closeAllSelects);
     document.addEventListener('mousedown', closeAllSelects);
 
-    context.querySelectorAll('.custom-select-wrapper').forEach(wrapper => {
+    context.querySelectorAll('.custom-select-wrapper:not([data-custom-select-init])').forEach(wrapper => {
+        wrapper.dataset.customSelectInit = 'true';
         const trigger = wrapper.querySelector('.custom-select-trigger');
         const hiddenInput = wrapper.querySelector('input[type="hidden"]');
         const triggerSpan = trigger.querySelector('span:first-child');
-
-        if (!trigger || wrapper.dataset.customSelectInit) return; // Cegah inisialisasi ganda
-        wrapper.dataset.customSelectInit = 'true';
 
         wrapper.addEventListener('mousedown', e => e.stopPropagation());
 
         trigger.addEventListener('click', (e) => {
             e.stopPropagation();
-            const isActive = wrapper.classList.contains('active');
-            
-            closeAllSelects();
+            closeAllSelects(); // Selalu tutup semua dropdown lain sebelum membuka yang baru
 
-            if (isActive) return;
-            
-            
-            wrapper.classList.add('active'); // Tandai wrapper asli sebagai aktif
             const optionsContainer = wrapper.querySelector('.custom-select-options');
             if (!optionsContainer) return;
-
-            const rect = trigger.getBoundingClientRect();
+            
+            // 1. Kloning Pilihan & Tambahkan ke Body
             const clone = optionsContainer.cloneNode(true);
-
-            clone.id = `cloned-options-${Date.now()}`;
             clone.classList.add('cloned-select-options');
             clone.addEventListener('mousedown', e => e.stopPropagation());
-            
-            document.body.appendChild(clone);
-            
-            clone.style.position = 'fixed';
-            // Position horizontally within viewport
-            let left = rect.left;
-            const vw = window.innerWidth;
-            const width = rect.width;
-            if (left + width + 4 > vw) left = Math.max(8, vw - width - 8);
-            clone.style.left = `${left}px`;
-            clone.style.width = `${width}px`;
-            
-            const viewportHeight = window.innerHeight;
-            const margin = 10; // ruang aman
+            (trigger.closest('.modal-bg') || document.body).appendChild(clone);
+
             const optionsListEl = clone.querySelector('.custom-select-options-list');
-            const searchWrapEl = clone.querySelector('.custom-select-search-wrapper');
-            // Reset heights to measure natural content
-            if (optionsListEl) {
-                optionsListEl.style.maxHeight = 'none';
-                optionsListEl.style.height = 'auto';
-            }
-            clone.style.maxHeight = 'none';
-            // Natural content height
-            const searchH = searchWrapEl ? searchWrapEl.offsetHeight : 0;
-            const naturalListH = optionsListEl ? optionsListEl.scrollHeight : 0;
-            let naturalTotal = searchH + naturalListH;
-            // Cap to 250px overall by default
-            const cap = 250;
-            naturalTotal = Math.min(naturalTotal || 0, cap);
-            // Available spaces
-            const availableBelow = viewportHeight - rect.bottom - margin;
-            const availableAbove = rect.top - margin;
-            // Decide placement and final height
-            let finalHeight, placeAbove = false;
-            if (availableBelow >= naturalTotal) {
-                finalHeight = naturalTotal;
-            } else if (availableAbove >= naturalTotal) {
-                finalHeight = naturalTotal; placeAbove = true;
-            } else if (availableBelow >= availableAbove) {
-                finalHeight = Math.max(availableBelow, Math.min(availableBelow, cap));
-            } else {
-                finalHeight = Math.max(availableAbove, Math.min(availableAbove, cap)); placeAbove = true;
-            }
-            // Apply size and position
-            clone.style.maxHeight = `${finalHeight}px`;
-            if (optionsListEl) {
-                const listMax = Math.max(0, finalHeight - searchH);
-                optionsListEl.style.maxHeight = `${listMax}px`;
-                optionsListEl.style.height = 'auto';
-            }
-            if (placeAbove) {
-                clone.style.bottom = `${viewportHeight - rect.top + 4}px`;
-                clone.style.top = 'auto';
-            } else {
-                clone.style.top = `${rect.bottom + 4}px`;
-                clone.style.bottom = 'auto';
-            }
-            
-            clone.addEventListener('click', (cloneEvent) => {
-                const option = cloneEvent.target.closest('.custom-select-option');
+            const searchInputClone = clone.querySelector('.custom-select-search');
+            const allOptionNodes = Array.from(clone.querySelectorAll('.custom-select-option'));
+
+            // 2. Logika untuk Menyesuaikan Posisi & Ukuran
+            const adjustPosition = () => {
+                const triggerRect = trigger.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const margin = 10;
+                const searchH = searchInputClone ? searchInputClone.parentElement.offsetHeight : 0;
+                const itemHeight = allOptionNodes.length > 0 ? allOptionNodes[0].offsetHeight : 40;
+                
+                // Tinggi ideal adalah 5.5 item atau tinggi konten, mana yang lebih kecil
+                const idealHeight = searchH + (itemHeight * 5.5) + 10; // 10 untuk padding
+
+                const availableBelow = viewportHeight - triggerRect.bottom - margin;
+                const availableAbove = triggerRect.top - margin;
+
+                let finalHeight = idealHeight;
+                let placeAbove = false;
+
+                if (availableBelow < idealHeight && availableAbove > availableBelow) {
+                    finalHeight = Math.min(idealHeight, availableAbove);
+                    placeAbove = true;
+                } else {
+                    finalHeight = Math.min(idealHeight, availableBelow);
+                }
+
+                clone.style.width = `${triggerRect.width}px`;
+                clone.style.left = `${triggerRect.left}px`;
+                if (placeAbove) {
+                    clone.style.bottom = `${viewportHeight - triggerRect.top}px`;
+                    clone.style.top = 'auto';
+                } else {
+                    clone.style.top = `${triggerRect.bottom}px`;
+                    clone.style.bottom = 'auto';
+                }
+                clone.style.maxHeight = `${finalHeight}px`;
+                optionsListEl.style.maxHeight = `${finalHeight - searchH}px`;
+            };
+
+            adjustPosition();
+            if (searchInputClone) searchInputClone.focus();
+
+            // 3. Event Listeners untuk Interaksi
+            clone.addEventListener('click', e => {
+                const option = e.target.closest('.custom-select-option');
                 if (option) {
-                    if (hiddenInput && triggerSpan) {
-                        hiddenInput.value = option.dataset.value;
-                        triggerSpan.textContent = option.textContent.trim();
-                        hiddenInput.dispatchEvent(new Event('change', { bubbles: true })); 
-                    }
+                    hiddenInput.value = option.dataset.value;
+                    triggerSpan.textContent = option.textContent.trim();
+                    hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
                     closeAllSelects();
                 }
             });
-            
-            const searchInputClone = clone.querySelector('.custom-select-search');
+
             if (searchInputClone) {
-                searchInputClone.focus();
-                const adjustSize = () => {
-                    // Recalculate height based on visible options
-                    if (!optionsListEl) return;
-                    // Temporarily let it autosize to compute natural
-                    optionsListEl.style.maxHeight = 'none';
-                    optionsListEl.style.height = 'auto';
-                    const visibleOptions = Array.from(clone.querySelectorAll('.custom-select-option')).filter(opt => opt.style.display !== 'none');
-                    // Measure by scrollHeight for simplicity
-                    const newNaturalListH = optionsListEl.scrollHeight;
-                    let newNaturalTotal = (searchWrapEl ? searchWrapEl.offsetHeight : 0) + newNaturalListH;
-                    newNaturalTotal = Math.min(newNaturalTotal, cap);
-                    const spaceBelow = viewportHeight - rect.bottom - margin;
-                    const spaceAbove = rect.top - margin;
-                    let newFinal = newNaturalTotal;
-                    if (!placeAbove && newFinal > spaceBelow) newFinal = spaceBelow;
-                    if (placeAbove && newFinal > spaceAbove) newFinal = spaceAbove;
-                    newFinal = Math.max(60, newFinal); // minimum sensible height
-                    clone.style.maxHeight = `${newFinal}px`;
-                    const listMax2 = Math.max(0, newFinal - (searchWrapEl ? searchWrapEl.offsetHeight : 0));
-                    optionsListEl.style.maxHeight = `${listMax2}px`;
-                    optionsListEl.style.height = 'auto';
-                };
                 searchInputClone.addEventListener('input', () => {
                     const searchTerm = searchInputClone.value.toLowerCase();
-                    clone.querySelectorAll('.custom-select-option').forEach(option => {
-                        option.style.display = option.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
+                    const fragment = document.createDocumentFragment();
+                    allOptionNodes.forEach(node => {
+                        if (node.textContent.toLowerCase().includes(searchTerm)) {
+                            fragment.appendChild(node);
+                        }
                     });
-                    adjustSize();
+                    optionsListEl.innerHTML = '';
+                    optionsListEl.appendChild(fragment);
                 });
-                // Initial size adjust
-                adjustSize();
             }
         });
     });
@@ -7146,43 +7113,36 @@ function _getFormFakturMaterialHTML(itemData = null) {
     const selectedSupplierId = isEdit ? itemData.supplierId : '';
     const formType = isEdit ? (itemData.formType || 'faktur') : 'faktur';
 
-    // Opsi untuk dropdown
     const supplierOptions = appState.suppliers.filter(s => s.category === 'Material').map(s => ({ value: s.id, text: s.supplierName }));
     const projectOptions = appState.projects.map(p => ({ value: p.id, text: p.projectName }));
     const materialOptions = (appState.materials || []).map(m => ({ value: m.id, text: m.materialName }));
-
-    // Membuat baris item faktur (penting untuk mode edit)
     const itemsHTML = isEdit ? (itemData.items || []).map((item, index) => {
         const material = appState.materials.find(m => m.id === item.materialId);
-        const unit = material?.unit || '';
         const priceNum = item.price || 0;
         const qtyNum = item.qty || 0;
-        const totalNum = priceNum * qtyNum;
 
-        const materialDropdownHTML = createMasterDataSelect(`materialId_${index}`, '', materialOptions, item.materialId)
-            .replace('<div class="form-group">', '<div class="item-name-wrapper">').replace('<label>', '');
+        const materialDropdownHTML = createMasterDataSelect(`materialId_${index}`, '', materialOptions, item.materialId, null) // <-- Ubah 'materials' menjadi null di sini
+            .replace('<div class="form-group">', '').replace('</div>', '');
 
-        if (formType === 'surat_jalan') {
-            return `
-                <div class="invoice-item-row" data-index="${index}">
-                    ${materialDropdownHTML}
-                    <input type="text" inputmode="decimal" pattern="[0-9]+([\\.,][0-9]+)?" name="itemQty" placeholder="Qty" class="item-qty" value="${qtyNum || '1'}" required>
-                    <span class="item-unit" style="margin-left: 0.25rem; min-width: 30px;">${unit}</span>
+        return `
+            <div class="multi-item-row" data-index="${index}">
+                <div class="multi-item-main-line">
+                    <div class="item-name-wrapper" style="flex-grow:1;">${materialDropdownHTML}</div>
                     <button type="button" class="btn-icon btn-icon-danger remove-item-btn"><span class="material-symbols-outlined">delete</span></button>
-                </div>`;
-        } else { // Mode faktur
-            return `
-                <div class="invoice-item-row" data-index="${index}">
-                    ${materialDropdownHTML}
-                    <input type="text" inputmode="numeric" name="itemPrice" placeholder="Harga" class="item-price" value="${priceNum ? new Intl.NumberFormat('id-ID').format(priceNum) : ''}" required>
-                    <input type="text" inputmode="decimal" pattern="[0-9]+([\\.,][0-9]+)?" name="itemQty" placeholder="Qty" class="item-qty" value="${qtyNum || '1'}" required>
-                    <span class="item-total">${fmtIDR(totalNum)}</span>
-                    <button type="button" class="btn-icon btn-icon-danger remove-item-btn"><span class="material-symbols-outlined">delete</span></button>
-                </div>`;
-        }
+                </div>
+                <div class="multi-item-details-line ${formType === 'surat_jalan' ? 'hidden' : ''}">
+                    <div class="form-group">
+                        <label>Qty</label>
+                        <input type="text" inputmode="decimal" pattern="[0-9]+([\\.,][0-9]+)?" name="itemQty" placeholder="Qty" class="item-qty" value="${qtyNum || '1'}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Harga Satuan</label>
+                        <input type="text" inputmode="numeric" name="itemPrice" placeholder="Harga" class="item-price" value="${priceNum ? new Intl.NumberFormat('id-ID').format(priceNum) : ''}" required>
+                    </div>
+                </div>
+            </div>
+        `;
     }).join('') : '';
-
-    // Tampilkan toggle hanya di mode tambah
     const formTypeToggleHTML = !isEdit ? `
         <div class="form-group full-width">
             <label>Jenis Input</label>
@@ -7290,23 +7250,13 @@ function _attachPengeluaranFormListeners(type, context = document) {
 
     if (type === 'material') {
         _initAutocomplete(form);
-
-        const addBtn = form.querySelector('#add-invoice-item-btn');
-        if(addBtn) {
-            addBtn.addEventListener('click', () => {
+        form.addEventListener('click', (e) => {
+            const btn = e.target.closest('#add-invoice-item-btn');
+            if (btn) {
                 _addInvoiceItemRow(form);
-                _initAutocomplete(form); 
-            });
-            // Fallback: delegate click to ensure it works in edit modal too
-            form.addEventListener('click', (e) => {
-                const btn = e.target.closest('#add-invoice-item-btn');
-                if (btn) {
-                    _addInvoiceItemRow(form);
-                    _initAutocomplete(form);
-                }
-            });
-        }
-        
+                _initAutocomplete(form); // Pastikan autocomplete diinisialisasi untuk baris baru
+            }
+        });        
         const itemsContainer = form.querySelector('#invoice-items-container');
         if (itemsContainer) {
             itemsContainer.addEventListener('input', (e) => _handleInvoiceItemChange(e, form));
@@ -7546,113 +7496,91 @@ async function handleAddPengeluaran(e, type) {
     }
 }
 
+// GANTI SELURUH FUNGSI LAMA DENGAN VERSI FINAL INI
 function _addInvoiceItemRow(context = document) {
     const container = $('#invoice-items-container', context);
     if (!container) return;
     const index = container.children.length;
     const mode = context?.querySelector?.('input[name="formType"]')?.value || 'faktur';
 
-    // Siapkan opsi untuk dropdown material
     const materialOptions = (appState.materials || []).map(m => ({ value: m.id, text: m.materialName }));
 
-    // Buat HTML untuk dropdown material
+    // [KUNCI PERBAIKAN] Panggil createMasterDataSelect dengan masterType = null
     const materialDropdownHTML = createMasterDataSelect(
-        `materialId_${index}`, // ID unik untuk setiap baris
-        '', // Label dikosongkan karena sudah ada di header kolom
-        materialOptions,
-        '',
-    ).replace('<div class="form-group">', '<div class="item-name-wrapper">') // Ganti class wrapper
-     .replace('<label>', ''); // Sembunyikan label
+        `materialId_${index}`, '', materialOptions, '', null // <-- Ubah 'materials' menjadi null di sini
+    ).replace('<div class="form-group">', '').replace('</div>', '');
 
-    let itemHTML = '';
-    if (mode === 'surat_jalan') {
-        itemHTML = `
-        <div class="invoice-item-row" data-index="${index}">
-            ${materialDropdownHTML}
-            <input type="text" inputmode="decimal" pattern="[0-9]+([\\.,][0-9]+)?" name="itemQty" placeholder="Qty" class="item-qty" value="1" required>
-            <span class="item-unit" style="margin-left: 0.25rem; min-width: 30px;"></span>
+    let itemHTML = `
+    <div class="multi-item-row" data-index="${index}">
+        <div class="multi-item-main-line">
+            <div class="item-name-wrapper" style="flex-grow:1;">${materialDropdownHTML}</div>
             <button type="button" class="btn-icon btn-icon-danger remove-item-btn"><span class="material-symbols-outlined">delete</span></button>
-        </div>`;
-    } else { // Mode faktur
-        itemHTML = `
-        <div class="invoice-item-row" data-index="${index}">
-            ${materialDropdownHTML}
-            <input type="text" inputmode="numeric" name="itemPrice" placeholder="Harga" class="item-price" required>
-            <input type="text" inputmode="decimal" pattern="[0-9]+([\\.,][0-9]+)?" name="itemQty" placeholder="Qty" class="item-qty" value="1" required>
-            <span class="item-total">Rp 0</span>
-            <button type="button" class="btn-icon btn-icon-danger remove-item-btn"><span class="material-symbols-outlined">delete</span></button>
-        </div>`;
-    }
+        </div>
+        <div class="multi-item-details-line ${mode === 'surat_jalan' ? 'hidden' : ''}">
+            <div class="form-group">
+                <label>Qty</label>
+                <input type="text" inputmode="decimal" pattern="[0-9]+([\\.,][0-9]+)?" name="itemQty" placeholder="Qty" class="item-qty" value="1" required>
+            </div>
+            <div class="form-group">
+                <label>Harga Satuan</label>
+                <input type="text" inputmode="numeric" name="itemPrice" placeholder="Harga" class="item-price" required>
+            </div>
+        </div>
+    </div>`;
 
     container.insertAdjacentHTML('beforeend', itemHTML);
     const newRow = container.lastElementChild;
     
-    // Inisialisasi dropdown kustom yang baru dibuat di baris ini
     _initCustomSelects(newRow); 
     
-    // Pasang event listener untuk update satuan saat material dipilih
-    const materialIdInput = newRow.querySelector('input[type="hidden"]');
-    materialIdInput.addEventListener('change', () => {
-        const selectedMaterial = appState.materials.find(m => m.id === materialIdInput.value);
-        const unitSpan = newRow.querySelector('.item-unit');
-        if(unitSpan) {
-            unitSpan.textContent = selectedMaterial?.unit || '';
-        }
+    newRow.classList.add('new-item');
+    newRow.querySelector('.remove-item-btn')?.addEventListener('click', () => {
+        newRow.style.transition = 'opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease';
+        newRow.style.opacity = '0';
+        setTimeout(() => {
+            newRow.remove();
+            _updateInvoiceTotal(context);
+        }, 300);
     });
 
-    newRow.classList.add('new-item');
-    const removeBtn = newRow.querySelector('.remove-item-btn');
-    if (removeBtn) {
-        removeBtn.addEventListener('click', () => {
-            newRow.style.transition = 'opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease';
-            newRow.style.opacity = '0';
-            setTimeout(() => {
-                newRow.remove();
-                _updateInvoiceTotal(context);
-            }, 300);
-        });
-    }
+    newRow.querySelectorAll('input[inputmode="numeric"]').forEach(input => {
+        input.addEventListener('input', _formatNumberInput);
+    });
+}
 
-    if (mode === 'faktur') {
-        newRow.querySelectorAll('input[inputmode="numeric"]').forEach(input => {
-            input.addEventListener('input', _formatNumberInput);
-        });
-    }
-}  
-  
-  function _handleInvoiceItemChange(e, context = document) {
-      if (!e.target.matches('.item-price, .item-qty')) return;
-      const row = e.target.closest('.invoice-item-row');
-      const priceEl = row.querySelector('.item-price');
-      const qty = parseLocaleNumber(row.querySelector('.item-qty').value);
-      const totalEl = row.querySelector('.item-total');
-      if (priceEl && totalEl) {
-          const price = parseFormattedNumber(priceEl.value);
-          totalEl.textContent = fmtIDR(price * qty);
-          _updateInvoiceTotal(context);
-      }
-  }
-  
-  function _updateInvoiceTotal(context = document) {
-      let totalAmount = 0;
-      const rows = $$('.invoice-item-row', context);
-      const hasPrice = !!context.querySelector('.item-price');
-      if (hasPrice) {
-          rows.forEach(row => {
-              const priceEl = row.querySelector('.item-price');
-              const qtyEl = row.querySelector('.item-qty');
-              if (!priceEl || !qtyEl) return;
-              const price = parseFormattedNumber(priceEl.value);
-              const qty = parseLocaleNumber(qtyEl.value);
-              totalAmount += price * qty;
-          });
-      } else {
-          totalAmount = 0;
-      }
-      const totalEl = $('#invoice-total-amount', context);
-      if (totalEl) totalEl.textContent = fmtIDR(totalAmount);
-  }
-  
+function _handleInvoiceItemChange(e, context = document) {
+    const row = e.target.closest('.multi-item-row');
+    if (!row) return;
+
+    const priceEl = row.querySelector('.item-price');
+    const qtyEl = row.querySelector('.item-qty');
+
+    if (priceEl && qtyEl) {
+        const price = parseFormattedNumber(priceEl.value);
+        const qty = parseLocaleNumber(qtyEl.value);
+        }
+    
+    _updateInvoiceTotal(context);
+}
+
+function _updateInvoiceTotal(context = document) {
+    let totalAmount = 0;
+    const rows = $$('.multi-item-row', context);
+    
+    rows.forEach(row => {
+        const priceEl = row.querySelector('.item-price');
+        const qtyEl = row.querySelector('.item-qty');
+        if (!priceEl || !qtyEl) return;
+
+        const price = parseFormattedNumber(priceEl.value);
+        const qty = parseLocaleNumber(qtyEl.value);
+        totalAmount += price * qty;
+    });
+
+    const totalEl = $('#invoice-total-amount', context);
+    if (totalEl) totalEl.textContent = fmtIDR(totalAmount);
+}
+
   function _generateInvoiceNumber() {
       const date = new Date();
       const year = date.getFullYear();
@@ -10663,33 +10591,8 @@ function closeDetailPane() {
 }
 
 function handleDetailPaneBack() {
-    try { document.body.classList.remove('comments-view-active'); } catch(_) {} // <-- ADD THIS LINE
-
-    const isMobile = window.matchMedia('(max-width: 599px)').matches;
-
-    if (appState.detailPaneHistory.length > 0) {
-        const previousState = appState.detailPaneHistory.pop();
-        
-        if (isMobile) {
-            showMobileDetailPage(previousState, true);
-        } else {
-            showDetailPane(previousState, true);
-            const activePane = document.getElementById('detail-pane');
-            if (activePane) {
-                _initCustomSelects(activePane);
-                activePane.querySelectorAll('input[inputmode="numeric"]').forEach(i => i.addEventListener('input', _formatNumberInput));
-                if (activePane.querySelector('[data-type="staff"]')) _attachStaffFormListeners(activePane);
-            }
-        }
-    } else {
-        if (isMobile) {
-            hideMobileDetailPage();
-        } else {
-            closeDetailPane();
-        }
-    }
+    history.back();
 }
-
 function initResizer() {
     const resizer = document.getElementById('resizer');
     if (!resizer) return;
@@ -10861,7 +10764,11 @@ function _createAttachmentManagerHTML(expenseData, localPreviewUrl = null, conte
     const isEditMode = context === 'edit';
 
     const createItemHTML = (url, field, title) => {
-        if (expenseData.attachmentStatus === 'uploading') {
+        if (!url && !localPreviewUrl && !isEditMode) {
+            return '';
+        }
+
+        if (expenseData.attachmentStatus === 'uploading' && field === 'attachmentUrl') {
             return `
             <div class="attachment-manager-item placeholder">
                 <div class="placeholder-icon"><div class="spinner"></div></div>
@@ -10869,11 +10776,11 @@ function _createAttachmentManagerHTML(expenseData, localPreviewUrl = null, conte
                 <span>Sedang mengunggah...</span>
             </div>`;
         }
-
-        if (localPreviewUrl && (field === 'attachmentUrl' || (expenseData.type === 'material' && field === 'invoiceUrl'))) {
-            return `
+        
+        if (localPreviewUrl && expenseData.localAttachmentId && (field === 'attachmentUrl' || (expenseData.type === 'material' && field === 'invoiceUrl'))) {
+             return `
             <div class="attachment-manager-item">
-                <img src="${localPreviewUrl}" alt="${title} (Lokal)" class="attachment-preview-thumb is-local-preview">
+                <img src="${localPreviewUrl}" alt="${title} (Lokal)" class="attachment-preview-thumb is-local-preview" data-action="view-attachment" data-src="${localPreviewUrl}">
                 <strong>${title}</strong>
                 <div class="attachment-manager-overlay">
                     <span class="material-symbols-outlined">cloud_upload</span>
@@ -10882,31 +10789,21 @@ function _createAttachmentManagerHTML(expenseData, localPreviewUrl = null, conte
             </div>`;
         }
 
-        if (expenseData.attachmentStatus === 'failed') {
-            return `
-            <div class="attachment-manager-item placeholder">
-                <div class="placeholder-icon"><span class="material-symbols-outlined" style="color:var(--danger);">error</span></div>
-                <strong>${title}</strong>
-                <span>Gagal diunggah</span>
-                <button type="button" class="btn btn-sm btn-secondary" data-action="retry-upload" data-id="${expenseData.id}">Coba Lagi</button>
-            </div>`;
-        }
-
         const hasFile = url && url.startsWith('http');
 
         if (hasFile) {
             return `
             <div class="attachment-manager-item">
-                <img src="${url}" alt="${title}" class="attachment-preview-thumb">
+                <img src="${url}" alt="${title}" class="attachment-preview-thumb" data-action="view-attachment" data-src="${url}">
                 <strong>${title}</strong>
                 <div class="attachment-manager-actions">
-                    <button type="button" class="btn btn-sm btn-secondary" data-action="view-attachment" data-src="${url}">Lihat</button>
-                    <button type="button" class="btn-icon" data-action="download-attachment" data-url="${url}" data-filename="${title.replace(/\s+/g,'_')}.jpg" title="Unduh"><span class="material-symbols-outlined">download</span></button>
-
                     ${isEditMode && !isViewer() ? `
-                        <button type="button" class="btn btn-sm" data-action="upload-attachment" data-id="${expenseData.id}" data-field="${field}">Ganti</button>
+                        <button type="button" class="btn btn-sm btn-secondary" data-action="upload-attachment" data-id="${expenseData.id}" data-field="${field}">Ganti</button>
                         <button type="button" class="btn-icon btn-icon-danger" data-action="delete-attachment" data-id="${expenseData.id}" data-field="${field}" title="Hapus"><span class="material-symbols-outlined">delete</span></button>
-                    ` : ''}
+                    ` : `
+                        <button type="button" class="btn btn-sm btn-secondary" data-action="view-attachment" data-src="${url}">Lihat</button>
+                        <button type="button" class="btn-icon" data-action="download-attachment" data-url="${url}" data-filename="${title.replace(/\s+/g,'_')}.jpg" title="Unduh"><span class="material-symbols-outlined">download</span></button>
+                    `}
                 </div>
             </div>`;
         } else if (isEditMode && !isViewer()) {
@@ -10920,20 +10817,21 @@ function _createAttachmentManagerHTML(expenseData, localPreviewUrl = null, conte
         }
         return '';
     };
+
     let managerHTML = '';
-    if (expenseData.type === 'material') {
-        managerHTML = createItemHTML(expenseData.invoiceUrl, 'invoiceUrl', 'Bukti Faktur') + createItemHTML(expenseData.deliveryOrderUrl, 'deliveryOrderUrl', 'Surat Jalan');
-    } else {
-        managerHTML = createItemHTML(expenseData.attachmentUrl, 'attachmentUrl', 'Lampiran');
-    }
+    managerHTML += createItemHTML(expenseData.attachmentUrl, 'attachmentUrl', 'Lampiran Utama');
+    managerHTML += createItemHTML(expenseData.invoiceUrl, 'invoiceUrl', 'Bukti Faktur');
+    managerHTML += createItemHTML(expenseData.deliveryOrderUrl, 'deliveryOrderUrl', 'Surat Jalan');
 
     if (managerHTML) {
         return `
             <h5 class="detail-section-title">Lampiran</h5>
             <div class="attachment-manager-container">${managerHTML}</div>`;
     }
-    return '';
+
+    return ''; // Kembalikan string kosong jika tidak ada lampiran sama sekali
 }
+
 function _createSalaryBillDetailContentHTML(bill, payments) {
     // --- 1. Data Preparation (Sama seperti di Bill Detail) ---
     const totalAmount = bill.amount || 0;
@@ -11125,12 +11023,18 @@ async function _createBillDetailContentHTML(bill, expenseData, payments) {
         if (!dueDt) return '-';
         const dueStr = dueDt.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
         const dayDiff = Math.ceil((dueDt - now) / (1000 * 60 * 60 * 24));
+        
+        // Kelas CSS baru untuk teks detail yang lebih kecil
+        const smallerTextClass = "due-date-detail-text";
+
         if (bill?.status === 'paid') return dueStr;
-        if (dayDiff < 0) return `${dueStr} (Lewat ${Math.abs(dayDiff)} hari)`;
+        if (dayDiff < 0) return `${dueStr} <span class="${smallerTextClass} negative">(Lewat ${Math.abs(dayDiff)} hari)</span>`;
+        if (dayDiff === 0) return `${dueStr} <span class="${smallerTextClass} warn">(Hari Ini)</span>`;
+        if (dayDiff > 0 && dayDiff <= 7) return `${dueStr} <span class="${smallerTextClass} warn">(dalam ${dayDiff} hari)</span>`;
+        if (dayDiff > 7) return `${dueStr} <span class="${smallerTextClass}">(dalam ${dayDiff} hari)</span>`;
         return dueStr;
     })();
 
-    // Main Category Badge logic
     const typeName = (expenseData?.type || bill?.type || '').toLowerCase();
     const categoryBadgeHTML = typeName ? `<span class="badge ${typeName}">${typeName.charAt(0).toUpperCase() + typeName.slice(1)}</span>` : '-';
 
@@ -11141,13 +11045,12 @@ async function _createBillDetailContentHTML(bill, expenseData, payments) {
                 ${project ? `<div><dt>Proyek</dt><dd>${project.projectName}</dd></div>` : ''}
                 ${supplier ? `<div><dt>Supplier</dt><dd>${supplier.supplierName}</dd></div>` : ''}
                 ${typeName ? `<div><dt>Kategori</dt><dd>${categoryBadgeHTML}</dd></div>` : ''}
-                ${dueDt ? `<div><dt>Jatuh Tempo</dt><dd>${dueDateText}</dd></div>` : ''}
+                ${dueDt ? `<div><dt>Jatuh Tempo</dt><dd class="due-date-dd">${dueDateText}</dd></div>` : ''}
                 <div><dt>Dibuat Pada</dt><dd>${createdOn}</dd></div>
                 <div><dt>Dibuat Oleh</dt><dd>${createdByHTML}</dd></div>
             </dl>
         </div>
     `;
-
     return mainPaymentSection + paymentHistoryHTML + metaDetailsHTML;
 }
 
@@ -11975,28 +11878,28 @@ function _getBillsListHTML(items) {
     }
   }
   
-  function _getEditFormSuratJalanItemsHTML(item) {
+function _getEditFormSuratJalanItemsHTML(item) {
     const itemsHTML = (item.items || []).map((subItem, index) => {
         const material = appState.materials.find(m => m.id === subItem.materialId);
-        const materialName = material?`${material.materialName}` : '';
+        const materialName = material ? `${material.materialName}` : '';
         return `
-                <div class="invoice-item-row" data-index="${index}">
-                    <div class="autocomplete-wrapper item-name-wrapper">
-                        <input type="text" name="itemName" placeholder="Ketik nama material..." class="autocomplete-input item-name" value="${materialName}" required autocomplete="off" ${subItem.materialId?'readonly' : ''}>
-                        <input type="hidden" name="materialId" class="autocomplete-id" value="${subItem.materialId || ''}">
-                        <button type="button" class="autocomplete-clear-btn" style="display: ${subItem.materialId?'flex' : 'none'};" title="Hapus Pilihan">
-                            <span class="material-symbols-outlined">close</span>
-                        </button>
-                        <div class="autocomplete-suggestions"></div>
-                    </div>
-                    <div class="item-details">
-                        <input type="text" inputmode="decimal" pattern="[0-9]+([\.,][0-9]+)?" name="itemQty" placeholder="Qty" class="item-qty" value="${subItem.qty}" required>
-                        <span class="item-unit" style="margin-left: 0.25rem;">${material?.unit || ''}</span>
-                        <button type="button" class="btn-icon add-master-btn" data-action="add-new-material" title="Tambah Master Material"><span class="material-symbols-outlined">add</span></button>
-                    </div>
-                    <button type="button" class="btn-icon btn-icon-danger remove-item-btn"><span class="material-symbols-outlined">delete</span></button>
+            <div class="invoice-item-row" data-index="${index}">
+                <div class="autocomplete-wrapper item-name-wrapper">
+                    <input type="text" name="itemName" placeholder="Ketik nama material..." class="autocomplete-input item-name" value="${materialName}" required autocomplete="off" ${subItem.materialId ? 'readonly' : ''}>
+                    <input type="hidden" name="materialId" class="autocomplete-id" value="${subItem.materialId || ''}">
+                    <button type="button" class="autocomplete-clear-btn" style="display: ${subItem.materialId ? 'flex' : 'none'};" title="Hapus Pilihan">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                    <div class="autocomplete-suggestions"></div>
                 </div>
-            `;
+                <div class="item-details">
+                    <input type="text" inputmode="decimal" pattern="[0-9]+([\\.,][0-9]+)?" name="itemQty" placeholder="Qty" class="item-qty" value="${subItem.qty}" required>
+                    <span class="item-unit" style="margin-left: 0.25rem;">${material?.unit || ''}</span>
+                    <button type="button" class="btn-icon add-master-btn" data-action="add-new-material" title="Tambah Master Material"><span class="material-symbols-outlined">add</span></button>
+                </div>
+                <button type="button" class="btn-icon btn-icon-danger remove-item-btn"><span class="material-symbols-outlined">delete</span></button>
+            </div>
+        `;
     }).join('');
     return `
             <form id="edit-item-form" data-id="${item.id}" data-type="delivery_order_items">
@@ -12767,14 +12670,13 @@ async function renderLaporanPage() {
 
     const fab = $('#fab-container');
     if (fab) {
-      const isMobile = window.matchMedia('(max-width: 599px)').matches;
-      if (!isViewer() && !isMobile) {
+      // Kondisi !isMobile dihapus agar FAB muncul di semua ukuran layar
+      if (!isViewer()) {
         fab.innerHTML = `<button class="fab" data-action="open-report-generator" title="Buat/Unduh Laporan"><span class="material-symbols-outlined">download</span></button>`;
       } else {
         fab.innerHTML = '';
       }
     }
-
     const renderTabContent = async (tabId) => {
       const contentContainer = $('#sub-page-content');
       if (!contentContainer) return;
@@ -17053,9 +16955,12 @@ function _getSingleJurnalHarianCardHTML(dateStr, dayData) {
     if (document.body.classList.contains('detail-view-active')) {
         hideMobileDetailPage();
     }
+    if (document.body.classList.contains('detail-pane-open')) {
+        closeDetailPane();
+    }
+
     closeAllModals();
-    if (!navId || appState.activePage === navId || isPageTransitioning) return;
-    isPageTransitioning = true;
+    if (!navId || appState.activePage === navId || isPageTransitioning) return;    isPageTransitioning = true;
     setTimeout(() => { isPageTransitioning = false; }, 500);
     const container = document.querySelector('.list-pane .page-container');
     container.classList.add('page-exit');
@@ -17108,21 +17013,40 @@ async function _animateTabSwitch(contentContainer, renderNewContentFunc, directi
           }
       } catch (_) {}
       window.addEventListener('popstate', (e) => {
-          // Jika ada modal terbuka, tutup modal teratas terlebih dahulu dan batalkan navigasi halaman
-          const container = $('#modal-container');
-          if (container) {
-              const modals = Array.from(container.querySelectorAll('.modal-bg'));
-              const top = modals[modals.length - 1];
-              if (top) {
-                  _closeModalImmediate(top);
-                  return;
-              }
-          }
-          const target = e.state && e.state.page ? e.state.page : appState.activePage;
-          // Navigate without pushing new history entry
-          handleNavigation(target, { source: 'history', push: false });
-      });
-  
+        // Prioritas 1: Tutup modal jika ada
+        const modalContainer = $('#modal-container');
+        if (modalContainer) {
+            const topModal = Array.from(modalContainer.querySelectorAll('.modal-bg.show')).pop();
+            if (topModal) {
+                _closeModalImmediate(topModal);
+                // Tambahkan kembali state yang baru saja dihapus oleh 'back'
+                history.pushState(e.state, '', window.location.href);
+                return;
+            }
+        }
+    
+        // Prioritas 2: Periksa apakah kita harus menutup panel detail
+        const isDetailViewOpen = document.body.classList.contains('detail-view-active');
+        // Jika state riwayat BUKAN untuk detail view TAPI panelnya MASIH terbuka,
+        // berarti kita harus menutupnya.
+        if (isDetailViewOpen && (!e.state || !e.state.detailView)) {
+            if (appState.detailPaneHistory.length > 0) {
+                // Jika ada riwayat internal, kembali ke state sebelumnya
+                const previousState = appState.detailPaneHistory.pop();
+                showMobileDetailPage(previousState, true); // `true` menandakan ini navigasi 'kembali'
+            } else {
+                // Jika tidak ada riwayat, tutup panel sepenuhnya
+                hideMobileDetailPage();
+            }
+            return; // Hentikan di sini
+        }
+    
+        // Prioritas 3: Navigasi halaman utama (logika lama)
+        const targetPage = e.state && e.state.page ? e.state.page : 'dashboard'; // Fallback ke dashboard
+        if (appState.activePage !== targetPage) {
+            handleNavigation(targetPage, { source: 'history', push: false });
+        }
+    });  
       // Optional: edge-swipe back gesture for Android-like UX inside the PWA
       const EDGE = 24; // px from left/right edge to start tracking
       const THRESH_X = 60; // required horizontal travel
@@ -17838,8 +17762,7 @@ function attachEventListeners() {
             'stok-out': () => handleStokOutModal(id),
             'edit-stock': () => handleEditStockTransaction(target.dataset),
             'delete-stock': () => handleDeleteStockTransaction(target.dataset),
-            'add-new-material-header': () => handleAddNewMaterialModal(),
-            'add-new-material': () => {
+            'add-new-material-header': () => handleManageMasterData('materials'),            'add-new-material': () => {
                 const row = target.closest('.invoice-item-row');
                 const wrapper = row?.querySelector('.custom-select-wrapper');
                 if (wrapper) handleAddNewMaterialModal(wrapper);

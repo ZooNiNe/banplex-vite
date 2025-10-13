@@ -25,9 +25,12 @@
   --radius-lg: 20px;
   --spacing: 1rem;
 }
-
-/* --- [PERBAIKAN SCROLL] Tata Letak Dasar Mobile --- */
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+* { 
+  box-sizing: border-box; 
+  -webkit-tap-highlight-color: transparent; 
+  user-select: none; /* Mencegah seleksi teks (standar) */
+  -webkit-user-select: none; /* Khusus untuk browser WebKit seperti Safari di iOS */
+}
 html { scroll-behavior: smooth; }
 body {
   margin: 0;
@@ -422,9 +425,7 @@ select {
 .form-group .custom-select-trigger {
     width: 100%;
 }
-
-/* KODE BARU - GUNAKAN INI */
-
+/* GANTI BLOK CSS INI di style.css */
 .custom-select-trigger {
   display: flex;
   align-items: center; /* Hapus 'justify-content' */
@@ -448,6 +449,7 @@ select {
   flex-shrink: 0; /* Pastikan ikon tidak ikut ter-squeeze */
   color: var(--text-dim); /* Beri warna agar konsisten */
 }
+
 /* Bottom Navigation */
 .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 2001; height: calc(65px + env(safe-area-inset-bottom, 0px)); background-color: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--line); box-shadow: 0 -2px 10px rgba(0,0,0,.03); display: flex; justify-content: space-around; padding: 0 .5rem env(safe-area-inset-bottom, 0px) .5rem; }
 .bottom-nav .nav-item { font-size: 0.75rem; gap: 4px; color: var(--text-dim); position: relative; display: flex; flex-direction: column; align-items: center; flex: 1; height: 100%; justify-content: center; font-weight: 500; border: none; background: none; cursor: pointer; padding: 0.5rem 0.25rem; transition: color var(--transition-base); }
@@ -6182,111 +6184,10 @@ body.detail-pane-open .modal-bg .fab {
   border: 1px solid var(--line);
 }
 
-/* =======================================================
- * [SOLUSI FINAL] Dropdown Desktop Responsif & Anti-Terpotong
- * ======================================================= */
-
-/* Sembunyikan dropdown asli di dalam form pada desktop */
-.desktop-form-layout .custom-select-wrapper .custom-select-options {
-  display: none !important;
-}
-
-/* 1. Wadah Utama Dropdown yang di-clone */
-.cloned-select-options {
-  position: fixed;
-  z-index: 9999;
-  background-color: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: var(--shadow-lg);
-  
-  /* KUNCI #1: Jadikan flex container vertikal dengan tinggi maksimal */
-  display: flex;
-  flex-direction: column;
-  max-height: 250px; /* batas atas default; akan dioverride JS sesuai ruang/isi */
-}
-
-/* 2. Style untuk Kotak Pencarian di Dalam Dropdown */
-.cloned-select-options .custom-select-search-wrapper {
-  padding: 0.5rem 0.8rem;
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0; /* Jangan biarkan kotak pencarian menyusut */
-  position: relative;
-}
-
-.cloned-select-options .custom-select-search-wrapper .material-symbols-outlined {
-    position: absolute;
-    left: 1.25rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-dim);
-    font-size: 20px;
-    pointer-events: none;
-}
-
-.cloned-select-options .custom-select-search {
-    padding-left: 2rem !important;
-}
-
-
-.cloned-select-options .custom-select-options-list {
-  overflow-y: auto;
-  max-height: calc(250px - 45px);
-  height: auto; /* Biarkan menyusut jika item sedikit */
-  padding: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-/* KODE BARU - GUNAKAN BLOK INI UNTUK MENGGANTIKAN SEMUA YANG LAMA */
-
-/* Style untuk setiap OPSI di dalam daftar dropdown */
-.cloned-select-options .custom-select-option {
-  /* KUNCI PERBAIKAN: Aturan untuk memotong teks panjang */
-  white-space: nowrap;      /* 1. Cegah teks turun baris */
-  overflow: hidden;         /* 2. Sembunyikan teks yang meluber */
-  text-overflow: ellipsis;  /* 3. Tampilkan "..." pada teks yang terpotong */
-  display: block;           /* 4. Pastikan text-overflow bekerja dengan baik */
- 
-  /* Style lain untuk tampilan yang rapi */
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-  line-height: 1.4;
-  transition: background-color 0.2s ease, transform 0.1s ease;
-}
-
-.cloned-select-options .custom-select-option:hover {
-  background-color: var(--surface-muted);
-}
-
-.cloned-select-options .custom-select-option:active {
-  transform: scale(0.98); /* Efek menekan saat diklik */
-  background-color: color-mix(in srgb, var(--primary) 15%, transparent);
-}
-/* Penyesuaian untuk Dark Theme */
-.dark-theme .cloned-select-options {
-    background-color: #1e293b; 
-    border-color: #334155;
-}
-.dark-theme .cloned-select-options .custom-select-option:hover {
-    background-color: #334155;
-}
 /* TAMBAHKAN ATURAN INI UNTUK MEMASTIKAN DROPDOWN LAMA SELALU TERSEMBUNYI */
 .custom-select-wrapper .custom-select-options {
   display: none !important;
 }
-/* =======================================================
- * [BARU] Aturan untuk Tombol Tunggal agar Lebar Penuh
- * ======================================================= */
-
-/* Selector :first-child:last-child ini secara cerdas hanya akan menargetkan 
-  sebuah elemen .btn jika ia adalah satu-satunya anak di dalam parent-nya.
-*/
-/* =======================================================
- * [DEBUGGING] Memaksa Scroll di Detail Page Mobile
- * ======================================================= */
 
   /* Pastikan .detail-pane adalah flex container vertikal dengan tinggi pasti */
   body.detail-view-active .detail-pane {
@@ -8859,4 +8760,169 @@ body.comments-view-active .mobile-detail-header + .mobile-detail-content + .moda
 }
 .dark-theme .attachments-dock {
   background: var(--panel);
+}
+/* =======================================================
+ * [PERBAIKAN] Tata Letak Multi-Item Form Faktur
+ * ======================================================= */
+
+/* Kontainer utama untuk setiap item, sekarang mendukung layout multi-baris */
+.multi-item-row {
+  display: flex;
+  flex-direction: column; /* Mengubah arah item menjadi vertikal */
+  gap: 0.75rem; /* Memberi jarak antar baris (nama material dan baris qty/harga) */
+  padding: 0.85rem;
+  margin-bottom: 0.75rem;
+  border-radius: 0.75rem;
+  background-color: var(--surface-muted);
+  border: 1px solid var(--line);
+}
+
+/* Baris pertama yang berisi dropdown nama material dan tombol hapus */
+.multi-item-main-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* GANTI BLOK CSS INI di style.css */
+.multi-item-details-line {
+  display: grid; /* Gunakan Grid untuk kontrol kolom yang lebih baik */
+  grid-template-columns: 2fr 3fr; /* Atur rasio lebar Qty:Harga menjadi 2:3 */
+  gap: 0.75rem;
+  padding-left: 0.25rem;
+}
+
+.multi-item-details-line .form-group {
+  margin-bottom: 0; /* Hapus margin bawah default dari form-group */
+}
+
+/* Tombol hapus tidak lagi butuh margin atas karena sudah ada gap */
+.multi-item-row .btn-icon {
+  margin-top: 0;
+}
+
+/* Sembunyikan label pada dropdown material karena sudah ada di form-group */
+.multi-item-main-line .item-name-wrapper label {
+    display: none;
+}
+/* Styling for Due Date detail in Bill Detail View */
+.due-date-dd {
+  display: flex;
+  flex-direction: column; /* Membuat tanggal dan detailnya tersusun vertikal */
+  align-items: flex-end; /* Tetap rata kanan */
+  gap: 2px; /* Jarak kecil antara tanggal dan detailnya */
+}
+
+.due-date-detail-text {
+  font-size: 0.8rem; /* Ukuran font lebih kecil */
+  font-weight: 400;  /* Font lebih tipis */
+  color: var(--text-dim); /* Warna abu-abu */
+}
+
+/* Memberi warna pada teks detail sesuai statusnya */
+.due-date-detail-text.negative {
+    color: var(--danger); /* Merah untuk terlambat */
+}
+.due-date-detail-text.warn {
+    color: var(--warn); /* Kuning untuk mendekati jatuh tempo */
+}
+/* =======================================================
+ * [PERBAIKAN FINAL] Tata Letak Modal Laporan (Bottom Sheet)
+ * ======================================================= */
+
+/* 1. Tambahkan padding horizontal pada body modal */
+/* Ini akan memberi jarak antara konten (form) dengan tepi layar */
+#reportGenerator-modal .modal-body {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+/* 2. Atur footer agar tombolnya bisa full-width */
+#reportGenerator-modal .modal-footer {
+  display: grid; /* Gunakan grid untuk layout yang lebih simpel */
+  grid-template-columns: 1fr; /* Satu kolom yang mengisi semua ruang */
+  padding: 1rem 1.25rem calc(1rem + env(safe-area-inset-bottom, 0px)) 1.25rem; /* Sesuaikan padding */
+}
+
+/* 3. Buat tombol "Unduh" menjadi full-width */
+#reportGenerator-modal #download-report-btn {
+  width: 100%; /* Paksa tombol untuk mengisi lebar grid */
+  justify-content: center; /* Pastikan ikon dan teks di tengah tombol */
+}
+/* =======================================================
+ * [SOLUSI TUNTAS] Dropdown Responsif, Anti-Terpotong & Bisa Scroll
+ * ======================================================= */
+
+ .cloned-select-options {
+  position: fixed;
+  z-index: 9999;
+  background-color: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  
+  display: flex;
+  flex-direction: column;
+}
+
+.cloned-select-options .custom-select-search-wrapper {
+  padding: 0.5rem 0.8rem;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.cloned-select-options .custom-select-search-wrapper .material-symbols-outlined {
+    position: absolute;
+    left: 1.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 20px;
+    pointer-events: none;
+}
+.cloned-select-options .custom-select-search {
+    padding-left: 2.2rem !important;
+}
+
+/* ... di dalam blok [SOLUSI TUNTAS] ... */
+.cloned-select-options .custom-select-options-list {
+  overflow-y: auto;
+  flex-grow: 1;
+  min-height: 0;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.cloned-select-options .custom-select-option {
+  white-space: normal;
+  word-wrap: break-word;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: background-color 0.2s ease;
+}
+.cloned-select-options .custom-select-option:hover {
+  background-color: var(--surface-muted);
+}
+
+.dark-theme .cloned-select-options {
+    background-color: #1e293b; 
+    border-color: #334155;
+}
+.dark-theme .cloned-select-options .custom-select-option {
+    color: var(--text);
+}
+.dark-theme .cloned-select-options .custom-select-option:hover {
+    background-color: #334155;
+}
+.dark-theme .cloned-select-options .custom-select-search {
+    background-color: var(--surface-muted);
+    color: var(--text);
+    border-color: var(--line);
+}
+.dark-theme .cloned-select-options .custom-select-search::placeholder {
+    color: var(--text-dim);
 }
