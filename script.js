@@ -3703,7 +3703,7 @@ async function _uploadFileToFirebaseStorage(file, folder = 'attachments') {
       }
   }
   
-function _initSelectionMode(containerSelector, pageContext) {
+  function _initSelectionMode(containerSelector, pageContext) {
     const container = $(containerSelector);
     if (!container) return;
 
@@ -3714,6 +3714,7 @@ function _initSelectionMode(containerSelector, pageContext) {
 
     let pressTimer = null;
     let hasMoved = false;
+    let isLongPress = false; // Flag untuk menandai jika long press terjadi
     let startX = 0;
     let startY = 0;
 
@@ -3725,6 +3726,7 @@ function _initSelectionMode(containerSelector, pageContext) {
         }
 
         hasMoved = false;
+        isLongPress = false; // Reset flag setiap kali ada event press baru
         startX = e.pageX;
         startY = e.pageY;
 
@@ -3732,38 +3734,42 @@ function _initSelectionMode(containerSelector, pageContext) {
             // Jika jari bergerak lebih dari 10px, ini dianggap swipe/drag
             if (Math.abs(moveEvent.pageX - startX) > 10 || Math.abs(moveEvent.pageY - startY) > 10) {
                 hasMoved = true;
-                // [KUNCI 1] Batalkan timer jika jari bergerak, mencegah swipe jadi seleksi.
                 if (pressTimer) clearTimeout(pressTimer);
             }
         };
 
-        const handlePointerUp = () => {
+        const handlePointerUp = (upEvent) => {
             // Bersihkan semua listener sementara
             document.removeEventListener('pointermove', handlePointerMove);
             document.removeEventListener('pointerup', handlePointerUp);
-            // [KUNCI 2] Batalkan timer jika jari sudah diangkat (ini adalah tap).
             if (pressTimer) clearTimeout(pressTimer);
 
-            // Aksi hanya jika jari tidak bergerak (ini adalah tap atau long-press)
+            // Jika ini adalah akhir dari long press, hentikan semua aksi lanjutan.
+            if (isLongPress) {
+                upEvent.preventDefault(); // Mencegah event 'click' susulan
+                return;
+            }
+            
+            // Jika ini adalah tap singkat (bukan long press & bukan swipe)
             if (!hasMoved) {
-                // Jika mode seleksi sudah aktif, tap biasa akan toggle item
+                // Dan jika mode seleksi sudah aktif, maka toggle item yang di-tap.
                 if (appState.selectionMode.active) {
-                    e.preventDefault(); // Mencegah aksi klik lain (seperti membuka modal)
+                    upEvent.preventDefault(); // Mencegah aksi klik lain (seperti membuka modal)
                     _toggleCardSelection(cardWrapper);
                 }
-                // Jika mode seleksi TIDAK aktif, JANGAN LAKUKAN APA-APA.
-                // Biarkan event 'click' standar yang menangani pembukaan modal/detail.
+                // Jika mode seleksi tidak aktif, biarkan event 'click' standar berjalan.
             }
         };
 
         document.addEventListener('pointermove', handlePointerMove);
         document.addEventListener('pointerup', handlePointerUp, { once: true });
 
-        // Atur timer untuk long-press HANYA jika mode seleksi belum aktif
+        // Atur timer untuk long-press HANYA jika mode seleksi belum aktif.
         if (!appState.selectionMode.active) {
             pressTimer = setTimeout(() => {
-                // Jika jari tidak bergerak setelah 500ms, aktifkan mode seleksi
+                // Jika jari tidak bergerak setelah 500ms, aktifkan mode seleksi.
                 if (!hasMoved) {
+                    isLongPress = true; // Tandai bahwa long press telah terjadi
                     _activateSelectionMode(pageContext, cardWrapper);
                 }
             }, 500); // Durasi long-press 500 milidetik
@@ -4893,88 +4899,62 @@ function getModalContent(type, data) {
                     const savingToast = toast('syncing', 'Menyimpan...');
                     const success = await handleUpdateItem(form);
                     savingToast.close();
-
+    
                     if (success) {
                         const { id, type } = form.dataset;
-
-                        // 1. Fetch the fully updated item directly from Dexie
-                        let updatedItem;
-                        let stateKey;
-                        if (type === 'expense' || type === 'bill' || type === 'fee_bill') {
-                            // Find the bill, as it's the primary representation in the 'Tagihan' list
-                            const bill = await localDB.bills.where({ expenseId: id }).first() || await localDB.bills.get(id);
-                            updatedItem = bill;
-                            stateKey = 'bills';
-                        } else if (type === 'termin' || type === 'pinjaman' || type === 'loan') {
-                            const tableName = (type === 'termin') ? 'incomes' : 'funding_sources';
-                            updatedItem = await localDB[tableName].get(id);
-                            stateKey = tableName;
+                        
+                        await loadAllLocalDataToState(); // Selalu muat ulang state dari Dexie
+    
+                        let updatedItemForUI, uiCardId, htmlGenerator;
+    
+                        if (type === 'expense') {
+                            const updatedExpense = appState.expenses.find(ex => ex.id === id);
+                            if (updatedExpense?.status === 'delivery_order') {
+                                uiCardId = `expense-${id}`;
+                                updatedItemForUI = { id: uiCardId, expenseId: id, ...updatedExpense };
+                                htmlGenerator = (item) => _getBillsListHTML([item]);
+                            } else {
+                                updatedItemForUI = appState.bills.find(b => b.expenseId === id);
+                                uiCardId = updatedItemForUI?.id;
+                                htmlGenerator = (item) => _getBillsListHTML([item]);
+                            }
+                        } else if (type === 'bill' || type === 'fee_bill') {
+                            updatedItemForUI = appState.bills.find(b => b.id === id);
+                            uiCardId = id;
+                            htmlGenerator = (item) => _getBillsListHTML([item]);
+                        } else if (type === 'termin') {
+                            updatedItemForUI = appState.incomes.find(i => i.id === id);
+                            uiCardId = id;
+                            htmlGenerator = (item) => _getSinglePemasukanHTML(item, 'termin');
+                        } else if (type === 'pinjaman' || type === 'loan') {
+                            updatedItemForUI = appState.fundingSources.find(f => f.id === id);
+                            uiCardId = id;
+                            htmlGenerator = (item) => _getSinglePemasukanHTML(item, 'pinjaman');
                         }
-
-                        if (updatedItem && stateKey) {
-                            // 2. Manually update the item in the in-memory appState
-                            const listToUpdate = (stateKey === 'funding_sources') ? appState.fundingSources : appState[stateKey];
-                            const itemIndex = listToUpdate.findIndex(item => item.id === updatedItem.id || item.id === id);
-                            if (itemIndex > -1) {
-                                listToUpdate[itemIndex] = updatedItem;
-                            }
-
-                            // Ensure expense cache reflects latest when editing an expense
-                            if (type === 'expense') {
-                                try {
-                                    const updatedExpense = await localDB.expenses.get(id);
-                                    if (updatedExpense) {
-                                        const expIdx = (appState.expenses || []).findIndex(e => e.id === id);
-                                        if (expIdx > -1) appState.expenses[expIdx] = updatedExpense;
-                                    }
-                                } catch (_) {}
-                            }
-
-                            // Also keep paginated/filtered Tagihan lists in sync to avoid stale re-renders
-                            if (stateKey === 'bills' && appState.tagihan) {
-                                try {
-                                    const fullIdx = (appState.tagihan.fullList || []).findIndex(b => b.id === updatedItem.id);
-                                    if (fullIdx > -1) appState.tagihan.fullList[fullIdx] = updatedItem;
-                                    const curIdx = (appState.tagihan.currentList || []).findIndex(b => b.id === updatedItem.id);
-                                    if (curIdx > -1) appState.tagihan.currentList[curIdx] = updatedItem;
-                                } catch (_) {}
-                            }
-
-                            // 3. Generate the new inner HTML for just the updated card
-                            let fullCardHtml = '';
-                            if (stateKey === 'bills') {
-                                fullCardHtml = _getBillsListHTML([updatedItem]);
-                            } else if (stateKey === 'incomes' || stateKey === 'funding_sources') {
-                                const itemType = (stateKey === 'incomes') ? 'termin' : 'pinjaman';
-                                fullCardHtml = _getSinglePemasukanHTML(updatedItem, itemType);
-                            }
-
-                            if (fullCardHtml) {
-                                const tempDiv = document.createElement('div');
-                                tempDiv.innerHTML = fullCardHtml;
-                                const contentWrapper = tempDiv.querySelector('.wa-card-v2, .dense-list-item');
-                                if (contentWrapper) {
-                                    const newInnerHtml = contentWrapper.innerHTML;
-                                    // 4. Call the animation function to update the UI in-place
-                                    _updateItemInListWithAnimation(updatedItem.id, newInnerHtml);
-                                }
+    
+                        if (updatedItemForUI && uiCardId && htmlGenerator) {
+                            const fullCardHtml = htmlGenerator(updatedItemForUI);
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = fullCardHtml;
+                            const contentWrapper = tempDiv.querySelector('.wa-card-v2, .dense-list-item');
+                            if (contentWrapper) {
+                                _updateItemInListWithAnimation(uiCardId, contentWrapper.innerHTML);
                             }
                         }
-
-                        // 5. Close edit modal, refresh detail view if open, then run background tasks
-                        try { const editModal = document.getElementById('editItem-modal'); if (editModal) closeModal(editModal); } catch (_) {}
+    
                         const isDetailOpen = document.body.classList.contains('detail-view-active') || document.body.classList.contains('detail-pane-open');
                         if (isDetailOpen) {
-                            try {
-                                if (stateKey === 'bills') {
-                                    const billIdToOpen = updatedItem?.id || id;
-                                    handleOpenBillDetail(billIdToOpen, null);
-                                } else if (stateKey === 'incomes' || stateKey === 'funding_sources') {
-                                    const t = (stateKey === 'incomes') ? 'termin' : 'pinjaman';
-                                    handleOpenPemasukanDetail({ dataset: { id, type: t } });
-                                }
-                            } catch (_) {}
+                            if (type === 'expense' || type === 'bill' || type === 'fee_bill') {
+                                const billToOpen = appState.bills.find(b => b.expenseId === id || b.id === id);
+                                handleOpenBillDetail(billToOpen?.id, (type === 'expense' ? id : billToOpen?.expenseId));
+                            } else if (type === 'termin' || type === 'pinjaman' || type === 'loan') {
+                                handleOpenPemasukanDetail({ dataset: { id, type } });
+                            }
                         }
+                        
+                        const editModal = document.getElementById('editItem-modal');
+                        if (editModal) closeModal(editModal);
+    
                         _calculateAndCacheDashboardTotals();
                         syncToServer({ silent: true });
                         toast('success', 'Perubahan berhasil disimpan!');
@@ -4984,18 +4964,39 @@ function getModalContent(type, data) {
                 }
             });
         });
-
         if ($('#material-invoice-form') || $('#edit-item-form[data-type="expense"] #invoice-items-container')) {
             _attachPengeluaranFormListeners('material', contextElement);
         }
     }
-
+    
     if (type === 'editAttendance') {
         $('#edit-attendance-form')?.addEventListener('submit', (e) => {
             e.preventDefault();
             handleUpdateAttendance(e.target);
         });
     }
+    // --- Tambahkan kode ini di dalam fungsi attachModalEventListeners ---
+
+document.body.addEventListener('click', e => {
+    // Event handler untuk menambah item di form faktur/surat jalan
+    if (e.target && e.target.id === 'add-invoice-item') {
+        e.preventDefault();
+        const container = $('#invoice-items-container');
+        if (container) {
+            const newRow = _createNewInvoiceItemRow(appState.materials);
+            container.insertAdjacentHTML('beforeend', newRow);
+            initMasMoney();
+            const lastRow = container.lastElementChild;
+            if(lastRow) initCustomSelect(lastRow.querySelector('.custom-select-wrapper'));
+        }
+    }
+    
+    // Event handler untuk menghapus item
+    if (e.target && e.target.classList.contains('remove-item-btn')) {
+        e.preventDefault();
+        e.target.closest('.multi-item-row')?.remove();
+    }
+});
 }
 onAuthStateChanged(auth, (user) => {
     if (user) {
@@ -7097,7 +7098,6 @@ function _getFormPengeluaranHTML(type, categoryOptions, categoryMasterType, cate
         </div>
     `;
 }
-// GANTI SELURUH FUNGSI LAMA DENGAN VERSI BARU INI
 function _getFormFakturMaterialHTML(itemData = null) {
     const isEdit = !!itemData;
     const formId = isEdit ? 'edit-item-form' : 'material-invoice-form';
@@ -7116,12 +7116,14 @@ function _getFormFakturMaterialHTML(itemData = null) {
     const supplierOptions = appState.suppliers.filter(s => s.category === 'Material').map(s => ({ value: s.id, text: s.supplierName }));
     const projectOptions = appState.projects.map(p => ({ value: p.id, text: p.projectName }));
     const materialOptions = (appState.materials || []).map(m => ({ value: m.id, text: m.materialName }));
+    
+    // Logika untuk merender baris item yang sudah ada
     const itemsHTML = isEdit ? (itemData.items || []).map((item, index) => {
         const material = appState.materials.find(m => m.id === item.materialId);
         const priceNum = item.price || 0;
         const qtyNum = item.qty || 0;
 
-        const materialDropdownHTML = createMasterDataSelect(`materialId_${index}`, '', materialOptions, item.materialId, null) // <-- Ubah 'materials' menjadi null di sini
+        const materialDropdownHTML = createMasterDataSelect(`materialId_${index}`, '', materialOptions, item.materialId, null)
             .replace('<div class="form-group">', '').replace('</div>', '');
 
         return `
@@ -7130,12 +7132,12 @@ function _getFormFakturMaterialHTML(itemData = null) {
                     <div class="item-name-wrapper" style="flex-grow:1;">${materialDropdownHTML}</div>
                     <button type="button" class="btn-icon btn-icon-danger remove-item-btn"><span class="material-symbols-outlined">delete</span></button>
                 </div>
-                <div class="multi-item-details-line ${formType === 'surat_jalan' ? 'hidden' : ''}">
+                <div class="multi-item-details-line">
                     <div class="form-group">
                         <label>Qty</label>
                         <input type="text" inputmode="decimal" pattern="[0-9]+([\\.,][0-9]+)?" name="itemQty" placeholder="Qty" class="item-qty" value="${qtyNum || '1'}" required>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group ${formType === 'surat_jalan' ? 'hidden' : ''}">
                         <label>Harga Satuan</label>
                         <input type="text" inputmode="numeric" name="itemPrice" placeholder="Harga" class="item-price" value="${priceNum ? new Intl.NumberFormat('id-ID').format(priceNum) : ''}" required>
                     </div>
@@ -7143,6 +7145,7 @@ function _getFormFakturMaterialHTML(itemData = null) {
             </div>
         `;
     }).join('') : '';
+
     const formTypeToggleHTML = !isEdit ? `
         <div class="form-group full-width">
             <label>Jenis Input</label>
@@ -7228,7 +7231,7 @@ function _getFormFakturMaterialHTML(itemData = null) {
             </form>
         </div>
     `;
-}  
+}
 function _attachPengeluaranFormListeners(type, context = document) {
     _initCustomSelects(context);
 
@@ -7249,14 +7252,15 @@ function _attachPengeluaranFormListeners(type, context = document) {
     });
 
     if (type === 'material') {
-        _initAutocomplete(form);
+        _initAutocomplete(form); // Inisialisasi autocomplete untuk baris yang sudah ada (saat edit)
+
         form.addEventListener('click', (e) => {
             const btn = e.target.closest('#add-invoice-item-btn');
             if (btn) {
                 _addInvoiceItemRow(form);
-                _initAutocomplete(form); // Pastikan autocomplete diinisialisasi untuk baris baru
             }
         });        
+        
         const itemsContainer = form.querySelector('#invoice-items-container');
         if (itemsContainer) {
             itemsContainer.addEventListener('input', (e) => _handleInvoiceItemChange(e, form));
@@ -7267,9 +7271,8 @@ function _attachPengeluaranFormListeners(type, context = document) {
             invoiceNumberInput.value = _generateInvoiceNumber();
         }
 
-        if (form.querySelectorAll('#invoice-items-container .invoice-item-row').length === 0) {
+        if (form.id === 'material-invoice-form' && form.querySelectorAll('#invoice-items-container .invoice-item-row').length === 0) {
             _addInvoiceItemRow(form);
-            _initAutocomplete(form);
         }
 
         const typeSelector = form.querySelector('#form-type-selector');
@@ -7290,24 +7293,22 @@ function _attachPengeluaranFormListeners(type, context = document) {
         if(amountInput) amountInput.addEventListener('input', _formatNumberInput);
         _attachClientValidation(form);
     }
-}  
-  function _switchMaterialFormMode(form, mode) {
+}
+
+function _switchMaterialFormMode(form, mode) {
       const totalWrapper = $('#total-faktur-wrapper', form);
       const paymentWrapper = $('#payment-status-wrapper', form);
       const itemsContainer = $('#invoice-items-container', form);
       const attachmentLabel = $('#attachment-label', form);
   
-      // 1. Tampilkan atau sembunyikan bagian Total dan Status Pembayaran
       const isSuratJalan = mode === 'surat_jalan';
       if (totalWrapper) totalWrapper.classList.toggle('hidden', isSuratJalan);
       if (paymentWrapper) paymentWrapper.classList.toggle('hidden', isSuratJalan);
   
-      // 2. Ubah label untuk upload lampiran
       if (attachmentLabel) {
           attachmentLabel.textContent = isSuratJalan ? 'Upload Bukti Surat Jalan' : 'Upload Bukti Faktur';
       }
   
-      // 3. Simpan data item yang ada, lalu bangun ulang barisnya sesuai mode baru
       const existingItems = [];
       $$('.invoice-item-row', form).forEach(row => {
           existingItems.push({
@@ -7318,13 +7319,11 @@ function _attachPengeluaranFormListeners(type, context = document) {
           });
       });
   
-      // Kosongkan container dan buat ulang baris item
       itemsContainer.innerHTML = '';
       existingItems.forEach(itemData => {
           _addInvoiceItemRow(form); // Fungsi ini sudah pintar, ia akan membuat baris sesuai mode yang aktif
           const newRow = itemsContainer.lastElementChild;
           if (newRow) {
-              // Isi kembali data yang sudah diinput sebelumnya
               const nameInput = newRow.querySelector('input[name="itemName"]');
               const idInput = newRow.querySelector('input[name="materialId"]');
               const qtyInput = newRow.querySelector('input[name="itemQty"]');
@@ -7335,7 +7334,6 @@ function _attachPengeluaranFormListeners(type, context = document) {
               if (qtyInput) qtyInput.value = itemData.qty;
               if (priceInput) priceInput.value = itemData.price;
               
-              // Jika material sudah dipilih, buat input nama menjadi readonly
               if(itemData.id) {
                   if (nameInput) nameInput.readOnly = true;
                   const clearBtn = newRow.querySelector('.autocomplete-clear-btn');
@@ -7496,7 +7494,6 @@ async function handleAddPengeluaran(e, type) {
     }
 }
 
-// GANTI SELURUH FUNGSI LAMA DENGAN VERSI FINAL INI
 function _addInvoiceItemRow(context = document) {
     const container = $('#invoice-items-container', context);
     if (!container) return;
@@ -7505,7 +7502,6 @@ function _addInvoiceItemRow(context = document) {
 
     const materialOptions = (appState.materials || []).map(m => ({ value: m.id, text: m.materialName }));
 
-    // [KUNCI PERBAIKAN] Panggil createMasterDataSelect dengan masterType = null
     const materialDropdownHTML = createMasterDataSelect(
         `materialId_${index}`, '', materialOptions, '', null // <-- Ubah 'materials' menjadi null di sini
     ).replace('<div class="form-group">', '').replace('</div>', '');
@@ -7531,8 +7527,9 @@ function _addInvoiceItemRow(context = document) {
     container.insertAdjacentHTML('beforeend', itemHTML);
     const newRow = container.lastElementChild;
     
-    _initCustomSelects(newRow); 
+    _initCustomSelects(newRow); // Inisialisasi dropdown kustom HANYA untuk baris baru
     
+    // Animasikan baris baru
     newRow.classList.add('new-item');
     newRow.querySelector('.remove-item-btn')?.addEventListener('click', () => {
         newRow.style.transition = 'opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease';
@@ -7543,11 +7540,11 @@ function _addInvoiceItemRow(context = document) {
         }, 300);
     });
 
+    // Tambahkan listener format angka
     newRow.querySelectorAll('input[inputmode="numeric"]').forEach(input => {
         input.addEventListener('input', _formatNumberInput);
     });
 }
-
 function _handleInvoiceItemChange(e, context = document) {
     const row = e.target.closest('.multi-item-row');
     if (!row) return;
@@ -11325,7 +11322,7 @@ async function handleUploadAttachment(dataset) {
         input.click();
         document.body.removeChild(input);
     } else {
-        // Hapus input lama jika ada untuk mencegah duplikasi
+        // [PERBAIKAN] Hapus input lama jika ada untuk mencegah duplikasi
         document.getElementById('modalUploadCamera')?.remove();
         document.getElementById('modalUploadGallery')?.remove();
 
@@ -11368,7 +11365,6 @@ async function handleUploadAttachment(dataset) {
         });
     }
 }
-
 async function _processAndUploadFile(file, expenseId, field) {
     if (!file || !expenseId || !field) return;
 
@@ -12425,95 +12421,55 @@ function _createNestedAccordionHTML(title, items) {
 function _openSimulasiItemActionsModal(dataset) {
     const { id, title, description, fullAmount, partialAllowed } = dataset;
     const isSelected = appState.simulasiState.selectedPayments.has(id);
-    
-    const headerHTML = `
-        <div class="simulasi-actions-modal-header">
-            <h5>${title}</h5>
-            <p>${description}</p>
-            <strong>${fmtIDR(fullAmount)}</strong>
-        </div>
-    `;
 
-    let actionsHTML = '';
+    // [PERBAIKAN 1] Siapkan daftar aksi (actions) seperti di modal lain
+    const actions = [];
+
     if (isSelected) {
-        actionsHTML = `<button class="btn btn-secondary" data-action="cancel"><span class="material-symbols-outlined">cancel</span>Batalkan Pilihan</button>`;
+        actions.push({ label: 'Batalkan Pilihan', action: 'cancel', icon: 'cancel' });
     } else {
-        actionsHTML = `<button class="btn btn-primary" data-action="pay_full"><span class="material-symbols-outlined">check_circle</span>Pilih & Bayar Penuh</button>`;
+        actions.push({ label: 'Pilih & Bayar Penuh', action: 'pay_full', icon: 'check_circle' });
         if (partialAllowed === 'true') {
-            actionsHTML += `<button class="btn btn-secondary" data-action="pay_partial"><span class="material-symbols-outlined">pie_chart</span>Bayar Sebagian</button>`;
+            actions.push({ label: 'Bayar Sebagian', action: 'pay_partial', icon: 'pie_chart' });
         }
     }
-    const footerHTML = `<div class="simulasi-actions-modal-footer">${actionsHTML}</div>`;
 
-    const modal = createModal('dataDetail', {
-        title: 'Pilih Aksi Pembayaran',
-        content: headerHTML + footerHTML
+    // [PERBAIKAN 2] Buat konten HTML menggunakan format dense-list-container
+    const content = `
+        <div class="dense-list-container">
+            ${actions.map(a => `
+                <button class="dense-list-item btn btn-ghost" data-action="${a.action}">
+                    <div class="item-main-content">
+                        <div class="action-item-primary">
+                            <span class="material-symbols-outlined">${a.icon}</span>
+                            <strong class="item-title">${a.label}</strong>
+                        </div>
+                    </div>
+                </button>
+            `).join('')}
+        </div>`;
+
+    // [PERBAIKAN 3] Panggil createModal dengan tipe 'actionsPopup'
+    const modal = createModal('actionsPopup', {
+        title: `${title}: ${description}`, // Judul yang lebih deskriptif
+        content
     });
 
-    const context = window.matchMedia('(min-width: 600px)').matches ? document.getElementById('detail-pane') : modal;
-
-    if (context) {
-        context.querySelectorAll('.btn').forEach(btn => {
+    if (modal) {
+        modal.querySelectorAll('.btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const card = $(`.simulasi-item[data-id="${id}"]`);
                 if (!card) return;
         
-        // Add floating Comments FAB to open full comments view
-        try {
-            const overlay = document.querySelector('.detail-pane') || document.querySelector('.modal-bg');
-            if (overlay && parentId) {
-                const existing = overlay.querySelector('.fab[data-action="open-comments-view"]');
-                if (!existing) {
-                    const fab = document.createElement('button');
-                    fab.className = 'fab fab-pop-in';
-                    fab.title = 'Komentar';
-                    fab.setAttribute('data-tooltip', 'Komentar');
-                    fab.setAttribute('data-action', 'open-comments-view');
-                    fab.dataset.parentId = parentId;
-                    fab.dataset.parentType = parentType;
-                    fab.innerHTML = '<span class="material-symbols-outlined">forum</span>';
-                    // Add unread badge
-                    try {
-                        let unread = 0;
-                        if (typeof _getUnreadCommentsCount === 'function') unread = _getUnreadCommentsCount(parentId);
-                        else unread = (appState.comments || []).filter(c => c.parentId === parentId && !c.isDeleted).length;
-                        if (unread > 0) {
-                            const badge = document.createElement('span');
-                            badge.className = 'badge';
-                            badge.textContent = String(unread);
-                            fab.appendChild(badge);
-                        }
-                    } catch (_) {}
-                    overlay.appendChild(fab);
-                }
-            }
-        } catch (_) {}
-        // Add floating Comments FAB to open full comments view
-        try {
-            const overlay = document.querySelector('.detail-pane') || document.querySelector('.modal-bg');
-            if (overlay && parentId) {
-                const existing = overlay.querySelector('.fab[data-action="open-comments-view"]');
-                if (!existing) {
-                    const fab = document.createElement('button');
-                    fab.className = 'fab fab-pop-in';
-                    fab.title = 'Komentar';
-                    fab.setAttribute('data-tooltip', 'Komentar');
-                    fab.setAttribute('data-action', 'open-comments-view');
-                    fab.dataset.parentId = parentId;
-                    fab.dataset.parentType = parentType;
-                    fab.innerHTML = '<span class="material-symbols-outlined">forum</span>';
-                    overlay.appendChild(fab);
-                }
-            }
-        } catch (_) {}
                 const action = btn.dataset.action;
+                const parentModal = btn.closest('.modal-bg');
 
-                // [FIX LOGIKA] Tutup modal pertama sebelum membuka yang kedua
                 if (action === 'pay_partial') {
-                    // On mobile, close the current modal before opening partial form to avoid overlay stacking
-                    if (!window.matchMedia('(min-width: 600px)').matches) closeModal(modal);
-                    _openSimulasiPartialPaymentModal(dataset);
-                    return; 
+                    if (parentModal) closeModal(parentModal);
+                    setTimeout(() => {
+                        _openSimulasiPartialPaymentModal(dataset);
+                    }, 300);
+                    return;
                 }
       
                 if (action === 'pay_full') {
@@ -12524,21 +12480,23 @@ function _openSimulasiItemActionsModal(dataset) {
                     card.classList.remove('selected');
                 }
                 
-                _updateSimulasiTotals();
+                if (parentModal) closeModal(parentModal);
 
-                // Tutup modal/panel
-                if (window.matchMedia('(min-width: 600px)').matches) closeDetailPane(); else closeModal(modal);
+                setTimeout(() => {
+                    _updateSimulasiTotals();
+                }, 300);
             });
         });
     }
 }
-
 function _openSimulasiPartialPaymentModal(dataset) {
     const { id, title, fullAmount } = dataset;
     const fullAmountNum = parseFormattedNumber(fullAmount);
     
+    const formId = `partial-payment-form-${id}`; 
+
     const content = `
-        <form id="partial-payment-form">
+        <form id="${formId}">
             <div class="simulasi-actions-modal-header">
                 <h5>${title}</h5>
                 <p>Total tagihan penuh: <strong>${fmtIDR(fullAmountNum)}</strong></p>
@@ -12548,35 +12506,38 @@ function _openSimulasiPartialPaymentModal(dataset) {
               'Jumlah Pembayaran Parsial',
               '<input type="text" name="amount" inputmode="numeric" required placeholder="mis. 500.000">'
             )}
+            
+            <div class="form-footer-actions">
+                <button type="submit" class="btn btn-primary">Simpan</button>
+                <button type="button" class="btn btn-secondary" data-action="close-modal-or-pane">Batal</button>
+            </div>
         </form>
     `;
-    const footer = `
-        <button type="button" class="btn btn-secondary" data-action="close-modal-or-pane">Batal</button>
-        <button type="submit" class="btn btn-primary" form="partial-payment-form">Simpan</button>
-    `;
-
-    const modal = createModal('payment', {
+    
+    // [PERBAIKAN KUNCI 1] Panggil createModal dengan tipe 'actionsPopup'
+    const modal = createModal('actionsPopup', {
         title: 'Pembayaran Parsial',
-        content: content,
-        footer: footer
+        content: content
+        // Footer tidak lagi diperlukan karena tombol ada di dalam 'content'
     });
-
-    const context = window.matchMedia('(min-width: 600px)').matches ? document.getElementById('detail-pane') : modal;
+    
+    // Sisa dari fungsi ini tidak perlu diubah
+    const context = modal; // Di mobile, konteksnya selalu modal itu sendiri
     
     if(context){
-        const form = $('#partial-payment-form', context);
+        const form = $(`#${formId}`, context); 
         const amountInput = form.querySelector('input[name="amount"]');
         const closeModalBtn = $('[data-action="close-modal-or-pane"]', context);
       
         amountInput.addEventListener('input', _formatNumberInput);
 
         const closeCurrentView = () => {
-            if (window.matchMedia('(min-width: 600px)').matches) {
-                // Return to the actions panel instead of closing the detail pane entirely
+            closeModal(modal); // Cukup tutup modal saat ini
+
+            // Setelah animasi tutup, buka kembali modal aksi sebelumnya
+            setTimeout(() => {
                 _openSimulasiItemActionsModal(dataset);
-            } else {
-                closeModal(modal);
-            }
+            }, 350);
         };
 
         closeModalBtn.addEventListener('click', closeCurrentView);
@@ -12596,15 +12557,20 @@ function _openSimulasiPartialPaymentModal(dataset) {
             if (card) {
                 appState.simulasiState.selectedPayments.set(id, amountToPay);
                 card.classList.add('selected');
-                _updateSimulasiTotals();
             }
             
-            closeCurrentView();
+            // Tutup modal ini terlebih dahulu
+            closeModal(modal);
+            
+            // Jalankan update total setelah animasi tutup selesai
+            setTimeout(() => {
+                _updateSimulasiTotals();
+            }, 350);
         });
     }
 }
 
-  function _updateSimulasiTotals() {
+function _updateSimulasiTotals() {
     const danaMasukEl = $('#simulasi-dana-masuk');
     const totalAlokasiEl = $('#simulasi-total-alokasi');
     const sisaDanaEl = $('#simulasi-sisa-dana');
@@ -13840,7 +13806,7 @@ async function _renderDynamicReportFilters(reportType) {
         sections: sections
     };
   }
-  async function generatePdfReport(config) {
+async function generatePdfReport(config) {
     const {
         title,
         subtitle,
@@ -13855,7 +13821,6 @@ async function _renderDynamicReportFilters(reportType) {
   
     toast('syncing', 'Membuat laporan PDF...');
     try {
-        // 'await' di sini WAJIB ADA untuk menunggu data dari Firestore
         if (!appState.pdfSettings) {
             const docSnap = await getDoc(settingsDocRef);
             if (docSnap.exists()) {
@@ -13958,7 +13923,8 @@ async function _renderDynamicReportFilters(reportType) {
                 ...tableConfig,
                 head: [section.headers],
                 body: section.body,
-                foot: section.foot?[section.foot] : [],
+                // [PERBAIKAN KUNCI DI SINI] Menghapus array tambahan yang membungkus section.foot
+                foot: section.foot || [], 
                 startY: lastY,
                 didDrawPage: didDrawPage,
                 margin: {
@@ -13979,138 +13945,158 @@ async function _renderDynamicReportFilters(reportType) {
         toast('error', 'Terjadi kesalahan saat membuat PDF.');
     }
   }
+  
   function _prepareSimulasiData() {
-    const groupedByProject = {};
+    const allItems = [];
     let totalAlokasi = 0;
+
     appState.simulasiState.selectedPayments.forEach((amount, id) => {
-        const [itemType, itemId] = id.split('-');
-        let billOrLoan = null;
-        let itemDetails = {
-            recipient: '-',
-            description: '-',
-            amount,
-            category: 'lainnya'
-        };
-        let projectId = 'tanpa_proyek';
-        let projectName = 'Tanpa Proyek';
+        // [PERBAIKAN KUNCI 1] Cara baru yang lebih aman untuk memisahkan ID
+        const firstHyphenIndex = id.indexOf('-');
+        if (firstHyphenIndex === -1) return; // Lewati jika format ID salah
+        const itemType = id.substring(0, firstHyphenIndex);
+        const itemId = id.substring(firstHyphenIndex + 1);
+
+        let details = {};
+
         if (itemType === 'bill') {
-            billOrLoan = appState.bills.find(b => b.id === itemId);
-            if (billOrLoan) {
-                projectId = billOrLoan.projectId || 'tanpa_proyek';
-                itemDetails.description = billOrLoan.description;
-                itemDetails.category = billOrLoan.type;
-                if (billOrLoan.type === 'gaji') itemDetails.recipient = appState.workers.find(w => w.id === billOrLoan.workerId)?.workerName || 'Pekerja';
-                else if (billOrLoan.type === 'fee') itemDetails.recipient = appState.staff.find(s => s.id === billOrLoan.staffId)?.staffName || 'Staf';
-                else {
-                    const expense = appState.expenses.find(e => e.id === billOrLoan.expenseId);
-                    itemDetails.recipient = appState.suppliers.find(s => s.id === expense?.supplierId)?.supplierName || 'Supplier';
-                }
+            const bill = appState.bills.find(b => b.id === itemId);
+            if (!bill) return;
+
+            const expense = appState.expenses.find(e => e.id === bill.expenseId);
+            const project = appState.projects.find(p => p.id === (expense?.projectId || bill.projectId));
+
+            details = {
+                projectName: project?.projectName || 'Tanpa Proyek',
+                description: bill.description,
+                amount: amount,
+                category: bill.type || 'lainnya',
+            };
+
+            if (bill.type === 'gaji') {
+                const worker = appState.workers.find(w => w.id === bill.workerId);
+                details.recipient = worker?.workerName || 'Pekerja';
+            } else if (bill.type === 'fee') {
+                const staff = appState.staff.find(s => s.id === bill.staffId);
+                details.recipient = staff?.staffName || 'Staf';
+            } else {
+                const supplier = appState.suppliers.find(s => s.id === expense?.supplierId);
+                details.recipient = supplier?.supplierName || 'Supplier';
             }
+
         } else if (itemType === 'loan') {
-            billOrLoan = appState.fundingSources.find(l => l.id === itemId);
-            if (billOrLoan) {
-                itemDetails.recipient = appState.fundingCreditors.find(c => c.id === billOrLoan.creditorId)?.creditorName || 'Kreditur';
-                itemDetails.description = 'Cicilan Pinjaman';
-                itemDetails.category = 'pinjaman';
-            }
-        }
-        if (!groupedByProject[projectId]) {
-            const project = appState.projects.find(p => p.id === projectId);
-            projectName = project?project.projectName : 'Tanpa Proyek';
-            groupedByProject[projectId] = {
-                projectName,
-                itemsByCategory: {}
+            const loan = appState.fundingSources.find(l => l.id === itemId);
+            if (!loan) return;
+            const creditor = appState.fundingCreditors.find(c => c.id === loan.creditorId);
+            details = {
+                projectName: 'Tanpa Proyek',
+                description: 'Cicilan Pinjaman',
+                amount: amount,
+                category: 'pinjaman',
+                recipient: creditor?.creditorName || 'Kreditur',
             };
         }
-  
-        if (!groupedByProject[projectId].itemsByCategory[itemDetails.category]) {
-            groupedByProject[projectId].itemsByCategory[itemDetails.category] = [];
+
+        if (Object.keys(details).length > 0) {
+            allItems.push(details);
+            totalAlokasi += amount;
         }
-        groupedByProject[projectId].itemsByCategory[itemDetails.category].push(itemDetails);
-        totalAlokasi += amount;
     });
+
+    const categoryLabels = {
+        gaji: 'Gaji Pekerja', fee: 'Fee Staf', material: 'Tagihan Material',
+        operasional: 'Tagihan Operasional', lainnya: 'Tagihan Lainnya', pinjaman: 'Cicilan Pinjaman'
+    };
+    
+    const groupedByCategory = allItems.reduce((acc, item) => {
+        const categoryKey = item.category || 'lainnya';
+        if (!acc[categoryKey]) {
+            acc[categoryKey] = {
+                categoryName: categoryLabels[categoryKey] || categoryKey.toUpperCase(),
+                items: [],
+                total: 0
+            };
+        }
+        acc[categoryKey].items.push(item);
+        acc[categoryKey].total += item.amount;
+        return acc;
+    }, {});
+    
     return {
-        groupedByProject,
+        groupedByCategory,
         totalAlokasi
     };
-  }
-  async function _createSimulasiPDF() {
+}
+
+async function _createSimulasiPDF() {
     const danaMasuk = parseFormattedNumber($('#simulasi-dana-masuk').value);
     if (danaMasuk <= 0 || appState.simulasiState.selectedPayments.size === 0) {
         toast('error', 'Isi dana masuk dan pilih minimal satu tagihan.');
         return;
     }
-    
-    toast('syncing', 'Mempersiapkan PDF...');
+
+    toast('syncing', 'Mempersiapkan Laporan PDF...');
 
     try {
-        // [PERBAIKAN] Ambil library dari window object
         const { jsPDF } = window.jspdf;
+        if (!jsPDF) throw new Error('Library PDF belum siap.');
 
-        if (!jsPDF) {
-            toast('error', 'Library PDF belum siap. Coba lagi sesaat.');
-            return;
-        }
-        
-        const { groupedByProject, totalAlokasi } = _prepareSimulasiData();
+        const { groupedByCategory, totalAlokasi } = _prepareSimulasiData();
         const sisaDana = danaMasuk - totalAlokasi;
 
         const sections = [];
-        const categoryLabels = {
-            gaji: 'Rincian Gaji Pekerja',
-            fee: 'Rincian Fee Staf',
-            material: 'Rincian Tagihan Material',
-            operasional: 'Rincian Tagihan Operasional',
-            lainnya: 'Rincian Tagihan Lainnya',
-            pinjaman: 'Rincian Cicilan Pinjaman'
-        };
-        const headers = ['Penerima', 'Deskripsi', 'Jumlah'];
-        // Summary Section
+
+        // Bagian 1: Ringkasan Global
+        // [PERBAIKAN KUNCI 2] Menyederhanakan format data untuk menghindari error [object Object]
         sections.push({
             sectionTitle: 'Ringkasan Alokasi Dana',
             headers: ['Deskripsi', 'Jumlah'],
             body: [
-                ['Dana Masuk', fmtIDR(danaMasuk)],
-                ['Total Alokasi', fmtIDR(totalAlokasi)]
+                ['Dana Masuk (Uang di Tangan)', fmtIDR(danaMasuk)],
+                ['Total Alokasi Pembayaran', fmtIDR(totalAlokasi)]
             ],
-            foot: [
-                ['Sisa Dana', fmtIDR(sisaDana)]
-            ]
+            foot: [['Sisa Dana', fmtIDR(sisaDana)]]
         });
-        // Loop through each project
-        for (const projectId in groupedByProject) {
-            const projectData = groupedByProject[projectId];
-            let projectTotal = 0;
 
-            // Loop through each category within the project
-            for (const category in projectData.itemsByCategory) {
-                const items = projectData.itemsByCategory[category];
-                const categoryTotal = items.reduce((sum, item) => sum + item.amount, 0);
-                projectTotal += categoryTotal;
-                sections.push({
-                    sectionTitle: `${categoryLabels[category]} - Proyek: ${projectData.projectName}`,
-                    headers: headers,
-                    body: items.map(item => [item.recipient, item.description, fmtIDR(item.amount)]),
-                    foot: [
-                        ['Subtotal Kategori', '', fmtIDR(categoryTotal)]
-                    ]
-                });
-            }
+        // Bagian 2: Rincian detail untuk setiap Kategori
+        const categoryLabels = {
+            gaji: 'Gaji Pekerja', fee: 'Fee Staf', material: 'Tagihan Material',
+            operasional: 'Tagihan Operasional', lainnya: 'Tagihan Lainnya', pinjaman: 'Cicilan Pinjaman'
+        };
+
+        for (const categoryKey in groupedByCategory) {
+            const categoryData = groupedByCategory[categoryKey];
+            
+            const bodyRows = categoryData.items.map(item => {
+                const description = `${item.description} (${item.projectName})`;
+                return [
+                    item.recipient,
+                    description,
+                    { content: fmtIDR(item.amount), styles: { halign: 'right' } }
+                ];
+            });
+            
+            sections.push({
+                sectionTitle: `Rincian Alokasi: ${categoryData.categoryName}`,
+                headers: ['Penerima', 'Deskripsi (Proyek)', { content: 'Jumlah', styles: { halign: 'right' } }],
+                body: bodyRows,
+                foot: [['Total Kategori', '', { content: fmtIDR(categoryData.total), styles: { halign: 'right' } }]]
+            });
         }
 
         generatePdfReport({
             title: 'Laporan Simulasi Alokasi Dana',
-            subtitle: `Dibuat pada: ${new Date().toLocaleDateString('id-ID')}`,
+            subtitle: `Dibuat pada: ${new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}`,
             filename: `Simulasi-Alokasi-Dana-${new Date().toISOString().slice(0, 10)}.pdf`,
             sections: sections
         });
+
     } catch (error) {
-        toast('error', 'Gagal membuat PDF. Pastikan library sudah termuat.');
+        toast('error', 'Gagal membuat PDF. Coba lagi.');
         console.error("Gagal membuat PDF Simulasi:", error);
     }
 }
-
-  function _getKwitansiHTML(data) {
+function _getKwitansiHTML(data) {
       const terbilang = (n) => {
           const bilangan = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
           if (n < 12) return bilangan[n];
@@ -14148,7 +14134,8 @@ async function _renderDynamicReportFilters(reportType) {
           </div>
       `;
   }
-  async function handleCetakKwitansi(billId) {
+
+async function handleCetakKwitansi(billId) {
     toast('syncing', 'Mempersiapkan kwitansi...');
     const bill = appState.bills.find(b => b.id === billId);
     if (!bill) {
@@ -14183,7 +14170,7 @@ async function _renderDynamicReportFilters(reportType) {
         recipient: recipientName,
         amount: bill.amount,
         totalTagihan: bill.amount || 0,
-        sisaTagihan: Math.max(0, (bill.amount || 0) - (bill.paidAmount || 0))
+        sisaTagihan: Math.max(0, (bill.amount || 0) - (bill.paidAmount || 0)),
     };
 
     const contentHTML = `
@@ -14243,7 +14230,7 @@ async function handleCetakKwitansiIndividu(dataset) {
         recipient: workerDetail.name,
         amount: workerDetail.amount,
         totalTagihan: workerDetail.amount,
-        sisaTagihan: 0
+        sisaTagihan: 0,
     };
 
     const contentHTML = `
@@ -14285,7 +14272,6 @@ async function handleCetakKwitansiKolektif(dataset) {
         return;
     }
 
-    // Langkah 1: Kumpulkan semua pembayaran dari server dan dari antrean offline
     let allPaymentsForBill = [];
     try {
         if (navigator.onLine) {
@@ -14873,20 +14859,22 @@ async function handleProcessIndividualSalaryPayment(form) {
       toggleFields();
   }
 
-  function _getUniversalKwitansiHTML(data = {}) {
+function _getUniversalKwitansiHTML(data = {}) {
     const {
         nomor = `INV-${Date.now()}`,
         tanggal = new Date().toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'}),
         namaPenerima = 'Penerima Tidak Dikenal',
         jumlah = 0,
         deskripsi = 'Pembayaran tagihan/lainnya',
-        isLunas = false
+        isLunas = false,
     } = data;
+
+    const namaPencetak = appState.currentUser?.displayName || 'Pengguna';
 
     const terbilangText = _terbilang(jumlah);
     const formattedJumlah = fmtIDR(jumlah);
 
-    const companyLogo = logoData; // Menggunakan logo dari logo-data.js
+    const companyLogo = logoData;
     const companyName = 'CV. ALAM BERKAH ABADI';
     const companyAddress = 'Cijiwa, Sukabumi';
 
@@ -14940,16 +14928,17 @@ async function handleProcessIndividualSalaryPayment(form) {
                 <p>Cijiwa, ${tanggal}</p>
                 <p class="signature-title">Hormat Kami,</p>
                 <div class="signature-space"></div>
-                <p class="signature-name">${companyName}</p>
+                
+                <p class="signature-name">${namaPencetak}</p>
+                
             </div>
             <div class="status-stamp ${isLunas ? 'lunas' : 'tanda-terima'}">
-                ${isLunas ? 'LUNAS' : 'TANDA TERIMA'}
+                ${isLunas ? 'TANDA TERIMA' : 'TANDA TERIMA'}
             </div>
         </footer>
     </div>
     `;
 }
-
 async function _downloadUniversalKwitansiAsPDF(data = {}) {
     toast('syncing', 'Membuat PDF Kwitansi...');
     try {
@@ -16102,23 +16091,31 @@ async function handleUpdateItem(form) {
     let dataToUpdate = {}, config = { title: 'Data' }, collectionRef, table;
 
     try {
+        const fileInput = form.elements['attachment'];
+        if (fileInput && fileInput.files[0]) {
+            const loadingToast = toast('syncing', 'Mengunggah lampiran...');
+            try {
+                const file = fileInput.files[0];
+                dataToUpdate.attachmentURL = await handleFileUpload(file, 'attachments');
+                dataToUpdate.attachmentName = file.name;
+            } catch (uploadError) {
+                loadingToast.close();
+                toast('error', `Gagal unggah file: ${uploadError.message}`);
+                return false;
+            }
+            loadingToast.close();
+        }
+
         switch (type) {
             case 'termin':
                 table = localDB.incomes; collectionRef = incomesCol; config.title = 'Pemasukan Termin';
-                dataToUpdate = { amount: parseFormattedNumber(form.elements['pemasukan-jumlah'].value), date: new Date(form.elements['pemasukan-tanggal'].value), projectId: form.elements['pemasukan-proyek'].value };
+                dataToUpdate = { ...dataToUpdate, amount: parseFormattedNumber(form.elements['pemasukan-jumlah'].value), date: new Date(form.elements['pemasukan-tanggal'].value), projectId: form.elements['pemasukan-proyek'].value };
                 break;
             
-            case 'loan':
-            case 'pinjaman':
+            case 'loan': case 'pinjaman':
                 table = localDB.funding_sources; collectionRef = fundingSourcesCol; config.title = 'Pinjaman';
-                dataToUpdate = { 
-                    totalAmount: parseFormattedNumber(form.elements.totalAmount.value),
-                    date: new Date(form.elements.date.value),
-                    creditorId: form.elements['pemasukan-kreditur'].value,
-                    interestType: form.elements['loan-interest-type'].value,
-                    rate: Number(form.elements.rate.value || 0),
-                    tenor: Number(form.elements.tenor.value || 0)
-                };
+                const interestType = form.elements['loan-interest-type'].value;
+                dataToUpdate = { ...dataToUpdate, totalAmount: parseFormattedNumber(form.elements.totalAmount.value), date: new Date(form.elements.date.value), creditorId: form.elements['pemasukan-kreditur'].value, interestType, rate: interestType === 'interest' ? Number(form.elements.rate.value || 0) : 0, tenor: interestType === 'interest' ? Number(form.elements.tenor.value || 0) : 0 };
                 if (dataToUpdate.interestType === 'interest') {
                     const amount = dataToUpdate.totalAmount;
                     const totalInterest = amount * (dataToUpdate.rate / 100) * dataToUpdate.tenor;
@@ -16128,23 +16125,27 @@ async function handleUpdateItem(form) {
 
             case 'fee_bill':
                 table = localDB.bills; collectionRef = billsCol; config.title = 'Tagihan Fee';
-                dataToUpdate = { description: form.elements.description.value.trim(), amount: parseFormattedNumber(form.elements.amount.value) };
+                dataToUpdate = { ...dataToUpdate, description: form.elements.description.value.trim(), amount: parseFormattedNumber(form.elements.amount.value) };
                 break;
 
             case 'expense':
                 table = localDB.expenses; collectionRef = expensesCol; config.title = 'Pengeluaran';
                 if (form.querySelector('#invoice-items-container')) {
                     const items = [];
-                    $$('.invoice-item-row', form).forEach(row => {
-                        const materialId = row.querySelector('.custom-select-wrapper input[type="hidden"]')?.value || null;
-                        if (materialId) {
-                            items.push({ name: row.querySelector('.custom-select-trigger span')?.textContent || 'Barang', price: parseFormattedNumber(row.querySelector('input[name="itemPrice"]').value), qty: parseLocaleNumber(row.querySelector('input[name="itemQty"]').value), total: parseFormattedNumber(row.querySelector('input[name="itemPrice"]').value) * parseLocaleNumber(row.querySelector('input[name="itemQty"]').value), materialId: materialId });
+                    $$('.multi-item-row', form).forEach(row => {
+                        const materialId = row.querySelector('input[name="materialId"]')?.value || null;
+                        const priceInput = row.querySelector('input[name="itemPrice"]');
+                        const qtyInput = row.querySelector('input[name="itemQty"]');
+                        if (materialId && qtyInput?.value) {
+                            const qty = parseLocaleNumber(qtyInput.value);
+                            const price = priceInput ? parseFormattedNumber(priceInput.value) : 0;
+                            items.push({ name: row.querySelector('.custom-select-trigger span')?.textContent || 'Barang', price, qty, total: price * qty, materialId });
                         }
                     });
                     if (items.length === 0) throw new Error('Faktur harus memiliki minimal satu barang.');
-                    dataToUpdate = { projectId: form.elements['project-id'].value, supplierId: form.elements['supplier-id'].value, description: form.elements.description.value, date: new Date(form.elements.date.value), items: items, amount: items.reduce((sum, item) => sum + item.total, 0) };
+                    dataToUpdate = { ...dataToUpdate, projectId: form.elements['project-id'].value, supplierId: form.elements['supplier-id'].value, description: form.elements.description.value, date: new Date(form.elements.date.value), items: items, amount: items.reduce((sum, item) => sum + item.total, 0) };
                 } else {
-                    dataToUpdate = { amount: parseFormattedNumber(form.elements['pengeluaran-jumlah'].value), description: form.elements['pengeluaran-deskripsi'].value, date: new Date(form.elements['pengeluaran-tanggal'].value), projectId: form.elements['expense-project'].value, supplierId: form.elements['expense-supplier'].value, categoryId: form.elements['expense-category']?.value || '' };
+                    dataToUpdate = { ...dataToUpdate, amount: parseFormattedNumber(form.elements['pengeluaran-jumlah'].value), description: form.elements['pengeluaran-deskripsi'].value, date: new Date(form.elements['pengeluaran-tanggal'].value), projectId: form.elements['expense-project'].value, supplierId: form.elements['expense-supplier'].value, categoryId: form.elements['expense-category']?.value || '' };
                 }
                 break;
             default: throw new Error('Tipe data untuk update tidak dikenal.');
@@ -16160,11 +16161,7 @@ async function handleUpdateItem(form) {
         return false;
     }
     
-    const dataToStore = {
-        ...currentItem,
-        ...dataToUpdate,
-        updatedAt: new Date()
-    };
+    const dataToStore = { ...currentItem, ...dataToUpdate, updatedAt: new Date() };
 
     if (navigator.onLine && !_isQuotaExceeded()) {
         const loadingToast = toast('syncing', `Memperbarui ${config.title}...`);
@@ -16172,13 +16169,14 @@ async function handleUpdateItem(form) {
             await runTransaction(db, async (transaction) => {
                 const docRef = doc(collectionRef, id);
                 const serverSnap = await transaction.get(docRef);
-                if (!serverSnap.exists()) throw new Error("Data tidak ditemukan di server.");
-                
-                const serverData = serverSnap.data();
-                const updatePayload = { ...dataToUpdate, rev: (serverData.rev || 0) + 1, updatedAt: serverTimestamp() };
-                transaction.update(docRef, updatePayload);
-                
-                // [PERBAIKAN UTAMA] Jika yang di-edit adalah expense, update juga bill terkait.
+                const localBaseRev = currentItem.serverRev || 0;
+                const serverRev = serverSnap.exists() ? (serverSnap.data().rev || 0) : 0;
+                const isSoftDeleteOperation = dataToUpdate.isDeleted === 1;
+                if (serverSnap.exists() && serverRev > localBaseRev && currentItem.syncState === 'pending_update' && !isSoftDeleteOperation) { throw new Error(`Conflict detected on ${type}:${id}.`); }
+                const nextRev = serverRev + 1;
+                const firestoreData = { ...dataToStore, syncState: 'synced', serverRev: nextRev };
+                delete firestoreData.localId;
+                transaction.set(docRef, { ...firestoreData, rev: nextRev, updatedAt: serverTimestamp() }, { merge: true });
                 if (type === 'expense') {
                     const localBill = await localDB.bills.where({ expenseId: id }).first();
                     if (localBill) {
@@ -16186,68 +16184,42 @@ async function handleUpdateItem(form) {
                         const serverBillSnap = await transaction.get(billRef);
                         if (serverBillSnap.exists()) {
                             const serverBillData = serverBillSnap.data();
-                            transaction.update(billRef, {
-                                amount: dataToUpdate.amount,
-                                description: dataToUpdate.description,
-                                dueDate: dataToUpdate.date || serverBillData.dueDate || serverTimestamp(),
-                                rev: (serverBillData.rev || 0) + 1,
-                                updatedAt: serverTimestamp()
-                            });
+                            transaction.update(billRef, { amount: dataToUpdate.amount, description: dataToUpdate.description, dueDate: dataToUpdate.date || serverBillData.dueDate || serverTimestamp(), rev: (serverBillData.rev || 0) + 1, updatedAt: serverTimestamp() });
                         }
                     }
                 }
             });
-            
-            // [PERBAIKAN UTAMA] Update data lokal untuk expense DAN bill.
             await table.put({ ...dataToStore, syncState: 'synced' });
             if (type === 'expense') {
                 const localBill = await localDB.bills.where({ expenseId: id }).first();
-                if (localBill) {
-                    await localDB.bills.update(localBill.id, {
-                        amount: dataToUpdate.amount,
-                        description: dataToUpdate.description,
-                        dueDate: dataToUpdate.date || new Date(),
-                        syncState: 'synced',
-                        updatedAt: new Date()
-                    });
-                }
+                if (localBill) { await localDB.bills.update(localBill.id, { amount: dataToUpdate.amount, description: dataToUpdate.description, dueDate: dataToUpdate.date || new Date(), syncState: 'synced', updatedAt: new Date() }); }
             }
-            
             await loadAllLocalDataToState();
             loadingToast.close();
-
+            return true;
         } catch (error) {
             loadingToast.close();
             toast('error', `Gagal update di server: ${error.message}. Perubahan disimpan lokal.`);
             await table.put({ ...dataToStore, syncState: 'pending_update' });
+            await syncToServer({ silent: true });
+            return true;
         }
     } else {
-        // [PERBAIKAN UTAMA] Tambahkan logika update bill untuk mode offline juga.
-        await table.put({ ...dataToStore, syncState: 'pending_update' });
-        if (type === 'expense') {
-            const localBill = await localDB.bills.where({ expenseId: id }).first();
-            if (localBill) {
-                await localDB.bills.update(localBill.id, {
-                    amount: dataToUpdate.amount,
-                    description: dataToUpdate.description,
-                    dueDate: dataToUpdate.date || new Date(),
-                    syncState: 'pending_update',
-                    updatedAt: new Date()
-                });
+        try {
+            await table.put({ ...dataToStore, syncState: 'pending_update' });
+            if (type === 'expense') {
+                const localBill = await localDB.bills.where({ expenseId: id }).first();
+                if (localBill) { await localDB.bills.update(localBill.id, { amount: dataToUpdate.amount, description: dataToUpdate.description, dueDate: dataToUpdate.date || new Date(), syncState: 'pending_update', updatedAt: new Date() }); }
             }
+            _logActivity(`Memperbarui Data (Offline): ${config.title}`, { docId: id });
+            await loadAllLocalDataToState();
+            return true;
+        } catch(error) {
+            toast('error', `Gagal menyimpan di perangkat: ${error.message}`);
+            return false;
         }
-        toast('info', 'Offline. Perubahan disimpan di perangkat.');
     }
-    
-    _logActivity(`Memperbarui Data: ${config.title}`, { docId: id });
-    await loadAllLocalDataToState();
-    try {
-        if (!appState._recentlyEditedIds) appState._recentlyEditedIds = new Set();
-        appState._recentlyEditedIds.add(id);
-    } catch (_) {}
-    return true;
 }
-
 async function handleDeleteItem(id, type) {
     const itemMap = {
         bill: { name: 'Tagihan', list: appState.bills },

@@ -113,10 +113,11 @@ body::before {
   padding-left: 10px;
 }
 
+/* GANTI BLOK CSS INI DI style.css */
 .invoice-title {
-  font-size: 14px; /* UKURAN FONT DIKECILKAN DRASTIS */
+  font-size: 10.5px; /* DIKECILKAN dari 14px */
   font-weight: 700;
-  margin: 0 0 6px 0;
+  margin: 0 0 4px 0; /* Margin bawah dikurangi agar lebih rapat */
   color: #000;
   text-transform: uppercase;
 }
@@ -8926,3 +8927,13 @@ body.comments-view-active .mobile-detail-header + .mobile-detail-content + .moda
 .dark-theme .cloned-select-options .custom-select-search::placeholder {
     color: var(--text-dim);
 }
+/* =======================================================
+ * [PERBAIKAN] Padding untuk Modal Pembayaran Parsial
+ * ======================================================= */
+
+/* Aturan ini menargetkan secara spesifik body dari modal 
+   bottom-sheet yang berisi form pembayaran parsial */
+   .modal-bg.is-bottom-sheet .modal-body:has(form[id^="partial-payment-form"]) {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
