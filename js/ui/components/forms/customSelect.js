@@ -79,7 +79,7 @@ export function initCustomSelects(context = document) {
         const optionsContainer = wrapper.querySelector('.custom-select-options');
         const optionsList = wrapper.querySelector('.custom-select-options-list');
         const searchInput = wrapper.querySelector('.custom-select-search');
-
+        
         if (!trigger || !hiddenInput || !triggerSpan || !optionsContainer || !optionsList) {
 
              return;
@@ -102,9 +102,12 @@ export function initCustomSelects(context = document) {
                 if (searchInput) {
                     searchInput.value = '';
                     optionsList.querySelectorAll('.custom-select-option').forEach(opt => opt.style.display = '');
-                     setTimeout(() => searchInput.focus(), 50);
-                }
-                if (optionsContainer) optionsContainer.scrollTop = 0;
+                    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+                    if (!isTouchDevice) {
+                        setTimeout(() => searchInput.focus(), 50);
+                    }
+                    if (optionsContainer) optionsContainer.scrollTop = 0;
 
                 const selectedOption = optionsList.querySelector('.custom-select-option.selected');
                 if (selectedOption) {
