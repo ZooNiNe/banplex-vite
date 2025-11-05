@@ -9,7 +9,7 @@
 
 html, body {
   overflow: hidden;
-  height: 100vh;
+  height: 100%;
 }
 body.is-resizing {
   cursor: col-resize;
@@ -18,7 +18,7 @@ body.is-resizing {
 
 #app-shell {
   display: flex;
-  height: 100vh;
+  height: 100%;
 }
 
 .content-wrapper {
@@ -29,7 +29,7 @@ body.is-resizing {
   position: relative;
   z-index: 1;
   overflow: hidden;
-  height: 100vh;
+  height: 100%;
 }
 
 .page-container {
