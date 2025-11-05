@@ -7,19 +7,8 @@ if (workbox) {
   workbox.core.clientsClaim();
   self.skipWaiting();
   try { workbox.navigationPreload.enable(); } catch(_) {}
-  workbox.precaching.precacheAndRoute([
-    { url: './', revision: null },
-    { url: 'index.html', revision: null },
-    { url: 'style/main.css', revision: null },
-    { url: 'public/manifest.json', revision: null },
-    { url: 'public/icons-logo.png', revision: null },
-    { url: 'public/logo-cv-aba.png', revision: null },
-    { url: 'public/icons-logo.webp', revision: null }, // optional modern format
-    { url: 'public/logo-cv-aba.webp', revision: null }, // optional modern format
-    { url: 'public/logo-header-pdf.png', revision: null },
-    { url: 'public/logo-footer-pdf.png', revision: null },
-    { url: 'js/app.js', revision: null },
-  ]);
+
+  workbox.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
 
   workbox.routing.registerRoute(
     ({ request }) => request.mode === 'navigate',
@@ -27,7 +16,6 @@ if (workbox) {
       cacheName: 'banplex-pages',
     })
   );
-
   workbox.routing.registerRoute(
     ({ request }) => request.destination === 'style' || request.destination === 'worker',
     new workbox.strategies.StaleWhileRevalidate({ cacheName: 'banplex-static-assets' })
