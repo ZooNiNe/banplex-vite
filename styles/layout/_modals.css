@@ -243,7 +243,7 @@
 }
 
 .modal-bg.is-bottom-sheet .modal-body {
-  padding: 0.5rem 1.25rem calc(1rem + env(safe-area-inset-bottom, 0px)) 1.25rem;
+  padding: 0.5rem 1.25rem calc(0rem + env(safe-area-inset-bottom, 0px)) 1.25rem;
   overflow-y: auto;
   flex-grow: 1;
   min-height: 0;

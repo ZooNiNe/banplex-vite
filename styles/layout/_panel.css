@@ -37,7 +37,7 @@
 .panel-footer {
     flex-shrink: 0;
     padding: 1rem 1.5rem;
-    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
     background-color: var(--panel);
     display: grid;
     gap: 0.75rem;
@@ -75,22 +75,6 @@
 */
 
 /* PERUBAHAN: Tambahkan .page-absensi .panel-body ke grup ini */
-.page-tagihan .panel-body,
-.page-pemasukan .panel-body,
-.page-jurnal .panel-body,
-.page-stok .panel-body,
-.page-pengeluaran .panel-body,
-  .page-recycle_bin .panel-body,
-  .page-log_aktivitas .panel-body,
-  .page-absensi .panel-body,
-  .page-laporan .panel-body {
-      padding-bottom: calc(1.5rem + 65px + env(safe-area-inset-bottom, 0px));
-}
-
-/* Ensure laporan content clears bottom nav on mobile */
-.page-laporan .panel-body {
-  padding-bottom: calc(1.5rem + 65px + env(safe-area-inset-bottom, 0px));
-}
 
 
 /* Unified page container palette for all non-dashboard/settings pages */

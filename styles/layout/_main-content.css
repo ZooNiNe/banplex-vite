@@ -38,9 +38,15 @@ body.is-resizing {
   overflow-y: auto;
   position: relative;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(65px + 1rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@media(min-width: 600px){
+  .page-container{
+    padding-bottom: 0;
+  }
 }
 
 .page-container::-webkit-scrollbar {
@@ -174,8 +180,8 @@ body.detail-view-active .detail-pane {
 .detail-pane-footer,
 .modal-footer {
     flex-shrink: 0;
-    padding: 1rem 1.5rem;
-    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    padding: .5rem 1rem;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
     background-color: var(--panel);
     display: grid;
     gap: 0.75rem;

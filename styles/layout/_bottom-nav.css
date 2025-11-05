@@ -4,8 +4,7 @@
   left: 0;
   right: 0;
   z-index: 2001;
-  height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
+  height: calc(var(--bottom-nav-height));
   background-color: var(--panel);
   border-top: 1px solid var(--line);
   box-shadow: 0 -2px 10px rgba(0, 0, 0, .03);

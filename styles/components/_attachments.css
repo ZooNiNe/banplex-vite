@@ -97,6 +97,7 @@
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 1rem;
   margin-top: 1rem;
+  margin-bottom: 1rem;
   /* Tambahkan kelas ini saat hanya ada 1 item + placeholder */
 }
 .attachment-manager-container.single-item-layout {

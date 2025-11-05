@@ -66,13 +66,13 @@ export function getFormPengeluaranHTML(type, categoryOptions, categoryMasterType
     const attachmentHTML = _createAttachmentManagerHTML(itemData || {}, { inputName: 'attachment', containerId: 'new-attachment-container' });
 
     const submitButtonHTML = `
-        <p class="form-notice full-width">Pastikan semua data terisi dengan benar sebelum menyimpan.</p>
         <div class="form-footer-actions full-width">
             <button type="submit" id="pengeluaran-submit-btn" class="btn btn-primary">
                 ${createIcon('save')}
                 <span>Simpan Pengeluaran</span>
             </button>
         </div>
+        <p class="form-notice full-width">Pastikan semua data terisi dengan benar sebelum menyimpan.</p>
     `;
 
     const heroHTML = `
