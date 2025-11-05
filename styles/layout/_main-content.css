@@ -38,7 +38,6 @@ body.is-resizing {
   overflow-y: auto;
   position: relative;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
@@ -58,7 +57,7 @@ body.is-resizing {
     overflow-y: auto;
     min-height: 0;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: calc( 18px + env(safe-area-inset-bottom, 24px));
+    padding-bottom: calc( 60px + 1rem + env(safe-area-inset-bottom, 24px));
 }
 
 .scrollable-content.has-form-padding {
