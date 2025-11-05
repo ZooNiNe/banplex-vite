@@ -630,22 +630,6 @@ background-color: var(--panel);
   display: none;
 }
 
-/* Style composer-wrapper yang sekarang ada di dalam modal-footer */
-.modal-bg.is-chat-sheet .modal-footer .composer-wrapper {
-  grid-row: unset;
-  position: static;
-  
-  padding: 0.5rem;
-  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
-  /* PERUBAHAN: Gunakan var(--panel-alt) */
-  background-color: var(--panel-alt);
-  box-shadow: none;
-}
-
-.dark-theme .modal-bg.is-chat-sheet .modal-footer .composer-wrapper {
-  background-color: var(--panel-alt);
-}
-
 /* PERUBAHAN: Pastikan capsule di modal juga menggunakan var(--panel-alt) */
 .modal-bg.is-chat-sheet .modal-footer .composer-capsule {
     background: var(--panel-alt);

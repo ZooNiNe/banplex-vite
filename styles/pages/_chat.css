@@ -1346,19 +1346,6 @@ font-size: 0.8rem;
   resize: none;
 }
 
-/* PERUBAHAN: Atur capsule */
-.composer-capsule {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: row; /* Tetap row */
-  align-items: flex-end; /* Ratakan bawah */
-  border: 1px solid var(--line);
-  border-radius: 1.25rem; /* Radius capsule */
-  background: var(--panel-alt);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  overflow: hidden; 
-  padding: 0.25rem 0.25rem 0.25rem 0.75rem; /* Padding di capsule */
-}
 
 /* PERUBAHAN: Target textarea dan actions di dalam capsule */
 .composer-capsule .composer-input {
@@ -2299,7 +2286,6 @@ mark.hit {
   grid-row: 2;
   position: sticky;
   bottom: 0;
-  /* PERUBAHAN: Gunakan padding yang konsisten */
   padding: 0.5rem max(0.5rem, env(safe-area-inset-right)) max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
   background: var(--panel-alt);
   z-index: 2;
@@ -2314,11 +2300,6 @@ mark.hit {
 .composer-capsule {
   flex-grow: 1;
   display: flex;
-  /* * INI PERBAIKAN UTAMANYA:
-   * 1. 'flex-direction: row' (default) - item utama (input, actions) akan berjajar.
-   * 2. 'flex-wrap: wrap' - item baru (seperti reply-bar) akan "turun" atau "naik" baris.
-   * 3. 'align-items: flex-end' - Meratakan input dan tombol ke bagian bawah.
-   */
   flex-wrap: wrap;
   align-items: flex-end;
   border: 1px solid var(--line);
@@ -2326,7 +2307,6 @@ mark.hit {
   background: var(--panel-alt);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   overflow: hidden;
-  /* Padding diatur untuk baris input di dalam capsule */
   padding: 0.25rem 0.25rem 0.25rem 0.75rem;
 }
 
@@ -2583,11 +2563,13 @@ mark.hit {
 /* Style composer-wrapper yang sekarang ada di dalam modal-footer */
 .modal-bg.is-chat-sheet .modal-footer .composer-wrapper {
   grid-row: unset;
-  position: static;
-  
-  padding: 0.5rem;
+  position: fixed; /* Mengunci posisi relatif terhadap viewport */
+  bottom: 0;       /* Menempel di bagian paling bawah */
+  left: 0;         /* Menempel di tepi kiri */
+  right: 0;        /* Menempel di tepi kanan (ini akan membuatnya 100% width) */
+  width: 100%;     /* Memastikan lebar penuh */
+  z-index: 100;  padding: 0.5rem;
   padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
-  /* PERUBAHAN: Gunakan var(--panel-alt) */
   background-color: var(--panel-alt);
   box-shadow: none;
 }

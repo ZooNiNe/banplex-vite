@@ -105,11 +105,6 @@ export function initializeGlobalClickListeners() {
             return;
         }
 
-        const insideModalContent = target.closest('.modal-content, .composer-wrapper, .chat-item-context-header');
-        if (insideModalContent && !target.closest('[data-action="close-modal"], .modal-close-btn')) {
-            return;
-        }
-
         const insideBottomSheetActions = target.closest('.actions-modal-list');
         if (insideBottomSheetActions) {
             return; 
