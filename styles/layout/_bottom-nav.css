@@ -15,6 +15,7 @@
   padding: 0 .5rem env(safe-area-inset-bottom, 0px) .5rem;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .bottom-nav::after {
