@@ -438,29 +438,27 @@ export function getFormFakturMaterialHTML(itemData = null, options = {}) {
     `;
 
     const heroHTML_Material = `
-        <div class="success-hero success-hero--material" style="margin-bottom:.75rem;">
-            <svg class="success-hero-art" width="120" height="88" viewBox="0 0 120 88" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <defs>
-                    <linearGradient id="mat1" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.18" />
-                        <stop offset="100%" stop-color="var(--primary)" stop-opacity="0.05" />
-                    </linearGradient>
-                </defs>
-                <rect x="8" y="12" width="84" height="52" rx="10" fill="url(#mat1)" stroke="var(--line)"/>
-                <rect x="20" y="26" width="40" height="8" rx="4" fill="var(--primary)" opacity="0.25" />
-                <rect x="20" y="40" width="30" height="8" rx="4" fill="var(--primary)" opacity="0.15" />
-            </svg>
-            <div class="success-preview-icon">${createIcon('archive', 24)}</div>
-        </div>`;
+    <div class="success-hero success-hero--material" style="margin-bottom:.75rem;">
+        <svg class="success-hero-art" width="120" height="88" viewBox="0 0 120 88" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+                <linearGradient id="mat1" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.18" />
+                    <stop offset="100%" stop-color="var(--primary)" stop-opacity="0.05" />
+                </linearGradient>
+            </defs>
+            <rect x="8" y="12" width="84" height="52" rx="10" fill="url(#mat1)" stroke="var(--line)"/>
+            <rect x="20" y="26" width="40" height="8" rx="4" fill="var(--primary)" opacity="0.25" />
+            <rect x="20" y="40" width="30" height="8" rx="4" fill="var(--primary)" opacity="0.15" />
+        </svg>
+        <div class="success-preview-icon">${createIcon('archive', 24)}</div>
+    </div>`;
 
-        return `
-        <div class="card" style="display: flex; flex-direction: column; height: 100%; overflow: hidden; padding: 1rem 1rem 0 1rem;">
-            ${heroHTML_Material}
-            <div class="scrollable-content" style="flex: 1; min-height: 0; padding-top: 1rem;">
-                 ${formContent}
-            </div>
-        </div>
-    `;
+    return `
+    <div class="card card-pad" style="padding-top: 1.5rem;">
+        ${heroHTML_Material}
+        ${formContent}
+    </div>
+`;
 }
 
 export async function getMasterDataFormHTML(type, itemData = null) {

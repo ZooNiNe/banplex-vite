@@ -498,6 +498,7 @@
   position: relative;
   z-index: 1;
   background: transparent;
+  overscroll-behavior: contain; /* <--- TAMBAHKAN INI */
 }
 
 .chat-thread::-webkit-scrollbar {

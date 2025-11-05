@@ -113,6 +113,7 @@
   overflow: hidden; 
   display: flex;
   flex-direction: column;
+  overscroll-behavior: contain; /* <--- TAMBAHKAN INI */
 }
 
  .dark-theme .modal-footer {

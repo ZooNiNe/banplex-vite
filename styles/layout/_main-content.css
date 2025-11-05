@@ -163,6 +163,7 @@ body.detail-view-active .detail-pane {
   display: flex;
   flex-direction: column;
   gap: 0rem;
+  overscroll-behavior: contain; /* <--- TAMBAHKAN INI */
 }
 
 .mobile-detail-content > .card {
@@ -311,7 +312,9 @@ body.guest-mode .title-group,
     display: flex;
     flex-direction: column;
     gap: .3rem;
+    overscroll-behavior: contain; /* <--- TAMBAHKAN INI */
   }
+  
   .page-container::-webkit-scrollbar,
   .detail-pane-body::-webkit-scrollbar {
     display: none;
