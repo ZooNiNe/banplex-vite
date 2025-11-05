@@ -1,0 +1,326 @@
+/* =======================================================
+ * COMPONENT: BUTTONS
+ * Mengatur semua gaya untuk elemen yang dapat diklik seperti
+ * tombol, tombol ikon, dan tombol aksi melayang (FAB).
+ * ======================================================= */
+
+/* --- Generic Button & Interaction Styles --- */
+.btn {
+  padding: .6rem 1.1rem; /* Consistent padding */
+  font-size: 0.85rem; /* Standardized font size */
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  transition: all .2s ease;
+  border: 1px solid transparent;
+  text-decoration: none; /* Ensure links styled as buttons don't have underlines */
+}
+
+.btn-icon,
+.icon-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: background-color .2s, color .2s, transform .2s ease;
+  width: 40px; /* Standard size */
+  height: 40px; /* Standard size */
+  position: relative; /* Anchor for notification badge */
+}
+
+/* --- Button Variants --- */
+.btn-primary {
+  background: var(--primary-grad);
+  color: #fff;
+  box-shadow: var(--shadow-md);
+  border-color: transparent;
+}
+
+.btn-secondary {
+  width: 100%;
+  background: var(--secondary-grad);
+  color: #fff;
+  border-color: transparent;
+}
+
+.btn-danger {
+  background: var(--danger-grad);
+  color: #fff;
+  box-shadow: var(--shadow-md);
+  border-color: transparent;
+}
+
+.btn-success {
+  background: var(--success-grad);
+  color: #fff;
+  border-color: transparent;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* --- Button States (Hover, Active) --- */
+.btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05); /* Subtle brightness increase */
+}
+.btn-primary:hover {
+  box-shadow: var(--shadow-lg);
+}
+.btn-secondary:hover {
+  filter: brightness(1.05);
+}
+.btn-ghost:hover {
+  background-color: var(--surface-muted);
+  color: var(--text);
+}
+.btn:active {
+  transform: translateY(0) scale(0.98); /* Press down effect */
+  filter: brightness(0.95);
+}
+
+.btn-icon:hover,
+.icon-btn:hover {
+  background-color: var(--surface-muted);
+  color: var(--text);
+}
+
+.btn-icon:active,
+.icon-btn:active {
+  transform: scale(0.95);
+  background-color: var(--line);
+}
+
+.btn-icon-danger {
+  color: var(--danger);
+}
+.btn-icon-danger:hover {
+  background-color: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+.btn-icon-success {
+  color: var(--success);
+}
+.btn-icon-success:hover {
+  background-color: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+}
+
+.multi-item-row .remove-item-btn,
+.invoice-item-row .remove-item-btn {
+  align-self: center;
+  justify-self: end;
+}
+
+.kwitansi-actions .btn-icon {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+
+.attendance-header .btn {
+  flex: 1;
+  padding: .5rem;
+  font-size: .8rem;
+}
+.attendance-header .btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.sort-direction button {
+  flex: 1;
+  text-align: center;
+  background: transparent;
+  border: none;
+  padding: .6rem .5rem;
+  cursor: pointer;
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-weight: 500;
+  transition: all .2s ease;
+}
+.sort-direction button.active {
+  background: var(--panel);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+
+/* Segmented (pill) toggle: global, reusable */
+.segmented-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-alt);
+  box-shadow: var(--shadow-sm);
+}
+.segmented-toggle button,
+.segmented-toggle a,
+.segmented-toggle .toggle-option,
+.segmented-toggle input[type="radio"] + label {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.segmented-toggle .active,
+.segmented-toggle [aria-pressed="true"],
+.segmented-toggle input[type="radio"]:checked + label {
+  background: var(--primary-light);
+  color: var(--primary);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+.segmented-toggle button:hover,
+.segmented-toggle a:hover,
+.segmented-toggle .toggle-option:hover,
+.segmented-toggle input[type="radio"] + label:hover {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+.segmented-toggle button:focus-visible,
+.segmented-toggle a:focus-visible,
+.segmented-toggle .toggle-option:focus-visible,
+.segmented-toggle input[type="radio"] + label:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 50%, transparent);
+  outline-offset: 2px;
+}
+@media (max-width: 599px) {
+  .segmented-toggle { padding: 3px; gap: 3px; }
+  .segmented-toggle button,
+  .segmented-toggle a,
+  .segmented-toggle .toggle-option,
+  .segmented-toggle input[type="radio"] + label { padding: 6px 10px; font-size: .92rem; }
+}
+
+/* Full-width segmented toggle (for modals/tabs) */
+.segmented-toggle--fullwidth { width: 100%; }
+.segmented-toggle--fullwidth .toggle-option { flex: 1; text-align: center; }
+
+.comment-submit,
+.composer .btn.send,
+.composer .chat-send-btn,
+.composer .icon-btn.mic {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--grad);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+.comment-submit:disabled {
+  transform: scale(0.8);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.comment-meta .btn-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.feedback-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border: none;
+  background: transparent !important;
+  color: var(--primary) !important;
+  padding: 0.35rem 0.5rem !important;
+  border-radius: var(--radius-full);
+}
+.feedback-action-btn:hover {
+  background: rgba(var(--primary-rgb), 0.1) !important;
+}
+
+.snackbar-close {
+  background: transparent !important;
+  border: none;
+  color: rgba(255,255,255,0.9);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 6px;
+}
+.snackbar-close:hover {
+  background: rgba(255,255,255,0.08) !important;
+}
+
+/* =======================================================
+ * DESKTOP & WIDER SCREENS
+ * ======================================================= */
+
+@media (min-width: 600px) {
+  .sidebar-toggle {
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 4px;
+  }
+  .sidebar-toggle:hover {
+    background-color: var(--surface-muted);
+    color: var(--text);
+  }
+  .sidebar-toggle .material-symbols-outlined {
+    font-size: 20px;
+  }
+  body.sidebar-collapsed .sidebar-toggle {
+    margin-left: 0;
+  }
+  .detail-pane .master-data-item .btn-icon {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--line);
+    background-color: var(--panel);
+    border-radius: 8px;
+  }
+  .detail-pane .master-data-item .btn-icon:hover {
+    background-color: var(--surface-muted);
+    border-color: var(--primary);
+    transform: translateY(-1px);
+  }
+  .detail-pane-footer .btn {
+    min-width: 100px;
+  }
+  .recap-filters .btn {
+    flex-shrink: 0;
+  }
+}

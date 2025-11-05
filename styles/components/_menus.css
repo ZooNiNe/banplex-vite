@@ -1,0 +1,169 @@
+/* =======================================================
+ * COMPONENT: MENUS
+ * Styles for action menus (dropdowns) and context menus.
+ * ======================================================= */
+
+ .actions-menu {
+  position: fixed;
+  background-color: var(--panel); /* Use panel color */
+  border-radius: var(--radius); /* Use standard radius */
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  min-width: 180px;
+  /* PERBAIKAN: Hapus animasi, gunakan transisi */
+  /* animation: fade-in-sm .15s ease; */
+  opacity: 0;
+  transform: scale(0.95) translateY(-5px);
+  transform-origin: top left; /* Default, JS akan sesuaikan */
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 1201; /* Pastikan di atas modal lain jika perlu */
+  border: 1px solid var(--line);
+  padding: 0.5rem;
+  pointer-events: none; /* Nonaktifkan interaksi saat tersembunyi */
+}
+
+/* PERBAIKAN: Tambahkan kelas .show untuk mengontrol visibilitas */
+.actions-menu.show {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto; /* Aktifkan interaksi saat terlihat */
+}
+
+
+.actions-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: .75rem .75rem; /* Padding lebih nyaman */
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color .2s;
+  border-radius: var(--radius-sm); /* Radius untuk item */
+  font-size: 1rem;
+}
+
+#actionsPopup-modal > div > div.modal-body > div > button:nth-child(1) > svg{
+  size: 24px;
+  
+}
+.actions-menu-item:hover {
+  background-color: var(--surface-muted);
+}
+.actions-menu-item .material-symbols-outlined {
+  font-size: 22px;
+  color: var(--text-dim);
+}
+.actions-menu-item.danger {
+    color: var(--danger);
+}
+.actions-menu-item.danger .material-symbols-outlined {
+    color: var(--danger);
+}
+.actions-menu-item.danger:hover {
+    background-color: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+/* --- Context Menu (Klik Kanan Desktop) --- */
+/* (Gaya context-menu tetap sama) */
+.context-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 180px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  padding: .35rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .5rem .75rem;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+}
+.context-menu-item:hover {
+  background: var(--surface-muted);
+}
+.context-menu-item .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--text-dim);
+}
+
+/* --- Bottom Sheet/Actions Modal Specifics --- */
+/* (Gaya actions-modal-header/list/footer tetap sama) */
+.actions-modal-header {
+  text-align: center;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.actions-modal-header h4 {
+  font-size: 1rem;
+  margin: 0;
+  word-break: break-word; /* Prevent long titles overflowing */
+}
+.actions-modal-header span {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  display: block;
+  margin-top: 0.25rem;
+}
+.actions-modal-header strong {
+  font-size: 1.25rem;
+  color: var(--primary);
+  display: block;
+  margin-top: 0.5rem;
+}
+
+.actions-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Specific styles for simulasi actions modal header/footer */
+.simulasi-actions-modal-header {
+   padding-bottom: 1rem;
+   margin-bottom: 1rem;
+   border-bottom: 1px solid var(--line);
+}
+.simulasi-actions-modal-header h5 {
+   font-size: 1.1rem;
+   margin: 0 0 0.25rem 0;
+}
+.simulasi-actions-modal-header p {
+   font-size: 0.85rem;
+   color: var(--text-dim);
+   margin: 0;
+   line-height: 1.5;
+}
+
+.simulasi-actions-modal-footer {
+   display: flex;
+   flex-direction: column;
+   gap: 0.75rem;
+   margin-top: 1.5rem;
+}
+
+
+/* Dark Theme Overrides */
+.dark-theme .actions-menu {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+.dark-theme .actions-menu-item:hover {
+  background-color: #334155;
+}

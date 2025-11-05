@@ -1,0 +1,95 @@
+/* =======================================================
+ * PAGE: RECYCLE BIN
+ * Mengatur semua gaya spesifik untuk halaman Sampah,
+ * termasuk mode seleksi dan item yang dihapus.
+ * ======================================================= */
+
+.recycle-bin-item .wa-card-v2 {
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+}
+
+.selection-checkbox-wrapper {
+  padding-right: 1rem;
+}
+
+.recycle-bin-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+}
+
+.recycle-bin-item .selection-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  padding-right: 1rem;
+}
+
+.recycle-bin-item input[type="checkbox"].recycle-item-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.recycle-bin-item input[type="checkbox"].recycle-item-checkbox:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.recycle-bin-item input[type="checkbox"].recycle-item-checkbox::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 7px;
+  width: 6px;
+  height: 12px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.recycle-bin-item input[type="checkbox"].recycle-item-checkbox:checked::before {
+  opacity: 1;
+}
+
+#recycle-bin-content.selection-mode-active .wa-card-v2__status .btn-icon {
+  display: none;
+}
+
+#recycle-bin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+#recycle-bin-toolbar .toolbar-left {
+  flex: 0 0 auto;
+}
+
+#recycle-bin-toolbar .toolbar-actions {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+#recycle-bin-toolbar .input-group {
+  flex: 1 1 280px;
+  min-width: 180px;
+  width: 100%;
+}
+
+#recycle-bin-toolbar #trash-search {
+  width: 100%;
+}

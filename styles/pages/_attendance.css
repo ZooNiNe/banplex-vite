@@ -1,0 +1,1201 @@
+/* =======================================================
+ * PAGE: ATTENDANCE
+ * Mengatur semua gaya spesifik untuk fitur absensi,
+ * baik manual maupun harian.
+ * ======================================================= */
+
+ .attendance-header {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: .75rem;
+  margin-bottom: 1.25rem;
+}
+
+.attendance-header .btn {
+  flex: 1;
+  padding: .5rem;
+  font-size: .8rem;
+}
+
+.attendance-header .btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.dark-theme .attendance-header .btn {
+  background-color: var(--surface-muted);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.attendance-controls {
+  margin-bottom: 1.25rem;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background-color: var(--panel);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.attendance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: calc(var(--spacing) * 0.75);
+}
+
+.attendance-card {
+  padding: var(--spacing);
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+.attendance-worker-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.attendance-worker-info strong {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.attendance-worker-info span {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.attendance-worker-info .worker-wage {
+  font-size: 0.85rem;
+  color: var(--primary);
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+
+.attendance-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.attendance-status {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  flex-grow: 1;
+}
+
+.attendance-status.checked-in {
+  color: var(--primary);
+}
+
+.attendance-status.completed {
+  color: var(--text);
+  font-weight: 600;
+}
+
+#manual-attendance-list-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.attendance-date-bar {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1rem;
+}
+
+.manual-attendance-list-card {
+  margin-top: 1rem;
+}
+
+#manual-attendance-summary {
+  margin-top: 1rem;
+}
+
+@media (min-width: 600px) {
+  .attendance-card-main {
+    grid-template-columns: 1fr 280px;
+  }
+}
+
+#manual-attendance-form .manual-form-footer {
+  padding: 1rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.manual-attendance-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+}
+
+.attendance-card-main {
+  display: grid;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  grid-template-columns: 1fr auto;
+}
+
+.attendance-card-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.attendance-card-right {
+  flex-grow: 1;
+  min-width: 150px;
+}
+
+.worker-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.worker-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.worker-wage {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.worker-role {
+  flex-grow: 1;
+  min-width: 150px;
+}
+
+.worker-role label {
+  font-size: 0.75rem;
+  margin-bottom: 2px;
+  display: block;
+}
+.manual-role-select .form-group {
+    margin-bottom: 0;
+}
+.manual-role-select label {
+    display: none;
+}
+
+
+.attendance-status-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+  width: 100%;
+  background-color: var(--surface-muted);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  margin-top: 0.5rem;
+}
+
+.attendance-status-selector label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  border: 1px solid transparent;
+}
+
+.attendance-status-selector input[type="radio"] {
+  display: none;
+}
+
+.attendance-status-selector label:has(input:checked) {
+  background-color: var(--panel) !important;
+  color: var(--primary) !important;
+  font-weight: 600 !important;
+  box-shadow: var(--shadow-sm) !important;
+  border-color: var(--line) !important;
+}
+
+.edit-attendance-intro {
+  font-size: 1rem;
+  color: var(--text-dim);
+  margin-bottom: 1.5rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-alt);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  line-height: 1.6;
+}
+
+.edit-attendance-intro strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+#edit-attendance-form .attendance-status-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  padding: 4px;
+  background-color: var(--bg-alt);
+}
+
+#edit-attendance-form .attendance-status-selector label {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.75rem 0.5rem;
+  cursor: pointer;
+  text-align: center;
+  font-weight: 500;
+  color: var(--text-dim);
+  transition: all 0.2s ease-in-out;
+  border-radius: var(--radius-md);
+}
+
+#edit-attendance-form .attendance-status-selector label input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+#edit-attendance-form .attendance-status-selector label:has(input:checked) {
+  background-color: var(--panel) !important;
+  color: var(--primary) !important;
+  font-weight: 600 !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+#edit-attendance-form .form-footer-actions {
+  position: sticky;
+  bottom: 0;
+  padding: 1rem;
+  background: linear-gradient(to top, var(--bg-start) 75%, transparent);
+  margin: 1.5rem -1rem -1rem -1rem;
+  border-top: 1px solid var(--line);
+}
+
+.dark-theme #edit-attendance-form .form-footer-actions {
+  background: linear-gradient(to top, var(--bg-end) 75%, transparent);
+}
+
+.detail-view-active #edit-attendance-form .form-footer-actions {
+  background: var(--bg-start);
+}
+
+.dark-theme .detail-view-active #edit-attendance-form .form-footer-actions {
+  background: var(--bg-end);
+}
+
+.attendance-edit-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--bg-alt);
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+}
+
+.attendance-edit-summary span {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.attendance-edit-summary strong {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--primary);
+  transition: color 0.2s ease;
+}
+
+.manual-assign-row {
+  margin: 0 -1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.manual-assign-row:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.manual-assign-row__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.manual-assign-row .worker-info {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.manual-assign-row .worker-name {
+    font-size: 0.95rem;
+}
+
+.manual-assign-row .worker-wage {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-weight: 500;
+    margin-top: 0.1rem;
+}
+
+.attendance-status-radios {
+    display: grid;
+    grid-template-columns: repeat(3, 44px);
+    gap: 0.5rem;
+    flex-shrink: 0;
+    justify-items: center;
+}
+
+.attendance-status-radios .custom-checkbox-label {
+    gap: 0;
+    padding: 0;
+    border: none;
+    background-color: transparent;
+    justify-content: center;
+}
+
+.attendance-status-radios .custom-checkbox-label span:not(.custom-checkbox-visual) {
+    display: none;
+}
+
+.attendance-status-radios .custom-checkbox-label .custom-checkbox-visual {
+    border-radius: 6px !important;
+    background-color: var(--surface-muted);
+}
+
+.attendance-status-radios .custom-checkbox-label input[type="radio"] + .custom-checkbox-visual::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 6px;
+    height: 12px;
+    border: solid white;
+    border-width: 0 3px 3px 0;
+    background-color: transparent;
+    border-radius: 0;
+    transform: rotate(45deg) scale(0);
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.attendance-status-radios .custom-checkbox-label input[type="radio"]:checked + .custom-checkbox-visual::after {
+    opacity: 1;
+    transform: rotate(45deg) scale(1);
+}
+
+.attendance-status-radios input[type="radio"]:checked + .custom-checkbox-visual {
+    background-color: var(--primary);
+    border-color: var(--primary);
+}
+
+.attendance-status-radios .custom-checkbox-label:has(input:checked) {
+    background-color: transparent;
+    border-color: transparent;
+}
+
+.attendance-status-radios .custom-checkbox-label:has(input:checked) span:not(.custom-checkbox-visual) {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.attendance-manual-header-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: -1rem -1rem -1rem;
+    padding: 1rem 1rem 0.5rem 1rem;
+}
+
+.check-all-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    border-top: 1px solid var(--line);
+    padding: 0.75rem 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.check-all-controls span {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-dim);
+}
+
+.check-all-controls .btn-sm {
+    padding: 0.3rem 0.8rem;
+}
+
+.check-all-controls .attendance-status-radios .custom-checkbox-label input[type="radio"]:checked + .custom-checkbox-visual {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.check-all-controls .attendance-status-radios .custom-checkbox-label input[type="radio"]:checked + .custom-checkbox-visual::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 6px;
+  height: 12px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  background-color: transparent;
+  border-radius: 0;
+  transform: rotate(45deg) scale(1);
+  opacity: 1;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.attendance-status-header {
+    display: flex;
+    padding: 0 .75rem;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+.header-label-placeholder {
+    flex-grow: 1;
+    min-width: 0;
+}
+.header-labels {
+    display: grid;
+    grid-template-columns: repeat(3, 44px);
+    gap: 0.5rem;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-bottom: 1px solid var(--line);
+    color: var(--text-dim);
+}
+
+
+.attendance-manual-summary {
+  background-color: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.attendance-manual-summary span {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-dim);
+}
+
+.attendance-manual-summary strong {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+#attendance-settings-form .attendance-settings-form {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+  background-color: var(--panel);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+}
+
+.attendance-date-display {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 0.5rem;
+    text-align: left;
+    background-color: var(--surface-muted);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+}
+
+.dark-theme .attendance-date-display {
+    background-color: var(--line);
+    border-color: var(--surface-muted);
+    color: var(--text);
+}
+
+.wa-card-v2-wrapper.is-assigned-elsewhere {
+    opacity: 0.6;
+    background-color: var(--surface-muted);
+    pointer-events: none;
+}
+.wa-card-v2-wrapper.is-assigned-elsewhere::before {
+    background-color: var(--surface-muted) !important;
+}
+
+.wa-card-v2-wrapper.is-assigned-elsewhere .selection-checkmark {
+    background-color: var(--line);
+    border-color: var(--line);
+}
+
+.wa-card-v2-wrapper.is-assigned-elsewhere .selection-checkmark .lucide-check {
+    opacity: 0;
+}
+
+/* Status Siap Disimpan (v2) */
+.wa-card-v2-wrapper.is-pending-save .wa-card-v2__header-meta {
+    color: var(--primary) !important;
+    font-weight: 600;
+}
+.wa-card-v2-wrapper.is-pending-save::before {
+    background-color: color-mix(in srgb, var(--primary) 8%, transparent) !important;
+}
+
+/* Status Sudah Absen (v2) */
+.wa-card-v2-wrapper.is-already-attended .wa-card-v2__header-meta {
+    color: var(--success) !important;
+    font-weight: 600;
+}
+.wa-card-v2-wrapper.is-already-attended::before {
+    background-color: color-mix(in srgb, var(--success) 8%, transparent) !important;
+}
+.wa-card-v2-wrapper.is-already-attended {
+    opacity: 0.75;
+}
+
+
+#global-attendance-settings-card {
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+}
+#global-attendance-settings-card .detail-section-title {
+  margin-top: 0;
+}
+#global-attendance-settings-card .helper-text {
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+#global-attendance-settings-card .form-group {
+  margin-bottom: 0; /* Hapus margin bawah default */
+}
+#global-attendance-settings-card .form-group + .form-group {
+  margin-top: 1.25rem; /* Beri jarak antar form group */
+}
+
+.role-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  background-color: var(--surface-muted);
+  border-radius: var(--radius-sm);
+}
+
+.role-option-list label {
+  display: block;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--panel);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.role-option-list label:hover {
+  background-color: var(--surface-muted);
+}
+
+.role-option-list input[type="radio"] {
+  margin-right: 0.5rem;
+}
+
+.role-option-list label:has(input:checked) {
+  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+  border-color: var(--primary);
+  font-weight: 500;
+}
+
+#page-container > div > div.panel-header > div.attendance-info-bar {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-radius: var(--radius);
+  gap: 0.25rem;
+}
+
+#page-container > div > div.panel-header > div.attendance-info-bar {
+  display: flex;
+  flex-direction: column; /* Tumpuk tanggal di atas toolbar */
+  background: var(--panel);
+  border-radius: var(--radius);
+  gap: 0.25rem; /* Jarak antara tanggal dan toolbar */
+  padding: 0.5rem 0.75rem; /* Padding internal */
+  margin-bottom: 0.5rem; /* Jarak ke elemen bawah */
+  border: 2px solid var(--line);
+}
+
+/* Atur toolbar seleksi */
+#attendance-selection-toolbar {
+  display: flex; /* Aktifkan flexbox */
+  justify-content: space-between; /* Info kiri, tombol kanan */
+  align-items: center; /* Sejajarkan vertikal */
+  width: 100%;
+  min-height: 40px; /* Beri tinggi minimum */
+  padding: 0; /* Hapus padding default jika ada */
+  background-color: transparent; /* Pastikan transparan */
+  border: none; /* Hapus border default jika ada */
+  height: auto; /* Biarkan tinggi menyesuaikan konten */
+}
+
+/* Pastikan grup tombol aksi (termasuk tombol Set Status) ada di kanan */
+#attendance-selection-toolbar .selection-actions-group {
+  margin-left: auto; /* Dorong ke kanan jika perlu */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+ /* Tombol Set Status Absen */
+#set-status-button {
+  /* Gaya tambahan jika perlu, misal padding/margin */
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  flex-shrink: 0; /* Jangan biarkan tombol menyusut */
+}
+
+/* Pastikan info seleksi tetap di kiri */
+#attendance-selection-toolbar .selection-info {
+    border-radius: var(--radius-sm);
+    margin: auto;
+}
+
+
+#attendance-date-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Panah di ujung, tanggal di tengah */
+  text-align: center; /* Pusatkan teks tanggal */
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text); /* Warna teks utama */
+  padding: 0.25rem 0; /* Sedikit padding vertikal */
+  background-color:transparent; /* Hapus background default */
+  border: none; /* Hapus border default */
+  gap:inherit;
+  margin-bottom: 6px; /* Hapus margin bawah default */
+}
+
+.date-nav-btn {
+  width: 40px; /* Ukuran tombol panah */
+  height: 40px;
+  color: var(--text-dim);
+  border-radius: 9999px;
+  background: var(--panel);
+  flex-shrink: 0; /* Jangan biarkan tombol menyusut */
+}
+.date-nav-btn:hover {
+    background-color: var(--surface-muted);
+    color: var(--text);
+}
+
+.date-parts-wrapper {
+  display: flex; /* Biarkan span berjajar */
+  flex-direction: column; /* Tumpuk hari/tanggal dan tahun */
+  align-items: center;
+  gap: 0px; /* Jarak antar span */
+  cursor: pointer; /* Tunjukkan bisa diklik */
+  padding: 0rem 0.75rem ; /* Beri sedikit ruang horizontal */
+  flex: 1;
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+.date-part[data-date-part="day"] {
+   font-weight: 600; /* Hari/Tanggal lebih tebal */
+   font-size: 0.9rem;
+}
+
+.date-part[data-date-part="year"] {
+   font-size: 0.75rem;
+   color: var(--text-dim);
+}
+
+
+.dark-theme #attendance-date-display {
+    color: var(--text);
+}
+
+/* --- Gaya Grup Proyek (BARU) --- */
+.project-group-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem; /* Jarak antar grup proyek */
+  /* Hapus margin list container agar menempel */
+  margin-left: calc(-1.5rem + 1rem);
+  margin-right: calc(-1.5rem + 1rem);
+}
+@media (min-width: 600px) {
+    .project-group-list-container {
+        margin-left: calc(-2rem + 1rem);
+        margin-right: calc(-2rem + 1rem);
+    }
+}
+
+
+.project-group-item {
+  border-bottom: 1px solid var(--line); /* Garis pemisah antar grup */
+  background-color: transparent; /* Transparan, biarkan panel-body yang atur */
+  overflow: hidden;
+}
+.project-group-item:first-child {
+    border-top: 1px solid var(--line);
+}
+
+
+.project-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+  padding: 0.8rem 1.5rem; /* Padding sama dengan card */
+  width: 100%;
+  background: transparent;
+  border: none;
+  transition: background-color 0.2s ease;
+}
+@media (min-width: 600px) {
+    .project-group-header {
+        padding: 0.8rem 2rem;
+    }
+}
+
+
+.project-group-item.open .project-group-header {
+   background-color: var(--surface-muted); /* Warna saat aktif/terbuka */
+}
+
+.project-group-header .header-info {
+   display: flex;
+   flex-direction: column;
+   align-items: flex-start;
+   gap: 0.1rem;
+   min-width: 0; /* Agar flexbox bisa mengecilkan teks */
+}
+
+.project-group-header .header-title {
+   font-size: 1.05rem;
+   font-weight: 600;
+   color: var(--text);
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+}
+
+.project-group-header .header-subtitle {
+   font-size: 0.8rem;
+   font-weight: 500;
+   color: var(--primary);
+}
+
+.project-group-header .accordion-chevron {
+  transition: transform 0.3s ease;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.project-group-item.open .accordion-chevron {
+  transform: rotate(180deg);
+}
+
+.project-group-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  background-color: var(--panel); /* Latar belakang untuk konten */
+}
+
+.project-group-item.open .project-group-content {
+  max-height: 500vh; /* Izinkan ekspansi penuh */
+  transition: max-height 0.5s ease-in;
+  /* Padding internal untuk daftar pekerja */
+  padding: 0.5rem 0 0 0; 
+}
+
+/* Hapus margin bawaan dari wa-card-list-wrapper saat di dalam grup */
+.project-group-content .wa-card-list-wrapper {
+    margin: 0;
+}
+/* Hapus border atas/bawah dari card pertama/terakhir di dalam grup */
+.project-group-content .wa-card-list-wrapper .wa-card-v2-wrapper:first-child {
+    border-top: none;
+}
+.project-group-content .wa-card-list-wrapper .wa-card-v2-wrapper:last-child {
+    border-bottom: none;
+}
+
+
+.attendance-info-bar {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-radius: var(--radius);
+  gap: 0.25rem; /* Jarak antara tanggal dan toolbar */
+  padding: 0.5rem 0.75rem; /* Padding internal */
+  margin-bottom: 0.5rem; /* Jarak ke elemen bawah */
+  border: 1px solid var(--line);
+}
+
+/* Atur toolbar seleksi */
+#attendance-selection-toolbar {
+  display: flex; /* Aktifkan flexbox */
+  justify-content: space-between; /* Info kiri, tombol kanan */
+  align-items: center; /* Sejajarkan vertikal */
+  width: 100%;
+  min-height: 40px; /* Beri tinggi minimum */
+  padding: 0; /* Hapus padding default jika ada */
+  background-color: transparent; /* Pastikan transparan */
+  border: none; /* Hapus border default jika ada */
+  height: auto; /* Biarkan tinggi menyesuaikan konten */
+}
+
+/* Pastikan grup tombol aksi (termasuk tombol Set Status) ada di kanan */
+#attendance-selection-toolbar .selection-actions-group {
+  margin-left: auto; /* Dorong ke kanan jika perlu */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+ /* Tombol Set Status Absen */
+#set-mass-attendance-btn {
+  /* Gaya tambahan jika perlu, misal padding/margin */
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  flex-shrink: 0; /* Jangan biarkan tombol menyusut */
+}
+
+/* Pastikan info seleksi tetap di kiri */
+#attendance-selection-toolbar .selection-info {
+    border-radius: var(--radius-sm);
+    margin-right: auto; /* Dorong tombol aksi ke kanan */
+    padding-right: 1rem;
+}
+
+
+#attendance-date-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Panah di ujung, tanggal di tengah */
+  text-align: center; /* Pusatkan teks tanggal */
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text); /* Warna teks utama */
+  padding: 0.25rem 0; /* Sedikit padding vertikal */
+  background-color:transparent; /* Hapus background default */
+  border: none; /* Hapus border default */
+  gap: 0.5rem;
+  margin-bottom: 6px; /* Jarak ke toolbar seleksi */
+}
+
+.date-nav-btn {
+  width: 40px; /* Ukuran tombol panah */
+  height: 40px;
+  color: var(--text-dim);
+  border-radius: 9999px;
+  background: var(--surface-muted);
+  flex-shrink: 0; /* Jangan biarkan tombol menyusut */
+}
+.date-nav-btn:hover {
+    background-color: var(--line);
+    color: var(--text);
+}
+
+.date-parts-wrapper {
+  display: flex; /* Biarkan span berjajar */
+  flex-direction: column; /* Tumpuk hari/tanggal dan tahun */
+  align-items: center;
+  gap: 0px; /* Jarak antar span */
+  cursor: pointer; /* Tunjukkan bisa diklik */
+  padding: 0.5rem 0.75rem ; /* Beri sedikit ruang horizontal */
+  flex: 1;
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+.date-parts-wrapper:hover {
+    background-color: var(--line);
+}
+
+.date-part[data-date-part="day"] {
+   font-weight: 600; /* Hari/Tanggal lebih tebal */
+   font-size: 0.9rem;
+}
+
+.date-part[data-date-part="year"] {
+   font-size: 0.75rem;
+   color: var(--text-dim);
+}
+
+
+.dark-theme #attendance-date-display {
+    color: var(--text);
+}
+.dark-theme .date-nav-btn {
+    background: var(--line);
+}
+.dark-theme .date-nav-btn:hover {
+    background: var(--surface-muted);
+}
+.dark-theme .date-parts-wrapper {
+    background: var(--line);
+}
+.dark-theme .date-parts-wrapper:hover {
+    background: var(--surface-muted);
+}
+
+
+/* --- Gaya Grup Proyek (BARU) --- */
+.project-group-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0; /* Hapus gap, gunakan border */
+  /* Hapus margin list container agar menempel */
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+}
+@media (min-width: 600px) {
+    .project-group-list-container {
+        margin-left: -2rem;
+        margin-right: -2rem;
+    }
+}
+
+
+.project-group-item {
+  border-bottom: 1px solid var(--line); /* Garis pemisah antar grup */
+  background-color: transparent; /* Transparan, biarkan panel-body yang atur */
+  overflow: hidden;
+}
+.project-group-item:first-child {
+    border-top: 1px solid var(--line);
+}
+
+
+.project-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+  padding: 0.8rem 1.5rem; /* Padding sama dengan card */
+  width: 100%;
+  background: transparent;
+  border: none;
+  transition: background-color 0.2s ease;
+}
+@media (min-width: 600px) {
+    .project-group-header {
+        padding: 0.8rem 2rem;
+    }
+}
+
+
+.project-group-item.open .project-group-header {
+   background-color: var(--surface-muted); /* Warna saat aktif/terbuka */
+}
+
+.project-group-header .header-info {
+   display: flex;
+   flex-direction: column;
+   align-items: flex-start;
+   gap: 0.1rem;
+   min-width: 0; /* Agar flexbox bisa mengecilkan teks */
+}
+
+.project-group-header .header-title {
+   font-size: 1.05rem;
+   font-weight: 600;
+   color: var(--text);
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+}
+
+.project-group-header .header-subtitle {
+   font-size: 0.8rem;
+   font-weight: 500;
+   color: var(--primary);
+}
+
+.project-group-header .accordion-chevron {
+  transition: transform 0.3s ease;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.project-group-item.open .accordion-chevron {
+  transform: rotate(180deg);
+}
+
+.project-group-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  background-color: var(--panel); /* Latar belakang untuk konten */
+}
+
+.project-group-item.open .project-group-content {
+  max-height: 500vh; /* Izinkan ekspansi penuh */
+  transition: max-height 0.5s ease-in;
+  /* Padding internal untuk daftar pekerja */
+  padding: 0.5rem 0 0 0; 
+}
+
+/* Hapus margin bawaan dari wa-card-list-wrapper saat di dalam grup */
+.project-group-content .wa-card-list-wrapper {
+    margin: 0;
+}
+/* Hapus border atas/bawah dari card pertama/terakhir di dalam grup */
+.project-group-content .wa-card-list-wrapper .wa-card-v2-wrapper:first-child {
+    border-top: none;
+}
+.project-group-content .wa-card-list-wrapper .wa-card-v2-wrapper:last-child {
+    border-bottom: none;
+}
+
+/* Footer Absensi (v2-L5) */
+.fab-footer-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding: 1rem 1.5rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  background: var(--panel);
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+  border-top: 1px solid var(--line);
+  display: block; /* Ditampilkan/disembunyikan oleh JS */
+  transform: translateY(0);
+  transition: transform 0.3s ease;
+}
+
+.fab-footer-container .fab-extended {
+    position: static; /* Bukan fixed */
+    width: 100%; /* Lebar penuh */
+    height: 56px;
+    border-radius: var(--radius);
+}
+
+.fab-footer-container .fab-extended .lucide {
+    font-size: 20px;
+}
+.fab-footer-container .fab-extended .fab-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* Sembunyikan footer ini di desktop, karena alurnya berbeda */
+@media (min-width: 600px) {
+    .fab-footer-container {
+        display: none;
+    }
+}
+
+
+        
+/* (Point 1) Tampilkan tombol 'more' di mode seleksi HANYA di hal. absensi */
+body.selection-active.page-absensi .wa-card-v2-wrapper .wa-card-v2__actions .card-more-action {
+  display: inline-flex; /* Tampilkan tombol 'more' */
+  z-index: 10; /* Pastikan di atas overlay seleksi (jika ada) */
+}
+
+/* (Point 3 & 5) Sembunyikan ikon di meta-badge absensi manual */
+.page-absensi #manual-attendance-list-container .meta-badge .lucide {
+  display: none;
+}
+
+/* (Point 3 & 5) Beri jarak untuk badge [PROYEK] Peran */
+.page-absensi #manual-attendance-list-container .meta-badge span {
+  margin-left: 0; /* Hapus margin kiri default krn ikon disembunyikan */
+}
+
+/* =======================================================
+ * REVISI: Desain Modal "Edit Proyek/Peran" (Bug Z-Index)
+ * ======================================================= */
+
+/* (Point 3) Kontainer untuk daftar kartu proyek/peran */
+.project-role-card-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+/* (Point 3) Desain baru untuk kartu di modal "Edit Proyek/Peran" */
+/* Menggantikan 'card card-pad' agar 'overflow: hidden' tidak memotong dropdown */
+.project-role-card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+  background-color: var(--surface-muted); /* Latar belakang berbeda */
+}
+
+.dark-theme .project-role-card {
+    background-color: var(--panel); /* Gunakan panel di dark mode */
+}
+
+/* Atur form group di dalam kartu */
+.project-role-card .form-group {
+  margin-bottom: 0.75rem;
+}
+.project-role-card .form-group:last-child {
+  margin-bottom: 0;
+}
+
+/* Atur tombol "Tambah Proyek Lain" */
+#edit-project-role-form .btn-secondary[data-action="add-project-role-entry"] {
+  width: 100%;
+  justify-content: center;
+  border-style: dashed;
+}
+
+[data-pane-type="attendance-settings"] .worker-setting-card .wa-card-v2 {
+  padding-left: 1.5rem !important;
+}
+@media (min-width: 600px) {
+  [data-pane-type="attendance-settings"] .worker-setting-card .wa-card-v2 {
+      padding-left: 2rem !important;
+  }
+}

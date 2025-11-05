@@ -1,0 +1,226 @@
+/* =======================================================
+ * COMPONENT: EMPTY STATES (BEM Refactor)
+ * Mengatur semua gaya untuk tampilan saat tidak ada data
+ * untuk ditampilkan. Menggunakan metodologi BEM.
+ * ======================================================= */
+
+ .empty-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  margin: 1rem 0;
+  background-color: transparent;
+  border-radius: var(--radius-lg);
+  color: var(--text-dim);
+}
+
+/* PERBAIKAN #6: Wrapper untuk empty state di tengah halaman */
+.centered-content-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    padding: 1rem;
+}
+.centered-content-wrapper .card {
+    max-width: 450px;
+    width: 100%;
+}
+.centered-content-wrapper .empty-state {
+    margin: 0;
+}
+
+/* Modifier untuk ukuran kecil */
+.empty-state--small .empty-state__icon .material-symbols-outlined {
+  font-size: 32px;
+}
+.empty-state--small .empty-state__title {
+  font-size: 1rem;
+}
+.empty-state--small .empty-state__description {
+  font-size: 0.85rem;
+}
+
+
+/* Style saat .empty-state berada di dalam sebuah kartu atau panel */
+.card > .empty-state,
+.content-panel > .empty-state {
+  margin: 0;
+  border: none;
+  background-color: var(--panel);
+}
+
+.empty-state__icon {
+  margin-bottom: 1rem;
+  transform: scale(0.9);
+  animation: pop-in 0.5s 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.empty-state__media {
+  margin-bottom: 1rem;
+  max-width: 320px;
+  width: 100%;
+  opacity: 0;
+  transform: translateY(6px);
+  animation: media-in 0.5s 0.1s ease-out forwards;
+}
+
+@keyframes media-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.empty-state__icon .material-symbols-outlined {
+  font-size: 48px;
+  color: var(--primary);
+  opacity: 0.5;
+}
+
+.empty-state__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.empty-state__description {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  max-width: 350px;
+}
+
+.empty-state__actions {
+  margin-top: 1.5rem;
+}
+
+.empty-state__actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.empty-state-small--left {
+  text-align: left;
+  padding: 0.5rem;
+  align-items: flex-start;
+  margin: 0;
+}
+
+/* Style khusus untuk empty state di dalam list master data */
+.master-data-list > .empty-state {
+  margin-top: 2rem;
+  background-color: var(--surface-muted);
+}
+
+.dark-theme .master-data-list > .empty-state {
+  background-color: var(--panel);
+}
+
+/* Gaya untuk empty state di panel detail desktop */
+.detail-pane-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: var(--text-dim);
+    padding: 2rem;
+}
+
+.detail-pane-empty-state .material-symbols-outlined {
+    font-size: 48px;
+    margin-bottom: 1rem;
+    color: var(--primary);
+    opacity: 0.5;
+}
+
+
+/* Legacy empty state style (bisa dihapus jika sudah tidak digunakan) */
+.empty-state-card {
+  text-align: center;
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text-dim);
+  display: grid;
+  justify-items: center;
+  gap: .5rem;
+}
+.empty-state-card .material-symbols-outlined {
+  font-size: 28px;
+  color: var(--text-dim);
+}
+.empty-state-card .title {
+  font-weight: 600;
+  color: var(--text);
+}
+.empty-state-card .desc {
+  font-size: .9rem;
+}
+.empty-state-card .btn {
+  margin-top: .25rem;
+}
+
+/* Empty state in detail pane */
+.detail-pane .empty-state {
+  background-color: var(--surface-muted);
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+
+#rekap-gaji-content > div,
+#rekap-gaji-results > div {
+  border-radius: 12px;
+  background-color: var(--panel);
+}
+
+.end-of-list-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  color: var(--text-dim);
+  opacity: 0;
+  animation: fadeIn 0.5s ease 0.1s forwards;
+}
+
+.eol-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: color-mix(in srgb, var(--success) 10%, transparent); /* Latar belakang ikon hijau muda */
+  color: var(--success); /* Warna ikon hijau */
+  margin-bottom: 1rem;
+}
+
+.eol-icon-wrapper .lucide {
+  width: 28px;
+  height: 28px;
+}
+
+.eol-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text); /* Teks utama lebih gelap */
+  margin-bottom: 0.25rem;
+}
+
+.eol-subtext {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}

@@ -1,0 +1,84 @@
+/* =======================================================
+ * THEME: PRINT STYLES
+ * Mengatur semua gaya spesifik untuk tampilan cetak.
+ * ======================================================= */
+
+@media print {
+  body,
+  #app-shell,
+  .content-wrapper,
+  .chat-view {
+    background: white !important;
+    color: #000 !important;
+  }
+
+  .sidebar,
+  .bottom-nav,
+  .chat-header,
+  .composer-wrapper,
+  .jump-bottom,
+  .context-menu,
+  .pinned-rail,
+  .quick-filters {
+    display: none !important;
+  }
+
+  .chat-thread {
+    height: auto;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .msg-group {
+    page-break-inside: avoid;
+  }
+
+  .date-pill {
+    page-break-before: always;
+    page-break-after: avoid;
+  }
+
+  .bubble {
+    box-shadow: none !important;
+    border: 1px solid #ddd;
+    background: #f9f9f9 !important;
+    print-color-adjust: exact;
+  }
+
+  .msg.outgoing .bubble {
+    background: color-mix(in srgb, var(--primary) 10%, white) !important;
+    border-color: color-mix(in srgb, var(--primary) 30%, #ddd);
+  }
+
+  .link-card a::after {
+    content: " (" attr(href) ")";
+  }
+
+  .chat-view.high-contrast {
+    --line: #aaa;
+    --text: #000;
+  }
+
+  .print-room-section {
+    page-break-before: always;
+  }
+
+  .print-room-title {
+    font-size: 16pt;
+    font-weight: bold;
+    margin-bottom: 10mm;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 2mm;
+  }
+
+  .t-block.task,
+  .t-block.poll {
+    border: 1px solid #ccc;
+    padding: .5rem;
+    margin-bottom: .5rem;
+  }
+}
+
+@page {
+  margin: 18mm;
+}

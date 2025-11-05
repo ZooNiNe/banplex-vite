@@ -1,0 +1,112 @@
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 2001;
+  height: calc(65px + env(safe-area-inset-bottom, 0px));
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, .03);
+  display: flex;
+  justify-content: space-around;
+  padding: 0 .5rem env(safe-area-inset-bottom, 0px) .5rem;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.bottom-nav::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  padding: 1px 0 0 0; /* ring on top border appearance */
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  background-image: var(--grad);
+  opacity: .10;
+}
+
+.bottom-nav .nav-item {
+  font-size: 0.75rem;
+  gap: 4px;
+  color: var(--text-dim);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+  justify-content: center;
+  font-weight: 500;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.5rem 0.25rem;
+  transition: color 0.2s ease, transform 0.15s ease;
+}
+
+.bottom-nav .nav-item:active { transform: scale(0.96); }
+
+.bottom-nav .nav-item .material-symbols-outlined,
+.bottom-nav .nav-item .lucide {
+  font-size: 24px;
+}
+
+.bottom-nav .nav-item.active {
+  color: var(--primary);
+}
+
+.bottom-nav .nav-item.active .material-symbols-outlined,
+.bottom-nav .nav-item.active .lucide {
+  font-variation-settings: 'FILL' 1;
+}
+
+.nav-item .notification-badge {
+  position: absolute;
+  top: 4px;
+  right: 22px;
+  background-color: var(--danger);
+  color: white;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 2px solid var(--panel);
+}
+
+body.mobile-sidebar-open .bottom-nav {
+  transform: translateY(100%);
+}
+
+body.modal-open .bottom-nav,
+body.detail-view-active .bottom-nav,
+body.detail-pane-open .bottom-nav,
+body.comments-view-active .bottom-nav {
+  transform: translateY(100%);
+}
+
+body.guest-mode .bottom-nav,
+body.pending-mode .bottom-nav {
+  display: none !important;
+}
+
+
+.dark-theme .bottom-nav {
+  background-color: rgba(15, 23, 42, 0.9);
+  border-top-color: #1f2937;
+}
+
+@media (min-width: 600px) {
+  .bottom-nav {
+    display: none !important;
+  }
+}

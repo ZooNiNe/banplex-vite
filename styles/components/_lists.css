@@ -1,0 +1,494 @@
+.date-group-header,
+.month-group-header {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    padding: 0.75rem 1.25rem 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 0.25rem;
+    cursor: pointer;
+}
+.dark-theme .date-group-header,
+.dark-theme .month-group-header {
+    background-color: var(--panel);
+    border-bottom-color: var(--line);
+}
+
+@media (min-width: 600px) {
+  .date-group-header,
+  .month-group-header {
+    padding: 0.6rem 1.5rem 0.3rem;
+  }
+}
+
+/* Collapsible group body */
+.date-group-body.collapsed { display: none; }
+.date-group-header.collapsed { opacity: 0.8; }
+ .settings-list-item,
+ .detail-list-item,
+ .jurnal-pekerja-item,
+ /* .material-list-item, */ /* Removed specific style */
+ .log-item-card {
+   display: flex;
+   justify-content: space-between;
+   align-items: center;
+   padding: 0.85rem 1rem;
+   margin-bottom: 0.5rem;
+   border-radius: var(--radius-sm);
+   background-color: var(--surface-muted);
+   border: 1px solid var(--line);
+   gap: 1rem;
+   transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+ }
+
+ .settings-list-item:hover,
+ /* .material-list-item:hover, */ /* Removed specific style */
+ .log-item-card.clickable:hover {
+   background-color: var(--panel);
+ }
+ .log-item-card.clickable:hover {
+   border-color: var(--primary);
+   box-shadow: var(--shadow-md);
+ }
+
+ .master-data-item.item-exiting {
+   animation: item-slide-out 0.4s ease-out forwards;
+ }
+
+ .detail-list {
+   display: flex;
+   flex-direction: column;
+ }
+ .detail-list div {
+   display: flex;
+   justify-content: space-between;
+   align-items: flex-start;
+   padding: .9rem 0;
+   border-bottom: 1px solid var(--line);
+   gap: 1rem;
+   flex-wrap: wrap;
+ }
+ .detail-list div:last-child {
+   border-bottom: none;
+ }
+ .detail-list dt {
+   font-size: clamp(.8rem, 2.2vw, .9rem);
+   color: var(--text-dim);
+   min-width: 0;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   display: flex;
+   flex-direction: column;
+   gap: 0.1rem; /* Jarak antara nama item dan sub-detail */
+   align-items: flex-start; /* Rata kiri */
+ }
+ 
+ .detail-list .detail-list-item-name {
+  font-weight: 500;
+  color: var(--text); /* Buat nama item lebih menonjol */
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.detail-list .detail-list-item-sub {
+  font-size: 0.8rem;
+  color: var(--text-dim); /* Sub-detail tetap redup */
+  font-weight: 400; /* Font weight normal */
+}
+
+ .detail-list dd {
+   font-size: clamp(.8rem, 2.6vw, .95rem);
+   font-weight: 500;
+   text-align: right;
+   white-space: nowrap;
+   display: flex;
+   align-items: center;
+   gap: 0.5rem;
+   justify-content: flex-end;
+   text-overflow: ellipsis;
+   color: var(--text)
+ }
+ .detail-list dd.positive { color: var(--success); }
+ .detail-list dd.negative { color: var(--danger); }
+
+ .detail-list .sub-item dt,
+ .detail-list .sub-item dd {
+     padding-left: 1.5rem;
+     font-size: 0.8rem;
+     color: var(--text-dim);
+ }
+ .detail-list .sub-item dd {
+     font-weight: 500;
+ }
+
+ /* Removed Master Data Specific List Styles - Rely on cards.css now */
+ .master-data-list {
+   display: flex;
+   flex-direction: column;
+   gap: 0; /* Use card wrapper border */
+   /* Ensure net 1rem side padding inside panel-body */
+   margin-left: calc(-1.5rem + 1rem);
+   margin-right: calc(-1.5rem + 1rem);
+ }
+ @media (min-width: 600px) {
+    .master-data-list {
+       margin-left: calc(-2rem + 1rem);
+       margin-right: calc(-2rem + 1rem);
+    }
+ }
+
+ .log-container {
+   display: flex;
+   flex-direction: column;
+   gap: .75rem;
+ }
+ .log-container-upgraded {
+   display: flex;
+   flex-direction: column;
+   gap: 1.5rem;
+ }
+ .log-day-group {
+   display: flex;
+   flex-direction: column;
+   gap: 0.75rem;
+ }
+ .log-day-header {
+   font-size: 0.9rem;
+   font-weight: 600;
+   color: var(--text-dim);
+   padding-bottom: 0.5rem;
+   border-bottom: 1px solid var(--line);
+ }
+ .log-item-card {
+   padding: 0.75rem;
+   background-color: var(--panel);
+   border: 1px solid transparent;
+   margin-bottom: 0;
+ }
+ .log-item-icon {
+   flex-shrink: 0;
+   width: 40px;
+   height: 40px;
+   border-radius: 50%;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   background-color: var(--bg);
+ }
+ .log-item-icon .material-symbols-outlined {
+   color: var(--text-dim);
+ }
+ .log-item-icon.add { background-color: rgba(34, 197, 94, 0.1); }
+ .log-item-icon.add .material-symbols-outlined { color: #22c55e; }
+ .log-item-icon.edit { background-color: rgba(245, 158, 11, 0.1); }
+ .log-item-icon.edit .material-symbols-outlined { color: #f59e0b; }
+ .log-item-icon.delete { background-color: rgba(239, 68, 68, 0.1); }
+ .log-item-icon.delete .material-symbols-outlined { color: #ef4444; }
+ .log-item-content {
+   flex-grow: 1;
+   display: flex;
+   flex-direction: column;
+ }
+ .log-item-title {
+   font-weight: 600;
+   color: var(--text);
+ }
+ .log-item-subtitle {
+   font-size: 0.85rem;
+   color: var(--text-dim);
+ }
+ .log-item-timestamp {
+   flex-shrink: 0;
+   font-size: 0.8rem;
+   color: var(--text-dim);
+   align-self: flex-start;
+ }
+
+ .jurnal-list {
+   display: flex;
+   flex-direction: column;
+   gap: 0;
+ }
+
+ .jurnal-item-header {
+   display: flex;
+   justify-content: space-between;
+   align-items: baseline;
+   font-size: 1rem;
+   font-weight: 600;
+   margin-bottom: 0.5rem;
+ }
+
+ .jurnal-item-details {
+   display: flex;
+   justify-content: space-between;
+   align-items: center;
+   font-size: 0.8rem;
+   color: var(--text-dim);
+   padding-bottom: 0.75rem;
+   margin-bottom: 0.75rem;
+   border-bottom: 1px solid var(--line);
+ }
+
+ .jurnal-item-actions {
+   text-align: right;
+ }
+
+ .detail-list-container {
+   display: flex;
+   flex-direction: column;
+   gap: 0.5rem;
+ }
+ .detail-list-item {
+   font-size: 0.85rem;
+   background-color: var(--panel);
+   box-shadow: var(--shadow-sm);
+ }
+ .detail-list-item .item-main {
+   display: flex;
+   flex-direction: column;
+   min-width: 0;
+   gap: 0.2rem;
+ }
+ .dense-list-item {
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     gap: 1rem;
+ }
+ .dense-list-item .item-main-content {
+     flex-grow: 1;
+     display: flex;
+     flex-direction: column;
+     min-width: 0;
+     gap: 0.2rem;
+ }
+ .detail-list-item .item-date { font-weight: 600; font-size: 0.9rem; }
+ .dense-list-item .item-title,
+ .detail-list-item .item-title {
+   font-weight: 600;
+   font-size: 0.9rem;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+ }
+ .detail-list-item .item-project {
+   font-size: 0.75rem;
+   color: var(--text-dim);
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+ }
+ .detail-list-item .item-secondary {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+.detail-list-item-card .item-secondary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+ .dense-list-item .item-actions {
+     flex-shrink: 0;
+     display: flex;
+     align-items: center;
+     gap: 0.5rem;
+ }
+ .detail-list-item .item-status {
+   display: block;
+   font-size: 0.7rem;
+   font-weight: 600;
+ }
+ .detail-list-item .item-status.paid { color: var(--success); }
+ .detail-list-item .item-status.unpaid { color: var(--warn); }
+
+ .detail-list-item .item-amount { font-weight: 700; font-size: 0.95rem; }
+
+ .dense-list-item .item-sub-content.role-summary {
+     display: flex;
+     flex-wrap: wrap;
+     gap: 6px;
+     margin-top: 4px;
+ }
+ /* Style untuk sub-konten di dense list */
+ .dense-list-item .item-subtitle {
+     font-size: 0.75rem;
+     color: var(--text-dim);
+     white-space: nowrap;
+     overflow: hidden;
+     text-overflow: ellipsis;
+ }
+ .dense-list-item .item-amount {
+     font-weight: 600;
+     font-size: 0.9rem;
+ }
+ .dense-list-item .item-amount.positive { color: var(--success); }
+ .dense-list-item .item-amount.negative { color: var(--danger); }
+ .dense-list-item .item-amount.warn { color: var(--warn); }
+
+ #detail-pane > div.mobile-detail-content > div:nth-child(2) > div > div{
+  border-bottom: 1px solid var(--line);
+ }
+
+ #detail-pane > div.mobile-detail-content > div > div:nth-child(2) > div > div{
+  padding: 1rem;
+ }
+
+ .jurnal-pekerja-list {
+   display: flex;
+   flex-direction: column;
+   gap: 0.5rem;
+ }
+ .jurnal-pekerja-item {
+   padding: 0.75rem 1rem;
+   background-color: transparent;
+   border: none;
+   margin-bottom: 0;
+ }
+ .jurnal-pekerja-info {
+   flex-grow: 1;
+   min-width: 0;
+ }
+ .jurnal-pekerja-status {
+   flex-shrink: 0;
+   text-align: right;
+   display: flex;
+   flex-direction: column;
+   align-items: flex-end;
+ }
+ .jurnal-pekerja-info strong {
+   display: block;
+   font-size: 0.9rem;
+   font-weight: 600;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+ }
+ .jurnal-pekerja-info span {
+   font-size: 0.75rem;
+   color: var(--text-dim);
+ }
+ .jurnal-pekerja-status strong {
+   display: block;
+   font-size: 0.95rem;
+   font-weight: 700;
+ }
+ .jurnal-pekerja-project {
+   display: flex;
+   align-items: center;
+   gap: 0.5rem;
+   margin-top: 0.125rem;
+ }
+ .jurnal-pekerja-project span {
+   color: var(--text-muted);
+ }
+
+ .settings-list {
+   display: flex;
+   flex-direction: column;
+   gap: .5rem;
+ }
+ .settings-list-item {
+   background-color: var(--panel);
+   padding: .8rem 1rem;
+   cursor: pointer;
+   margin-bottom: 0;
+ }
+ .settings-list-item .icon-wrapper {
+   width: 40px;
+   height: 40px;
+   flex-shrink: 0;
+   background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+   color: var(--primary);
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   border-radius: 10px;
+ }
+ .settings-list-item .icon-wrapper .material-symbols-outlined {
+   font-size: 22px;
+ }
+
+ .settings-list-item .label {
+   font-weight: 600;
+   font-size: 0.9rem;
+   color: var(--text);
+   flex-grow: 1;
+ }
+
+ .settings-list-item .material-symbols-outlined:last-child {
+   color: var(--text-dim);
+ }
+
+ .sort-options {
+   display: flex;
+   flex-direction: column;
+   gap: .5rem;
+ }
+ .sort-option {
+   display: flex;
+   align-items: center;
+   gap: .5rem;
+ }
+
+ .accordion-section {
+   margin-bottom:10px;
+ }
+ .accordion-header {
+   display:flex;
+   justify-content:space-between;
+   align-items:center;
+   width:100%;
+   padding:10px 12px;
+   background: var(--panel);
+   border:1px solid var(--line);
+   border-radius:10px;
+   box-shadow: var(--shadow-sm);
+ }
+ .accordion-section .dense-list-container {
+   display:block;
+   padding-top:6px;
+ }
+ .accordion-section:not(.open) .dense-list-container {
+   display:none;
+ }
+ .accordion-header .material-symbols-outlined {
+   transition: transform .2s ease;
+ }
+ .accordion-section.open .accordion-header .material-symbols-outlined {
+   transform: rotate(180deg);
+ }
+
+ /* Removed Material List Specific Styles */
+ .material-list {
+   display: flex;
+   flex-direction: column;
+   gap: 0;
+   margin-left: -1.5rem;
+   margin-right: -1.5rem;
+ }
+  @media (min-width: 600px) {
+    .material-list {
+       margin-left: -2rem;
+       margin-right: -2rem;
+    }
+ }
+
+ .loading-indicator {
+     display: flex;
+     justify-content: center;
+     align-items: center;
+     padding: 1.5rem;
+     margin-top: 1rem;
+ }

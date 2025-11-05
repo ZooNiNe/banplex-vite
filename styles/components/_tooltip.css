@@ -1,0 +1,33 @@
+/* =======================================================
+ * COMPONENT: TOOLTIP
+ * Styles for the custom tooltip component.
+ * ======================================================= */
+
+ .custom-tooltip {
+    position: fixed;
+    background-color: #1f2937; /* Dark background */
+    color: #f9fafb;
+    padding: 0.5rem 0.85rem;
+    border-radius: 6px; /* Revised: less rounded */
+    font-size: 0.8rem;
+    font-weight: 500;
+    z-index: 3000;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    box-shadow: var(--shadow-lg);
+    max-width: 280px;
+    text-align: center;
+    line-height: 1.4;
+}
+
+.custom-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.dark-theme .custom-tooltip {
+    background-color: #e5e7eb;
+    color: #111827;
+}

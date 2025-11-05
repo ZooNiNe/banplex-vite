@@ -6,9 +6,27 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:deps": "node tools/verify-imports-exports.mjs ./project_structure.json --graph ./project_import_graph.json",
+    "optimize-images": "node tools/optimize-images.mjs",
+    "build-min": "node tools/build-min.mjs"
   },
   "devDependencies": {
+    "cypress": "^15.4.0",
+    "dotenv-cli": "^11.0.0",
+    "esbuild": "^0.25.11",
+    "firebase-admin": "^13.5.0",
+    "glob": "^11.0.3",
+    "sharp": "^0.34.4",
     "vite": "^5.2.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "7.4.4",
+    "@capacitor/app": "7.1.0",
+    "@capacitor/cli": "7.4.4",
+    "@capacitor/core": "7.4.4",
+    "@capacitor/haptics": "7.0.2",
+    "@capacitor/keyboard": "7.0.3",
+    "@capacitor/status-bar": "7.0.3"
   }
 }

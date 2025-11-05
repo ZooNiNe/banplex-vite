@@ -1,0 +1,104 @@
+/* Enhanced list UI: hero banner, micro-interactions, headers */
+
+.list-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  margin: 0.25rem 0 0.5rem;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 10%, transparent) 0%, transparent 100%);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.list-hero__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.list-hero__title {
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.list-hero__subtitle {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.list-hero__art {
+  pointer-events: none;
+  opacity: 0.9;
+  transform: translateY(2px);
+}
+
+.list-hero--billing {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 12%, transparent) 0%, transparent 100%);
+}
+
+.list-hero--income,
+.list-hero--journal,
+.list-hero--recycle {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 12%, transparent) 0%, transparent 100%);
+}
+
+/* Subtle hover lift for cards */
+.content-panel .wa-card-v2-wrapper:not(.selected):hover .wa-card-v2 {
+  transform: translateY(-2px);
+}
+.content-panel .wa-card-v2 {
+  transition: transform .18s cubic-bezier(.4,0,.2,1), box-shadow .18s ease;
+}
+
+/* Click ripple (centered) */
+.wa-card-v2::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--primary) 30%, transparent) 10%,
+    transparent 60%
+  );
+  transform: scale(0);
+  opacity: 0.5;
+  transition: transform .36s ease, opacity .6s ease;
+}
+.wa-card-v2:active::after {
+  transform: scale(10);
+  opacity: 0;
+}
+
+/* Group headers with sticky behavior and accent bar */
+.wa-card-list-wrapper.grouped .date-group-header {
+  /* Do not stack/sticky group headers; render inline with list */
+  position: static;
+  top: auto;
+  z-index: auto;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  border-bottom: 1px solid var(--line);
+}
+.wa-card-list-wrapper.grouped .date-group-header::before {
+  content: "";
+  width: 6px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--primary);
+  opacity: 0.35;
+}
+
+/* Staggered enter: wrappers already get .card-item-enter */
+.wa-card-v2-wrapper.card-item-enter {
+  will-change: transform, opacity;
+}

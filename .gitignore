@@ -7,18 +7,49 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Dependensi dan Build
+node_modules/
+dist/
+tools/
+dist-ssr/
 *.local
+
+# Folder build platform (ini sudah benar)
+android/ 
+.vercel/
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# File Environment (RAHASIA - ini sudah benar)
+.env
+.env.development
+.env.development.local
+
+# File server pengembangan lokal (Opsional, ini sudah benar)
+dev-server.js
+
+# 
+# -------------------------------------------------------------------
+# FILE KONFIGURASI DI BAWAH INI TELAH DIHAPUS DARI IGNORE
+# Vercel dan tool lain MEMBUTUHKAN file-file ini untuk build.
+# 
+# vite.config.js  <-- Dihapus dari ignore
+# capacitor.config.json  <-- Dihapus dari ignore
+# cypress.config.js  <-- Dihapus dari ignore
+#
+# FOLDER DI BAWAH INI JUGA DIHAPUS DARI IGNORE
+# (Asumsi 'api/' berisi serverless functions dan 'cypress/' berisi tes)
+# 
+# api/
+# cypress/
+# -------------------------------------------------------------------
+#

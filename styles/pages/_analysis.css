@@ -1,0 +1,52 @@
+/* =======================================================
+ * PAGE: ANALYSIS
+ * Mengatur semua gaya spesifik untuk halaman analisis beban.
+ * ======================================================= */
+
+.analysis-card {
+  margin-bottom: 1.5rem;
+}
+
+.analysis-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.analysis-category-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.analysis-category-row .category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1rem;
+}
+
+.analysis-category-row .category-name {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.analysis-category-row .category-total {
+  font-weight: 600;
+}
+
+.analysis-category-row .category-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.analysis-category-row .category-details strong {
+  font-weight: 600;
+}

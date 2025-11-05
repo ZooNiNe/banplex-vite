@@ -1,0 +1,27 @@
+{
+    "scc": [
+      {
+        "members": [
+          "js/utils/ui.js",
+          "js/pages/tagihan.js",
+          "js/pages/crud.js",
+          "js/pages/pengeluaran.js",
+          "js/pages/pemasukan.js"
+        ],
+        "cycles": [
+          [
+            "js/utils/ui.js",
+            "js/pages/tagihan.js",
+            "js/pages/crud.js",
+            "js/utils/ui.js"
+          ],
+          [
+            "js/utils/ui.js",
+            "js/pages/pengeluaran.js",
+            "js/pages/crud.js",
+            "js/utils/ui.js"
+          ]
+        ]
+      }
+    ]
+  }

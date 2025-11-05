@@ -1,0 +1,168 @@
+/* =======================================================
+ * LAYOUT: HEADER
+ * Berisi gaya untuk header utama halaman, termasuk judul
+ * dan indikator status sinkronisasi.
+ * ======================================================= */
+
+/* Wrapper utama untuk label halaman di dalam toolbar */
+.page-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+/* Grup yang berisi nama aplikasi dan nama halaman */
+.page-label .title-group {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.5rem;
+  text-align: left;
+  min-width: 0;
+  line-height: 1.05;
+}
+
+.page-label .app-name {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #64748b;
+  line-height: 1.1;
+}
+
+/* Perbaikan #4: Improve tampilan page label agar lebih menonjol */
+.page-label .page-name {
+  display: inline-block;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.1;
+  padding: 0; /* Blend in with toolbar */
+  border: none; /* Remove chip/badge look */
+  background: transparent; /* Subtle, text-only */
+  box-shadow: none;
+}
+
+.dark-theme .page-label .page-name {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    text-shadow: none;
+}
+
+
+/* Kontainer untuk semua item di sebelah kanan header */
+.page-label .header-right {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+/* Penyesuaian Dark Theme */
+.dark-theme .page-label .app-name,
+.dark-theme .page-label .page-name {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+
+/* =============================================
+ * Indikator Sinkronisasi
+ * ============================================= */
+
+#sync-indicator {
+  margin-left: auto;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Kapsul yang muncul saat proses sinkronisasi */
+#sync-indicator .sync-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .25rem .6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(110%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+#sync-indicator .sync-capsule.show {
+  transform: translateX(0);
+  opacity: 1;
+  transition: transform .5s cubic-bezier(.22,.7,.23,1), opacity .5s ease-out;
+  pointer-events: auto;
+}
+
+#sync-indicator .sync-capsule.hide {
+  transform: translateX(110%);
+  opacity: 0;
+  transition: transform .5s cubic-bezier(.22,.7,.23,1), opacity .5s ease-out;
+  pointer-events: none;
+}
+
+#sync-indicator .sync-capsule .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+#sync-indicator .sync-capsule.is-syncing .dot { background: var(--warn); }
+#sync-indicator .sync-capsule.is-online .dot { background: var(--success); }
+#sync-indicator .sync-capsule.is-offline .dot { background: var(--danger); }
+
+#sync-indicator .sync-capsule .label {
+  font-size: .75rem;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+/* Detail progress sinkronisasi (biasanya tersembunyi) */
+.sync-progress-details {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--surface-muted);
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  position: absolute;
+  right: 2.5rem;
+  top: 50%;
+  transform: translateY(-50%) translateX(10px);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.sync-progress-details.show {
+  transform: translateY(-50%) translateX(0);
+  opacity: 1;
+}
+
+.sync-progress-details .spinner {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+  border-color: var(--text-dim);
+  border-top-color: var(--primary);
+}
+
+.sync-progress-details span {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}

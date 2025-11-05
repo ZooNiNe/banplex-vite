@@ -1,0 +1,70 @@
+:root {
+  /* --- Base Palette --- */
+  --bg-start: #f8fafc; /* Slightly brighter off-white */
+  --bg-end: #f1f5f9;   /* Slightly cooler off-white */
+  --panel: #ffffff;   /* Pure white for panels/cards */
+  --panel-alt: #f8fafc; /* Consistent with bg-start for subtle variations */
+  --surface-muted: #f1f5f9; /* Consistent with bg-end for muted surfaces */
+  --text: #1e293b;     /* Dark slate for main text (better contrast) */
+  --text-fab: #e2e8f0;   /* Dimmer gray for secondary text */
+  --text-dim: #64748b; /* Lighter slate for secondary text */
+  --line: #e2e8f0;     /* Light gray for borders/lines */
+
+  /* --- Primary & Accents --- */
+  --primary: #2563eb;  /* Slightly richer blue */
+  --primary-light: #dbeafe; /* Lighter blue for backgrounds */
+  --secondary: #475569; /* Slate gray for secondary elements */
+  --accent: #ec4899;   /* Pink accent */
+
+    /* --- Gradients & Shadows (Dark) --- */
+  --primary-grad: linear-gradient(135deg, #5a5de8 0%, #339edb 100%);
+  --secondary-grad: linear-gradient(135deg, #2cc48c 0%, #44c3d7 100%);
+  --success-grad: linear-gradient(135deg, #34d399 0%, #22c55e 100%);
+  --danger-grad: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+  --grad: linear-gradient(135deg, color-mix(in srgb, var(--primary) 18%, #1e293b) 0%, color-mix(in srgb, var(--accent) 18%, #1e293b) 100%);
+  --app-bg-gradient: linear-gradient(180deg, var(--bg-start) 0%, var(--bg-end) 100%); /* Subtle vertical gradient */
+  /* Quick buttons gradient (dark) */
+  --quick-grad: linear-gradient(135deg, #facc15 0%, #fb7185 100%);
+
+  /* --- Semantic Colors --- */
+  --info: #0ea5e9;     /* Sky blue for info */
+  --success: #16a34a;  /* Greener success */
+  --warn: #f59e0b;     /* Amber warning */
+  --danger: #dc2626;   /* Richer red */
+
+  /* --- Gradients & Shadows --- */
+  --grad: linear-gradient(135deg, color-mix(in srgb, var(--primary) 6%, #ffffff) 0%, color-mix(in srgb, var(--info) 6%, #ffffff) 100%);
+  --app-bg-gradient: linear-gradient(135deg, color-mix(in srgb, var(--bg-start) 92%, white) 0%, color-mix(in srgb, var(--bg-end) 90%, white) 50%, color-mix(in srgb, var(--primary) 8%, var(--bg-end)) 100%);
+  --grad-app-bg: linear-gradient(120deg, #a1c4fd, #c2e9fb);
+
+  /* --- Chart Colors (ensure good contrast on white) --- */
+  --chart-income-rgb: 22, 163, 74;   /* success */
+  --chart-expense-rgb: 220, 38, 38;  /* danger */
+  --chart-funding-rgb: 245, 158, 11; /* warn */
+
+  /* --- Other UI Variables --- */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --spacing: 1rem;
+  --sticky-group-header-offset: 56px;
+
+  /* --- Hero Palette (Light) --- */
+  --hero-bg: linear-gradient(135deg, #eff6ff 0%, #fef3c7 100%); /* Light Blue to Light Yellow */
+  --hero-emerald: #10b981;
+  --hero-sun: #f59e0b;
+  --hero-rose: #f43f5e;
+  --hero-indigo: #6366f1;
+  --hero-text: #1e293b; /* Dark text for contrast */
+
+/* --- Tipografi Heading --- */
+--font-size-h1: 2rem;
+--font-size-h2: 1.5rem;
+--font-size-h3: 1.25rem;
+--font-size-h4: 1.1rem;
+--font-size-h5: 1rem;   /* <-- Ini untuk H5, kamu bisa ubah nilainya */
+--font-size-h6: 0.9rem;
+}

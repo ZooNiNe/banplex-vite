@@ -1,0 +1,681 @@
+/* Latar belakang gradien utama halaman dashboard */
+.dashboard-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--app-bg-gradient); /* Gunakan variabel gradien utama */
+  background-size: 200% 200%;
+  animation: gradient-animation 15s ease infinite; /* Animasi gradien */
+}
+
+/* --- Carousel Hero --- */
+.dashboard-hero {
+  position: relative;
+  padding: 1.5rem 1rem;
+  background: var(--hero-bg); /* Latar belakang khas hero */
+  border-radius: var(--radius-lg);
+  margin-bottom: 1.5rem; /* Jarak ke konten bawah */
+  overflow: hidden;
+  color: var(--hero-text);
+  border: 1px solid color-mix(in srgb, var(--hero-indigo) 18%, var(--line));
+  box-shadow: var(--shadow-sm); /* Bayangan halus */
+}
+.dark-theme .dashboard-hero {
+  border-color: color-mix(in srgb, var(--hero-indigo) 25%, var(--line));
+  box-shadow: var(--shadow-sm); /* Gunakan shadow dark mode */
+}
+.hero-content {
+  position: relative; /* Agar di atas ilustrasi */
+  z-index: 1;
+}
+.hero-content h1 {
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: clamp(1.6rem, 4vw, 1.8rem); /* Ukuran font adaptif */
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.3rem 0;
+  color: var(--hero-text);
+}
+.hero-content p {
+  font-size: clamp(0.9rem, 2.5vw, 1rem); /* Ukuran font adaptif */
+  color: color-mix(in srgb, var(--hero-text) 75%, transparent);
+  margin: 0;
+  max-width: 90%; /* Batasi lebar teks di mobile */
+}
+.hero-illustration {
+  position: absolute;
+  top: -20px;
+  right: -30px;
+  width: 150px;
+  height: 120px;
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 0; /* Di bawah konten */
+}
+.hero-illustration svg {
+  width: 100%;
+  height: 100%;
+}
+/* Quote Hero (random quotes below stats grid) */
+.quote-hero {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--hero-indigo)) 0%, color-mix(in srgb, var(--hero-emerald)) 100%);
+  border: 1px solid color-mix(in srgb, var(--hero-indigo) 20%, var(--line));
+  overflow: hidden;
+}
+.quote-hero .quote-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 1rem;
+}
+.quote-hero .quote-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.quote-hero .quote-auto {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--hero-text) 80%, transparent);
+  opacity: 0.9;
+  user-select: none;
+}
+.quote-hero .quote-auto input {
+  width: 28px;
+  height: 16px;
+  appearance: none;
+  background: color-mix(in srgb, var(--hero-text) 20%, transparent);
+  border-radius: 999px;
+  position: relative;
+  outline: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.quote-hero .quote-auto input::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.quote-hero .quote-auto input:checked {
+  background: color-mix(in srgb, var(--hero-emerald) 70%, white);
+}
+.quote-hero .quote-auto input:checked::after {
+  transform: translateX(12px);
+}
+.quote-hero .quote-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--hero-text);
+}
+.quote-hero .quote-mark {
+  font-size: 1.4rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--hero-text) 55%, transparent);
+}
+.quote-hero .quote-text {
+  font-size: clamp(0.95rem, 2.5vw, 1.05rem);
+  color: var(--hero-text);
+  margin: 0.15rem 0 0 0;
+}
+.quote-hero .quote-meta {
+  color: color-mix(in srgb, var(--hero-text) 70%, transparent);
+  font-size: 0.85rem;
+}
+.quote-hero .refresh-quote {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--text-dim);
+}
+
+.quote-hero .refresh-quote:hover { background: color-mix(in srgb, var(--hero-indigo) 10%, transparent); }
+.quote-hero .refresh-quote.spinning .lucide { animation: spin 0.8s linear infinite; }
+
+.quote-hero .quote-illustration {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.65;
+  pointer-events: none;
+}
+.quote-hero .q-orb { animation: hero-float 7s ease-in-out infinite; }
+.quote-hero .q-orb-2 { animation-duration: 9s; animation-direction: alternate-reverse; }
+.quote-hero .q-dot { animation: twinkle 2.4s ease-in-out infinite; }
+.quote-hero .q-line { stroke-dasharray: 240; stroke-dashoffset: 240; animation: hero-draw 6s ease-in-out infinite; opacity: 0.3; }
+
+.q-fade { animation: fadeIn 0.35s ease-in-out; }
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes twinkle { 0%,100% { opacity: 0.2; transform: scale(0.95);} 50% { opacity: 1; transform: scale(1);} }
+/* Carousel Container */
+.dashboard-hero-carousel {
+  position: relative;
+  overflow: hidden; /* Sembunyikan slide non-aktif */
+}
+.hero-slide {
+  display: none; /* Sembunyikan slide by default */
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out;
+}
+.hero-slide.active {
+  display: block; /* Tampilkan slide aktif */
+  opacity: 1;
+  animation: fadeIn 0.5s ease-in-out; /* Animasi fade-in halus */
+}
+/* Indikator Carousel */
+.hero-indicators {
+  display: flex;
+  gap: 8px; /* Jarak antar dot */
+  justify-content: center;
+  position: absolute; /* Posisikan di atas hero */
+  bottom: 0.75rem; /* Jarak dari bawah */
+  left: 0;
+  right: 0;
+  z-index: 2; /* Di atas ilustrasi */
+}
+.hero-indicators .dot {
+  width: 8px; /* Ukuran dot lebih besar */
+  height: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--hero-text) 30%, transparent); /* Warna dot non-aktif */
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+.hero-indicators .dot.active {
+  background: var(--hero-indigo); /* Warna dot aktif */
+  transform: scale(1.2); /* Sedikit perbesar dot aktif */
+}
+
+/* Animasi & Variasi Ilustrasi Carousel */
+.hero-slide[data-tone="warning"] .hero-illustration .hero-circle1 { fill: color-mix(in srgb, var(--hero-sun) 30%, transparent); }
+.hero-slide[data-tone="danger"] .hero-illustration .hero-circle1 { fill: color-mix(in srgb, var(--hero-rose) 30%, transparent); }
+.hero-slide[data-tone="success"] .hero-illustration .hero-circle1 { fill: color-mix(in srgb, var(--hero-emerald) 30%, transparent); }
+.hero-circle1 { animation: hero-float 6s ease-in-out infinite alternate; }
+.hero-circle2 { animation: hero-float 8s ease-in-out infinite alternate-reverse; }
+.hero-line { stroke-dasharray: 200; stroke-dashoffset: 200; animation: hero-draw 5s ease-in-out infinite alternate; }
+
+/* Animasi untuk Ilustrasi */
+@keyframes hero-float {
+  from { transform: translateY(0px) rotate(0deg) scale(1); }
+  to { transform: translateY(10px) rotate(5deg) scale(1.05); }
+}
+@keyframes hero-draw {
+  from { stroke-dashoffset: 200; }
+  to { stroke-dashoffset: 0; }
+}
+/* Animasi fade in untuk slide aktif */
+@keyframes fadeIn {
+from { opacity: 0; }
+to { opacity: 1; }
+}
+
+
+/* --- Grid Kartu Statistik (Revisi Layout) --- */
+.dashboard-stats-grid,
+.dashboard-worker-stats-grid { /* Style juga berlaku untuk grid pekerja */
+  display: grid;
+  /* Mobile: 2 kolom */
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem; /* Jarak antar kartu */
+  margin-bottom: 1.5rem; /* Jarak ke bagian bawah */
+}
+
+/* Kartu Statistik Individual */
+.stat-item {
+  background-color: var(--panel); /* Gunakan warna panel */
+  border-radius: var(--radius); /* Radius konsisten */
+  border: 1px solid var(--line);
+  padding: 0.8rem; /* Padding internal */
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem; /* Jarak antar elemen di dalam kartu */
+  text-align: left;
+  position: relative;
+  box-shadow: var(--shadow-sm); /* Bayangan halus */
+  transition: transform .15s ease, background-color .2s ease, box-shadow .2s ease;
+  overflow: hidden; /* Tambahkan overflow hidden */
+}
+.dark-theme .stat-item {
+  background-color: var(--panel-alt); /* Warna alternatif di dark mode */
+}
+.stat-item:hover {
+  transform: translateY(-2px); /* Efek angkat saat hover */
+  box-shadow: var(--shadow-md);
+}
+.stat-item:active {
+  transform: translateY(0) scale(0.98); /* Efek tekan */
+}
+
+.stat-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem; /* Jarak ke value */
+}
+.stat-header .card-icon {
+  width: 30px; /* Ukuran ikon lebih besar */
+  height: 30px;
+  border-radius: 8px; /* Radius ikon */
+  display: flex; /* Pusatkan ikon di dalam box */
+  align-items: center;
+  justify-content: center;
+  color: white; /* Ikon putih */
+  flex-shrink: 0; /* Cegah ikon mengecil */
+}
+.stat-header .card-icon.income { background-color: var(--success); }
+.stat-header .card-icon.expense { background-color: var(--danger); }
+.stat-header .card-icon.bills { background-color: #6366f1; } /* Indigo */
+.stat-header .card-icon.loans { background-color: #a855f7; } /* Purple */
+.stat-header .card-icon.workers { background-color: #2dd4bf; } /* Teal */
+.stat-header .card-icon.worker-days { background-color: #f472b6; } /* Pink */
+.stat-header .card-icon.paid-wages { background-color: var(--success); }
+.stat-header .card-icon.unpaid-wages { background-color: var(--warn); }
+
+
+.stat-header .card-title {
+  font-size: 0.8rem; /* Ukuran judul */
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap; /* Cegah judul wrap */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-header .refresh-btn {
+  width: 28px; /* Ukuran tombol refresh */
+  height: 28px;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  color: var(--text-dim); /* Warna ikon refresh */
+}
+.stat-header .refresh-btn:hover {
+  background-color: var(--surface-muted); /* Background saat hover */
+  color: var(--text);
+}
+.stat-header .refresh-btn .lucide {
+  width: 16px; /* Ukuran ikon di dalam tombol */
+  height: 16px;
+}
+.refresh-btn .lucide.spin {
+  animation: spin 1.5s linear infinite; /* Animasi putar */
+}
+
+
+.stat-value {
+  font-size: clamp(1rem, 4vw, 1.4rem);
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 0.1rem;
+  color: var(--text);
+  white-space: nowrap; /* Cegah teks value wrap */
+  overflow: hidden;
+  text-overflow: ellipsis; /* Tampilkan ... jika terlalu panjang */
+}
+.stat-label {
+  font-size: 0.7rem; /* Ukuran label */
+  color: var(--text-dim);
+  margin-top: 0.1rem;
+}
+
+.stat-footer {
+  margin-top: auto; /* Dorong footer ke bawah */
+  padding-top: 0.5rem; /* Jarak dari atas */
+  text-align: right;
+  display: flex; /* Gunakan flexbox untuk mensejajarkan */
+  justify-content: flex-end; /* Ratakan ke kanan */
+  align-items: center; /* Sejajarkan vertikal */
+  gap: 0.3rem; /* Jarak antara teks dan tombol */
+}
+.action-hint {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-right: 0.2rem; /* Jarak ke tombol */
+}
+
+.stat-footer .btn-sm {
+  width: 30px; /* Ukuran tombol navigasi */
+  height: 30px;
+  padding: 0;
+  background: transparent; /* Transparan by default */
+  border: none;
+  border-radius: 6px;
+  flex-shrink: 0; /* Cegah tombol mengecil */
+}
+.stat-footer .btn-sm:hover {
+  background: var(--surface-muted); /* Background saat hover */
+}
+.stat-footer .btn-sm .lucide {
+  width: 16px; /* Ukuran ikon navigasi */
+  height: 16px;
+}
+
+/* --- Info Hero Card (Baru) --- */
+.info-hero-card {
+display: flex;
+align-items: center;
+gap: 1rem;
+padding: 1.25rem;
+background-color: var(--panel);
+border: 1px solid var(--line);
+border-radius: var(--radius-lg);
+box-shadow: var(--shadow-sm);
+margin-bottom: 1.5rem;
+}
+.dark-theme .info-hero-card {
+background-color: var(--panel-alt);
+}
+.info-hero-card .icon-wrapper {
+flex-shrink: 0;
+width: 44px;
+height: 44px;
+display: flex;
+align-items: center;
+justify-content: center;
+border-radius: 12px;
+background-color: color-mix(in srgb, var(--hero-indigo) 15%, transparent);
+color: var(--hero-indigo);
+}
+.info-hero-card .lucide {
+width: 24px;
+height: 24px;
+}
+.info-hero-card .info-content {
+flex-grow: 1;
+min-width: 0;
+}
+.info-hero-card .info-title {
+font-weight: 600;
+font-size: 0.9rem;
+color: var(--text);
+margin-bottom: 0.2rem;
+}
+.info-hero-card .info-quote {
+font-size: 0.85rem;
+color: var(--text-dim);
+line-height: 1.5;
+}
+
+
+/* --- Layout Kartu Chart & Budget --- */
+.dashboard-grid-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  /* Hapus padding-top agar info-hero-card menempel */
+}
+
+/* Customizable layout toggles */
+body.dashboard-layout-grid .dashboard-grid-layout {
+  grid-template-columns: 1fr;
+}
+@media (min-width: 600px) {
+  body.dashboard-layout-grid .dashboard-grid-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+body.dashboard-layout-cards .dashboard-grid-layout {
+  grid-template-columns: 1fr;
+}
+
+.dashboard-card {
+  background-color: var(--panel);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: var(--shadow-sm); /* Terapkan shadow base */
+}
+.dashboard-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md); /* Shadow lebih besar saat hover */
+}
+
+.dashboard-card .card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.dashboard-card .refresh-btn {
+  margin-left: auto; /* Tombol refresh tetap di kanan */
+  width: 32px;
+  height: 32px;
+  color: var(--text-dim);
+}
+.dashboard-card .refresh-btn:hover {
+  background-color: var(--surface-muted);
+  color: var(--text);
+}
+
+.dashboard-card .card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+/* Warna ikon untuk kartu chart/budget */
+.dashboard-card .card-icon.income-expense { background-color: var(--warn); }
+.dashboard-card .card-icon.balance { background-color: var(--primary); }
+.dashboard-card .card-icon.budget { background-color: #2dd4bf; } /* Teal */
+
+.dashboard-card .card-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+.dashboard-card .card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex-grow: 1;
+}
+.dashboard-card .card-body-chart {
+  min-height: 200px; /* Tinggi minimum chart */
+  position: relative;
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex-grow: 1;
+}
+.dashboard-card .chart-container {
+  position: relative;
+  height: 100%;
+  min-height: 200px; /* Konsisten dengan card-body-chart */
+  width: 100%;
+  flex-grow: 1;
+}
+.dashboard-card .card-footer {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+  text-align: right;
+}
+.dashboard-card#dashboard-card-budgets {
+  padding-bottom: 1.25rem; /* Tambah padding bawah untuk ruang tambahan */
+  margin-bottom: 1rem; /* Beri jarak dengan grid statistik di bawahnya */
+}
+.dashboard-card .card-footer .chart-hint {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.dashboard-card .btn-sm { /* Tombol navigasi di footer kartu chart/budget */
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  border-radius: 6px;
+}
+.dashboard-card .btn-sm:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+.dashboard-card .btn-sm .lucide {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+.dashboard-card .error-text { /* Teks error jika gagal load */
+  color: var(--danger);
+  font-size: 0.85rem;
+  text-align: center;
+  margin: auto;
+}
+.chart-placeholder { /* Placeholder saat chart kosong */
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+/* --- Style Kartu Anggaran --- */
+.budget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.budget-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.budget-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.budget-item-name {
+  font-weight: 500;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70%;
+  color: var(--text);
+}
+.budget-item-percent {
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.budget-item-percent.near-limit-text { color: var(--warn); }
+.budget-item-percent.over-budget-text { color: var(--danger); }
+.budget-bar { height: 8px; }
+.budget-bar-used.over-budget { background: var(--danger) !important; }
+.budget-bar-used.near-limit { background: var(--warn) !important; }
+.budget-item-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 0.1rem;
+}
+
+/* --- Media Queries (Desktop Layout) --- */
+@media (min-width: 600px) {
+  /* Desktop: Grid 4 kolom untuk statistik (utama & pekerja) */
+  .dashboard-stats-grid,
+  .dashboard-worker-stats-grid {
+      grid-template-columns: repeat(4, 1fr);
+  }
+  /* Desktop: Grid 2 kolom untuk chart */
+  .dashboard-grid-layout {
+      grid-template-columns: 1fr 1fr;
+  }
+  .dashboard-card.card-full-width {
+      grid-column: 1 / -1; /* Kartu full width span 2 kolom */
+  }
+   .dashboard-card .card-body-chart {
+      min-height: 250px; /* Chart lebih tinggi */
+  }
+   .dashboard-card .chart-container {
+      min-height: 250px;
+  }
+   .budget-list { /* Budget jadi grid di desktop */
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+  }
+  .hero-content p { max-width: 70%; } /* Lebarkan teks hero */
+  .hero-illustration { width: 200px; height: 150px; top: -30px; right: -20px; }
+}
+
+/* Layout untuk layar lebih lebar */
+@media (min-width: 600px) {
+  /* Layout 3 kolom untuk chart */
+  .dashboard-grid-layout {
+      grid-template-columns: repeat(3, 1fr);
+  }
+  /* Atur span kartu agar sesuai layout 3 kolom */
+  .dashboard-card#dashboard-card-income_vs_expense,
+  .dashboard-card#dashboard-card-summary {
+      grid-column: span 1; /* Chart & Ringkasan ambil 1 kolom */
+  }
+   /* Kartu Anggaran (#dashboard-card-budgets) sekarang di luar grid ini */
+
+}
+
+/* Layout untuk layar sangat lebar */
+@media (min-width: 1200px) {
+ /* Tetap 3 kolom */
+ .dashboard-grid-layout {
+    grid-template-columns: repeat(3, 1fr);
+}
+.dashboard-card#dashboard-card-income_vs_expense {
+   grid-column: span 1;
+}
+/* Kartu Anggaran (#dashboard-card-budgets) sekarang di luar grid ini */
+ .dashboard-card#dashboard-card-summary {
+    grid-column: span 1; /* Ringkasan 1 kolom */
+ }
+}
+
+/* Tweak untuk ponsel sangat kecil */
+@media (max-width: 360px) {
+.dashboard-stats-grid,
+.dashboard-worker-stats-grid { gap: 0.75rem; } /* Kurangi jarak grid */
+.stat-item { padding: 0.6rem; } /* Kurangi padding kartu */
+.stat-header .card-icon { width: 26px; height: 26px; }
+.stat-header .card-title { font-size: 0.75rem; }
+.stat-value { font-size: clamp(0.9rem, 4vw, 1.1rem); } /* Kecilkan sedikit */
+.stat-label { font-size: 0.65rem; }
+.stat-header .refresh-btn { width: 22px; height: 22px; top: 4px; right: 4px; }
+.stat-header .refresh-btn .lucide { width: 12px; height: 12px; }
+.hero-content h1 { font-size: 1.5rem; }
+.hero-content p { font-size: 0.85rem; }
+.stat-footer { gap: 0.1rem; } /* Kurangi gap di footer stat */
+.action-hint { font-size: 0.65rem; } /* Kecilkan hint */
+}

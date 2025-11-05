@@ -1,0 +1,656 @@
+/* =======================================================
+ * LAYOUT: MODALS & OVERLAYS
+ * Berisi gaya untuk semua jenis modal, dialog, bottom sheet,
+ * menu konteks, dan overlay lainnya.
+ * ======================================================= */
+
+
+/* --- Main Modal Container (Centered Dialog) --- */
+
+.modal-bg {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 2100;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.modal-bg.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-content {
+  background: var(--panel);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.08);
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  max-width: 550px;
+  height: auto;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(0.95);
+  opacity: 0;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease, box-shadow 0.3s ease;
+}
+
+.modal-content::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  background-image: var(--grad);
+  opacity: .12;
+}
+
+.modal-bg.show .modal-content {
+  transform: scale(1);
+  opacity: 1;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.05),
+              var(--shadow-lg),
+              0 0 35px rgba(120, 120, 120, 0.15);
+}
+
+.dark-theme .modal-bg.show .modal-content {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08),
+              var(--shadow-lg),
+              0 0 45px rgba(255, 255, 255, 0.06);
+}
+
+
+
+/* --- Modal Sections (Header, Body, Footer) --- */
+
+.modal-header {
+  padding: 1rem 1.25rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.modal-header h4 {
+  font-size: 1.1rem;
+  margin: 0;
+  flex: 1;
+  text-align: center;
+  padding: 0 40px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-header .modal-close-btn {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    z-index: 10;
+}
+
+
+.modal-body {
+  overflow-y: auto;
+  padding: 1.25rem;
+  flex-grow: 1;
+  min-height: 0;
+}
+
+ .dark-theme .modal-footer {
+   background-color: var(--panel);
+ }
+
+/* --- Welcome Onboarding Modal --- */
+.modal-bg.is-welcome-modal .modal-content {
+  max-width: 440px; /* Sedikit lebih lebar dari dialog biasa */
+  overflow: visible; /* Izinkan ilustrasi "bocor" sedikit */
+}
+.modal-bg.is-welcome-modal .modal-header {
+  display: none; /* Sembunyikan header default */
+}
+.modal-bg.is-welcome-modal .modal-body {
+  padding: 0; /* Hapus padding body default */
+}
+
+.welcome-hero-content {
+  text-align: center;
+  padding: 2.5rem 2rem 2rem;
+  position: relative;
+}
+
+.welcome-hero-illustration {
+  height: 100px;
+  margin-bottom: 1.5rem;
+}
+/* Animasi untuk ilustrasi */
+.welcome-hero-art {
+  animation: auth-float 6s ease-in-out infinite alternate;
+}
+.welcome-hero-art .auth-svg-shape {
+  animation: auth-float 5s 0.5s ease-in-out infinite alternate-reverse;
+}
+@keyframes auth-float {
+  from { transform: translateY(0px) rotate(0deg); }
+  to { transform: translateY(10px) rotate(8deg); }
+}
+
+.welcome-hero-title {
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0 0 0.5rem 0;
+}
+
+.welcome-hero-description {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.modal-bg.is-welcome-modal .modal-footer {
+  background-color: var(--surface-muted);
+  border-top-color: var(--line);
+  padding-top: 1.25rem;
+  padding-bottom: 1.25rem;
+}
+
+.modal-bg.is-welcome-modal .modal-footer .btn-primary {
+  width: 100%;
+  padding: 0.8rem 1.25rem;
+}
+
+/* Efek 'bocor' untuk ilustrasi */
+.welcome-hero-illustration {
+    margin-top: -4.5rem; /* Tarik ilustrasi ke atas */
+    margin-bottom: 1rem;
+    transform: scale(1.1);
+}
+
+/* --- Bottom Sheet Variant --- */
+
+.modal-bg.is-bottom-sheet {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.modal-bg.is-bottom-sheet .modal-content {
+  width: 95%;
+  max-width: 95%;
+  height: auto;
+  max-height: 80vh;
+  margin-bottom: 0.5rem;
+  border-radius: 1rem 1rem;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(95%);
+  opacity: 1;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modal-bg.is-bottom-sheet.show .modal-content {
+  transform: translateY(0);
+}
+
+.modal-bg.is-bottom-sheet .modal-header {
+  padding: 1rem;
+  text-align: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.modal-bg.is-bottom-sheet .modal-header::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 6px;
+  background-color: var(--text-dim);
+  border-radius: 2px;
+}
+
+.modal-bg.is-bottom-sheet .modal-header h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  padding-top: 12px;
+}
+
+.modal-bg.is-bottom-sheet .modal-header .btn-icon {
+  display: none;
+}
+
+.modal-bg.is-bottom-sheet .modal-body {
+  padding: 0.5rem 1.25rem calc(1rem + env(safe-area-inset-bottom, 0px)) 1.25rem;
+  overflow-y: auto;
+  flex-grow: 1;
+  min-height: 0;
+}
+
+
+/* --- Simple Dialog Variant --- */
+
+.modal-bg.is-simple-dialog .modal-content {
+  max-width: 400px;
+}
+.modal-bg.is-simple-dialog .modal-header {
+  justify-content: center;
+  padding-top: 1.5rem;
+  border-bottom: none;
+  position: relative;
+}
+.modal-bg.is-simple-dialog .modal-header h4 {
+  padding-top: 0;
+  text-align: center;
+  font-size: 1.2rem;
+}
+
+.modal-bg.is-simple-dialog .modal-header .modal-close-btn {
+    top: 0.75rem;
+    right: 0.75rem;
+    transform: none;
+    z-index: 10;
+}
+.modal-bg.is-simple-dialog:has(.modal-footer) .modal-header .modal-close-btn {
+    display: none;
+}
+
+
+.modal-bg.is-simple-dialog .modal-body {
+  padding: 0.25rem 1.5rem 1.5rem 1.5rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+  text-align: center;
+}
+.modal-bg.is-simple-dialog .modal-body strong {
+  font-weight: 600;
+  color: var(--text);
+}
+.modal-bg.is-simple-dialog .modal-footer {
+  background-color: transparent;
+  border-top: none;
+  padding: 0 1.5rem 1.5rem 1.5rem;
+}
+
+/* Upload source buttons */
+.upload-source-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+/* Payment modal specifics */
+.quick-pay-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .75rem;
+    padding: 0 1.25rem 1.25rem;
+}
+.payment-form-body {
+    padding: 0 1.25rem;
+}
+
+.payment-form-body .upload-buttons {
+    display: flex;
+    gap: .75rem;
+}
+
+/* --- Feedback Modals (Success/Error/Loading) --- */
+.feedback-dialog-container {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+.dark-theme .feedback-dialog-container {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.feedback-dialog-container.show {
+  opacity: 1;
+}
+
+.feedback-dialog-content {
+  background-color: var(--panel);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+  max-width: 90vw;
+  text-align: center;
+  transform: scale(0.9);
+  opacity: 0;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+}
+
+.feedback-dialog-container.show .feedback-dialog-content {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.feedback-dialog-icon {
+  width: 72px;
+  height: 72px;
+  position: relative;
+}
+.feedback-dialog-message {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+
+/* --- Image Viewer Modal --- */
+.modal-bg.is-image-viewer {
+    background-color: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 1rem;
+}
+.modal-bg.is-image-viewer img {
+    max-width: 95vw;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+}
+.modal-bg.is-image-viewer .modal-header,
+.modal-bg.is-image-viewer .modal-close-btn {
+    display: none !important;
+}
+.modal-bg.is-image-viewer img::-webkit-media-controls-enclosure,
+.modal-bg.is-image-viewer img::-webkit-media-controls {
+    display:none !important;
+}
+
+.is-image-viewer .image-view-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background-color: rgba(0, 0, 0, 0.4);
+    color: white;
+    z-index: 2501;
+}
+.is-image-viewer .image-view-close:hover {
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+/* Share Modal Styles */
+.share-modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.share-preview-image {
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    object-fit: contain;
+    max-height: 40vh;
+}
+.share-text-template {
+    width: 100%;
+    resize: vertical;
+}
+.share-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+
+/* =======================================================
+ * DESKTOP & WIDER SCREENS (Footer Consistency)
+ * ======================================================= */
+
+@media (min-width: 600px) {
+  .modal-bg.is-simple-dialog {
+    align-items: center;
+    padding-bottom: 0;
+  }
+  .modal-bg.is-simple-dialog .modal-content {
+    max-width: 380px;
+    width: 90%;
+  }
+
+  .modal-bg.is-bottom-sheet {
+     align-items: center;
+     padding: 1rem;
+  }
+  .modal-bg.is-bottom-sheet .modal-content {
+    transform: none;
+    opacity: 0;
+    transform: scale(0.95);
+    max-width: 550px;
+    border-radius: var(--radius-lg);
+  }
+  .modal-bg.is-bottom-sheet.show .modal-content {
+    transform: scale(1);
+    opacity: 1;
+  }
+  .modal-bg.is-bottom-sheet .modal-header::before {
+    display: none;
+  }
+   .modal-bg.is-bottom-sheet .modal-header h4 {
+        padding-top: 0;
+        text-align: center;
+   }
+   .modal-bg.is-bottom-sheet .modal-header .btn-icon {
+     display: inline-flex;
+     position: absolute;
+     right: 0.75rem;
+     top: 50%;
+     transform: translateY(-50%);
+   }
+}
+
+
+#rekap-gaji-content {
+margin-top: 1rem;
+border-radius: var(--radius);
+background-color: var(--panel);
+}
+
+#rekap-gaji-results {
+  margin-top: 1.5rem;
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+/* === (Revisi Total untuk Sticky Footer) === */
+
+.modal-bg.is-chat-sheet {
+  align-items: flex-end;
+  padding: 0;
+}
+
+/* Konten Modal (Wadah utama) */
+.modal-bg.is-chat-sheet .modal-content {
+  width: 95%;
+  max-width: 95%;
+  height: auto;
+  max-height: 65vh;
+  margin-bottom: .5rem;
+  border-radius: 1 1rem;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* PERUBAHAN: Layout flex-column untuk sticky footer */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Penting! */
+  
+  /* PERUBAHAN: Style card-wa-v2 */
+  background: var(--bg-start);
+}
+.dark-theme .modal-bg.is-chat-sheet .modal-content {
+  background: var(--panel-alt);
+}
+
+.modal-bg.is-chat-sheet.show .modal-content {
+  transform: translateY(0);
+}
+
+/* Header Modal */
+.modal-bg.is-chat-sheet .modal-header {
+  padding: 1.5rem 1.25rem;
+  text-align: left;
+  position: relative;
+  flex-shrink: 0; /* Header tidak boleh menyusut */
+}
+.modal-bg.is-chat-sheet .modal-header::before { display: none; }
+.modal-bg.is-chat-sheet .modal-header h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.modal-bg.is-chat-sheet .modal-header .modal-close-btn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+}
+.modal-bg.is-chat-sheet .modal-header h4 .title-wrap {
+    display: grid;
+    line-height: 1.1;
+    min-width: 0;
+    flex-grow: 1;
+}
+.modal-bg.is-chat-sheet .modal-header h4 .chat-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.modal-bg.is-chat-sheet .modal-header h4 .chat-subtitle {
+    font-size: .8rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.modal-bg.is-chat-sheet .modal-header h4 .avatar-badge.is-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  background: var(--primary-light);
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.modal-bg.is-chat-sheet .modal-header h4 .avatar-badge.is-icon .lucide {
+  width: 20px;
+  height: 20px;
+}
+
+/* Body Modal (Area Scroll) */
+.modal-bg.is-chat-sheet .modal-body {
+  padding: 0;
+  overflow-y: auto;  /* <-- INI KUNCINYA: Membuat body scroll */
+  flex-grow: 1;      /* <-- INI KUNCINYA: Mengisi sisa ruang */
+  min-height: 0;     /* <-- Wajib untuk flex-grow */
+  display: flex;
+  /* PERUBAHAN DI SINI */
+  flex-direction: column; /* Menumpuk .chat-item-context-header dan .chat-view secara vertikal */
+}
+
+/* chat-view di dalam modal-body */
+.modal-bg.is-chat-sheet .modal-body .chat-view {
+  width: 100%;
+  height: auto; /* Biarkan mengikuti konten */
+  display: grid;
+  grid-template-rows: 1fr; /* Hanya thread, composer ada di footer */
+  position: relative;
+}
+
+/* chat-thread di dalam modal-body .chat-view */
+.modal-bg.is-chat-sheet .modal-body .chat-thread {
+  grid-row: 1;
+  flex-grow: 1; /* Tumbuh untuk mendorong date-separator ke atas */
+}
+
+/* Footer Modal (Sticky Composer) */
+.modal-bg.is-chat-sheet .modal-footer {
+  display: block; /* <-- PENTING: Tampilkan footer modal */
+  padding: 0;
+  border-top: none; /* composer-wrapper sudah punya border */
+  background: var(--panel);
+  flex-shrink: 0; /* <-- PENTING: Membuatnya sticky */
+  z-index: 10;
+}
+
+/* Sembunyikan wrapper default jika ada */
+.modal-bg.is-chat-sheet .modal-footer-actions {
+  display: none;
+}
+
+/* Style composer-wrapper yang sekarang ada di dalam modal-footer */
+.modal-bg.is-chat-sheet .modal-footer .composer-wrapper {
+  grid-row: unset;
+  position: static;
+  
+  padding: 0.5rem;
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  /* PERUBAHAN: Gunakan var(--panel-alt) */
+  background-color: var(--panel-alt);
+  box-shadow: none;
+}
+
+.dark-theme .modal-bg.is-chat-sheet .modal-footer .composer-wrapper {
+  background-color: var(--panel-alt);
+}
+
+/* PERUBAHAN: Pastikan capsule di modal juga menggunakan var(--panel-alt) */
+.modal-bg.is-chat-sheet .modal-footer .composer-capsule {
+    background: var(--panel-alt);
+}
+#actionsPopup-modal > div > div.modal-footer > div > footer > div > div > textarea{
+  border-color: none;
+  box-shadow: none;
+}

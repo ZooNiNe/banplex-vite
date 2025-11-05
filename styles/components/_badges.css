@@ -1,0 +1,282 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .6rem;
+  padding: .1rem .35rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--text-dim);
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.meta-badge .badge {
+    margin-right: 4px; /* Add slight margin if used inside meta-badge */
+}
+
+
+.badge.material {
+  color: #065f46;
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+.badge.operasional {
+  color: #1e3a8a;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+.badge.lainnya {
+  color: #6b21a8;
+  border-color: #e9d5ff;
+  background: #faf5ff;
+}
+
+.status-badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.status-badge.positive {
+  color: #15803d;
+  background-color: #dcfce7;
+}
+.status-badge.negative {
+  color: #b91c1c;
+  background-color: #fee2e2;
+  font-size: .68rem;
+  padding: .15rem .45rem;
+}
+
+.status-badge.warn,
+.status-badge--warn {
+  color: var(--warn);
+  background-color: rgba(245, 158, 11, 0.12);
+}
+.status-badge.status-hadir {
+  color: var(--success);
+  background-color: rgba(34, 197, 94, 0.15);
+}
+.status-badge.status-setengah {
+  color: var(--warn);
+  background-color: rgba(245, 158, 11, 0.15);
+}
+.status-badge.status-absen {
+  color: var(--text-dim);
+  background-color: var(--surface-muted);
+}
+.status-badge.info,
+.status-badge--info {
+    color: #0ea5e9;
+    background-color: rgba(14, 165, 233, 0.1);
+}
+.status-badge--positive {
+    color: var(--success);
+    background-color: rgba(34, 197, 94, 0.15);
+}
+
+
+.category-badge {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  color: var(--text);
+  background-color: var(--line);
+  flex-shrink: 0;
+  font-weight: 500;
+}
+.category-badge.category-main {
+  background-color: #dcfce7;
+  color: #16a34a;
+}
+.category-badge.category-internal {
+  background-color: #e0e7ff;
+  color: #4338ca;
+}
+
+.user-badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.user-badge.role-owner {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+.user-badge.role-editor {
+  background-color: #fef9c3;
+  color: #a16207;
+}
+.user-badge.role-viewer {
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+.user-badge.status-active {
+  background-color: #dcfce7;
+  color: #16a34a;
+}
+.user-badge.status-pending {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.percent-badge {
+  display: inline-flex;
+  font-size: 0.7rem;
+  padding: .15rem .4rem;
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  background: rgba(14, 165, 233, 0.1);
+}
+
+.profile-role-badge {
+  margin-top: 0.5rem;
+  background-image: var(--grad);
+  color: #fff;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+
+.notification-badge {
+  position: absolute;
+  top: 4px;
+  right: 22px;
+  background-color: var(--danger);
+  color: white;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.sidebar-nav-item .notification-badge {
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  font-size: 0.7rem;
+}
+
+/* Badge inside header icon button */
+.btn-icon .notification-badge,
+.icon-btn .notification-badge {
+  right: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  font-size: 0.6rem;
+}
+
+.fab .badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: var(--danger);
+  color: #fff;
+  border-radius: 999px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--panel);
+}
+
+.jump-bottom .badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  font-size: .7rem;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--panel);
+}
+
+/* Stock badges */
+.stock-badges-row {
+  display: flex;
+  gap: .35rem;
+  flex-wrap: wrap;
+  margin-top: .35rem;
+}
+.stock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .65rem;
+  padding: .15rem .4rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.stock-badge.in {
+  color: #166534;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+.stock-badge.out {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.chat-list-item__unread-badge {
+  background-color: var(--success);
+  color: white;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2px;
+}
+
+.badge .comment-avatar {
+  width: 16px;
+  height: 16px;
+  font-size: 0.6rem;
+}
+
+@media (min-width: 600px) {
+    .badge, .status-badge, .category-badge, .user-badge {
+      padding: 0.3rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border-radius: 6px;
+      line-height: 1;
+    }
+
+    .badge {
+      font-size: .6rem;
+      padding: .1rem .35rem;
+    }
+}

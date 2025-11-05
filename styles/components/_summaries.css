@@ -1,0 +1,223 @@
+/* =======================================================
+ * COMPONENT: SUMMARIES
+ * Mengatur semua gaya untuk elemen ringkasan (summary),
+ * seperti grid total, kartu statistik, dll.
+ * ======================================================= */
+
+/* --- Generic Summary Grid --- */
+.detail-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  background: var(--surface-muted);
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-item .label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+
+.summary-item .value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.summary-item .value.positive { color: var(--success); }
+.summary-item .value.negative { color: var(--danger); }
+.summary-item .value.warn { color: var(--warn); }
+
+
+/* --- Invoice Total Block --- */
+ .invoice-total {
+  background-color: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.invoice-total span {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+.invoice-total strong {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+
+/* --- Worker Recap Summary (Modal) --- */
+.worker-recap-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: var(--spacing);
+  margin-bottom: 1.5rem;
+  background-color: var(--surface-muted);
+}
+.worker-recap-summary > div {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+}
+.worker-recap-summary .label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+.worker-recap-summary strong {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.worker-recap-summary .total-gaji {
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+.worker-recap-summary .total-gaji strong {
+  color: var(--primary);
+  font-size: 1.4rem;
+}
+
+
+/* --- Jurnal Detail Summary (Modal) --- */
+#jurnal-detail-summary {
+  margin-bottom: 1rem;
+}
+#jurnal-detail-summary .summary-title {
+  margin-top: 0;
+  margin-bottom: 0.25rem;
+  text-align: center;
+}
+#jurnal-detail-summary .summary-total {
+  text-align: center;
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+
+/* --- Simulasi Payment Summary --- */
+.simulasi-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.simulasi-totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding-top: 0.75rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--line);
+}
+.simulasi-totals > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.simulasi-totals .label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+.simulasi-totals strong {
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+
+/* --- Report Page Chart Summary --- */
+.chart-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.summary-stat-card {
+  background-color: var(--surface-muted);
+  border: 1px solid var(--line);
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  text-align: center;
+}
+.summary-stat-card .label {
+  font-size: 0.70rem;
+  font-weight: 400;
+  color: var(--text-dim);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+.summary-stat-card .value {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+
+/* --- Generic Summary Card --- */
+.summary-card {
+  padding: 1rem;
+  margin: 0 var(--spacing) 1rem var(--spacing);
+}
+.summary-card-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin: 0 0 0.75rem 0;
+}
+.summary-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 0.75rem;
+}
+.summary-card-item .label {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+.summary-card-item .amount {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+
+/* --- Payment Modal Header --- */
+.payment-modal-header {
+  padding: 1.25rem 1.5rem;
+  text-align: center;
+  background-color: var(--surface-muted);
+  border-bottom: 1px solid var(--line);
+  margin: -0.8rem -1.25rem 1.5rem -1.25rem;
+}
+.payment-modal-header .label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+.payment-modal-header .payment-main-amount {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--danger);
+}
+.dark-theme .payment-modal-header {
+    background-color: var(--panel);
+}

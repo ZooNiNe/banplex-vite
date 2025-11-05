@@ -1,0 +1,407 @@
+/* =======================================================
+ * LAYOUT: MAIN CONTENT & PANELS
+ * Mengatur tata letak utama aplikasi, termasuk wrapper
+ * konten, area halaman yang dapat di-scroll, dan panel
+ * master-detail untuk mobile dan desktop.
+ * ======================================================= */
+
+/* --- Mobile First & Shared Styles --- */
+
+html, body {
+  overflow: hidden;
+  height: 100vh;
+}
+body.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+#app-shell {
+  display: flex;
+  height: 100vh;
+}
+
+.content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  height: 100vh;
+}
+
+.page-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--spacing);
+  padding-bottom: calc(65px + 1rem + env(safe-area-inset-bottom, 0px));
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.page-container::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollable-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    min-height: 0;
+    padding-bottom: calc( 18px + env(safe-area-inset-bottom, 24px));
+}
+
+.scrollable-content.has-form-padding {
+    padding: 0rem;
+}
+
+
+/* --- Master-Detail Layout (Mobile) --- */
+
+.list-pane,
+.detail-pane {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.list-pane {
+  transform: translate3d(0, 0, 0);
+  z-index: 1;
+}
+
+.detail-pane {
+  z-index: 1100;
+  transform: translate3d(100%, 0, 0);
+  opacity: 0;
+  pointer-events: none;
+  background-color: var(--panel);
+}
+
+body.detail-view-active .list-pane {
+  transform: translate3d(-30%, 0, 0);
+  opacity: 0.5;
+}
+
+body.detail-view-active .detail-pane {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mobile-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background-color: var(--panel-alt);
+  flex-shrink: 0;
+  position: relative;
+}
+.mobile-detail-header .breadcrumb-nav {
+  flex-grow: 1;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* PERBAIKAN: Tambahkan min-width: 0 agar flex item bisa menyusut */
+  min-width: 0;
+}
+.mobile-detail-header .breadcrumb-nav strong {
+  color: var(--text);
+}
+.mobile-detail-header .header-actions {
+  margin-left: auto;
+}
+
+/* PERBAIKAN: Tambahkan style untuk title-wrap di dalam mobile-detail-header */
+.mobile-detail-header .breadcrumb-nav .title-wrap {
+    display: grid;
+    gap: 2px;
+    align-items: center;
+}
+.mobile-detail-header .breadcrumb-nav .chat-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    font-size: 1rem;
+    color: var(--text);
+    font-weight: 600;
+}
+.mobile-detail-header .breadcrumb-nav .chat-subtitle {
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+/* AKHIR PERBAIKAN */
+
+
+.mobile-detail-content {
+  background: var(--app-bg-gradient);
+  flex-grow: 1;
+  overflow-y: auto;
+  min-height: 0;
+  transition: transform 0.4s ease, opacity 0.4s ease, filter 0.4s ease;
+  padding: 1rem;
+  padding-bottom: calc( 0px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 0rem;
+}
+
+.mobile-detail-content > .card {
+    margin: 0;
+}
+
+/* --- Footer Panel Detail (Mobile & Desktop) --- */
+.detail-pane-footer,
+.modal-footer {
+    flex-shrink: 0;
+    padding: 1rem 1.5rem;
+    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    background-color: var(--panel);
+    display: grid;
+    gap: 0.75rem;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+}
+.detail-pane-footer:has(.btn:only-child),
+.modal-footer:has(.btn:only-child) {
+    grid-template-columns: 1fr;
+}
+.detail-pane-footer:has(.btn:first-child + .btn:last-child),
+.modal-footer:has(.btn:first-child + .btn:last-child) {
+    grid-template-columns: 1fr 1fr;
+}
+.detail-pane-footer:has(.btn:nth-child(3):last-child),
+.modal-footer:has(.btn:nth-child(3):last-child) {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+.detail-pane-footer .btn,
+.modal-footer .btn {
+    width: 100%;
+    justify-content: center;
+}
+.dark-theme .detail-pane-footer,
+.dark-theme .modal-footer {
+    background-color: #1e293b;
+}
+
+
+/* --- Guest & Pending Mode Layout --- */
+
+body.guest-mode .content-wrapper,
+body.pending-mode .content-wrapper {
+  display: block !important;
+  grid-template-columns: 1fr !important;
+  margin-left: 0 !important;
+  width: 100% !important;
+}
+
+body.guest-mode .page-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+body.guest-mode .list-pane,
+body.pending-mode .list-pane {
+  border-right: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100%;
+  background: linear-gradient(120deg, #a1c4fd, #c2e9fb) !important;
+}
+
+body.guest-mode #sidebar-nav,
+body.pending-mode #sidebar-nav,
+body.guest-mode .resizer,
+body.pending-mode .resizer,
+body.guest-mode .detail-pane,
+body.pending-mode .detail-pane,
+body.guest-mode .title-group,
+  body.pending-mode .header-right {
+  display: none !important;
+}
+
+
+/* =======================================================
+ * DESKTOP & WIDER SCREENS
+ * ======================================================= */
+
+@media (min-width: 600px) {
+  :root {
+    --list-pane-width: 450px;
+  }
+  .scrollable-content.has-form-padding {
+    padding: 0rem;
+  }
+
+  .content-wrapper {
+    margin-left: 250px;
+    display: block;
+    width: calc(100% - 250px);
+    transition: margin-left .25s ease, width .25s ease;
+  }
+
+  body.sidebar-collapsed .content-wrapper {
+    margin-left: 72px;
+    width: calc(100% - 72px);
+  }
+
+  body.detail-pane-open .content-wrapper {
+    display: grid;
+    grid-template-columns: var(--list-pane-width) 5px 1fr;
+  }
+
+  .list-pane, .detail-pane {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .list-pane {
+    border-right: 1px solid var(--line);
+  }
+
+  .detail-pane {
+    background-color: var(--surface-muted);
+    display: none;
+  }
+
+  body.detail-pane-open .detail-pane {
+    display: flex;
+  }
+
+  .page-container,
+  .detail-pane-body {
+    flex: 1;
+    overflow-y: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+  }
+  .page-container::-webkit-scrollbar,
+  .detail-pane-body::-webkit-scrollbar {
+    display: none;
+  }
+
+  .resizer {
+    display: none;
+    cursor: col-resize;
+    background-color: var(--line);
+    width: 5px;
+    transition: background-color 0.2s ease;
+  }
+  body.detail-pane-open .resizer {
+    display: block;
+  }
+  .resizer:hover,
+  body.is-resizing .resizer {
+    background-color: var(--primary);
+  }
+
+  .detail-pane-header {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+    position: relative;
+    background-color: var(--panel);
+  }
+  .detail-pane-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    flex-grow: 1;
+  }
+
+  .detail-pane-header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      position: absolute;
+      right: 1.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+  }
+
+  .detail-pane-header-right .header-actions {
+      display: flex;
+      gap: 0.5rem;
+  }
+
+  .detail-pane-header-right .btn-icon {
+      position: relative;
+      z-index: 3;
+  }
+
+  .detail-pane-body {
+    padding: 1rem;
+    text-align: left;
+  }
+
+  .mobile-detail-header {
+    display: none;
+  }
+
+  .detail-pane:not([data-is-success-panel="true"]) .detail-pane-footer,
+  .modal-bg:not(.is-simple-dialog):not(.is-bottom-sheet) .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      grid-template-columns: unset;
+      background-color: var(--panel);
+  }
+  .detail-pane:not([data-is-success-panel="true"]) .detail-pane-footer .btn,
+  .modal-bg:not(.is-simple-dialog):not(.is-bottom-sheet) .modal-footer .btn {
+      width: auto;
+  }
+   .detail-pane[data-is-success-panel="true"] .detail-pane-footer {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background-color: var(--panel);
+   }
+   .detail-pane[data-is-success-panel="true"] .detail-pane-footer .btn {
+      width: 100%;
+      justify-content: center;
+   }
+}
+
+/* Unified palette for list panel group (except dashboard/settings) */
+body:not(.page-dashboard):not(.page-pengaturan) .list-pane {
+  background-color: var(--panel);
+}
+body:not(.page-dashboard):not(.page-pengaturan) .list-pane .scrollable-content {
+  background-color: var(--panel);
+}

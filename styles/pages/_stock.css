@@ -1,0 +1,221 @@
+/* =======================================================
+ * PAGE: STOCK
+ * Mengatur semua gaya spesifik untuk halaman manajemen
+ * stok, daftar material, dan estimasi belanja.
+ * ======================================================= */
+
+.estimasi-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.estimasi-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.estimasi-info span {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.estimasi-input {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.estimasi-input .qty-beli {
+  width: 80px;
+  text-align: center;
+}
+
+.estimasi-input .estimasi-subtotal {
+  font-weight: 600;
+  width: 120px;
+  text-align: right;
+}
+
+.material-selector-modal .modal-content {
+  height: 90vh;
+}
+
+.material-selector-modal .modal-header {
+  padding-bottom: 0.5rem;
+}
+
+.modal-search-bar {
+  padding: 0.5rem 1.25rem 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.material-selector-modal .modal-body {
+  padding: 0.75rem;
+}
+
+.material-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.material-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  background-color: var(--surface-muted);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.material-list-item:hover {
+  background-color: var(--panel);
+  transform: scale(1.02);
+}
+
+.material-list-item .item-info strong {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.material-list-item .item-info span {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.material-list-item .item-stock {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.stok-header {
+  padding: 0 .5rem 1rem .5rem;
+}
+
+.autocomplete-wrapper {
+  position: relative;
+}
+
+.autocomplete-suggestions {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.autocomplete-suggestions.active {
+  display: block;
+}
+
+.suggestion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover {
+  background-color: #f8fafc;
+}
+
+.suggestion-item .suggestion-name {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.suggestion-item .match-highlight {
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.suggestion-item .unit-badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.15rem 0.4rem;
+  border-radius: 99px;
+  background-color: #e2e8f0;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.autocomplete-clear-btn {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background-color: #f1f5f9;
+  color: #64748b;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.autocomplete-clear-btn:hover {
+  background-color: #e2e8f0;
+  color: #1e293b;
+}
+
+.autocomplete-clear-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.autocomplete-wrapper .autocomplete-input {
+  padding-right: 75px;
+}
+
+.autocomplete-add-btn {
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background-color: #e0f2fe;
+  color: #0284c7;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.autocomplete-add-btn:hover {
+  background-color: #bae6fd;
+  color: #0369a1;
+}
+
+.autocomplete-add-btn .material-symbols-outlined {
+  font-size: 20px;
+}

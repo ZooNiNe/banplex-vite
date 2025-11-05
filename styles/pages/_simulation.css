@@ -1,0 +1,257 @@
+/* =======================================================
+ * PAGE: SIMULATION
+ * Mengatur semua gaya spesifik untuk halaman simulasi
+ * pembayaran utang, termasuk layout akordeon.
+ * ======================================================= */
+
+.simulasi-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.simulasi-summary .btn {
+  padding: 0.5rem 1rem;
+  min-height: 40px;
+}
+
+.simulasi-totals {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.sim-totals-rows { gap: 0.6rem; }
+.sim-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+}
+.sim-total-row .sim-total-label { font-size: .8rem; color: var(--text-dim); font-weight: 600; }
+.sim-total-row .sim-total-value { font-size: 1.05rem; font-weight: 700; }
+.sim-total-row.is-alloc { background: color-mix(in srgb, var(--primary) 8%, transparent); border-color: var(--line); border-left-width: 4px; border-left-color: var(--primary); }
+.sim-total-row.is-alloc .sim-total-value { color: var(--primary); }
+.sim-total-row.is-remaining { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: var(--line); border-left-width: 4px; border-left-color: var(--success); }
+.sim-total-row.is-remaining .sim-total-value { color: var(--success); }
+
+#simulasi-utang-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.simulasi-section {
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background-color: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.simulasi-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.simulasi-section-header .header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.simulasi-section-header .header-title {
+  font-size: clamp(.9rem, 2.6vw, 1.05rem);
+  font-weight: 600;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.simulasi-section-header .header-total {
+  font-size: clamp(.75rem, 2.2vw, .9rem);
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.simulasi-section-header .header-icon {
+  font-size: 24px;
+  transition: transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+.simulasi-section.open .simulasi-section-header {
+  border-bottom: 1px solid var(--line);
+}
+
+.simulasi-section.open .simulasi-section-header .header-icon {
+  transform: rotate(180deg);
+}
+
+.simulasi-section-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease-out, padding 0.3s ease-out;
+  padding: 0 1rem;
+  background-color: var(--surface-muted);
+}
+
+.simulasi-section.open .simulasi-section-content {
+  max-height: 40vh;
+  overflow-y: auto;
+  transition: max-height 0.5s ease-in, padding 0.3s ease-in;
+  padding: 0.75rem 1rem;
+}
+
+.simulasi-subsection {
+  margin-bottom: 0.5rem;
+}
+
+.simulasi-subsection:last-child {
+  margin-bottom: 0;
+}
+
+.simulasi-subsection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.simulasi-subsection-header .header-title {
+  font-size: clamp(.85rem, 2.4vw, 1rem);
+  font-weight: 500;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.simulasi-subsection-header .header-total {
+  font-size: clamp(.8rem, 2.4vw, .95rem);
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.simulasi-subsection-header .header-icon {
+  transition: transform 0.3s ease;
+  font-size: 20px;
+}
+
+.simulasi-subsection.open .simulasi-subsection-header .header-icon {
+  transform: rotate(180deg);
+}
+
+.simulasi-subsection-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out, padding-top 0.3s ease-out, padding-bottom 0.3s ease-out;
+  padding: 0 0.5rem;
+}
+
+.simulasi-subsection.open .simulasi-subsection-content {
+  max-height: 250px;
+  overflow-y: auto;
+  transition: max-height 0.4s ease-in;
+  padding-top: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+
+.simulasi-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-left-color: transparent;
+  cursor: pointer;
+  background-color: var(--panel);
+  border-radius: var(--radius);
+  transition: all 0.2s ease-in-out;
+}
+
+.simulasi-item:active {
+  transform: scale(0.98);
+}
+
+.simulasi-item.selected {
+  border-left-color: var(--primary);
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.simulasi-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.simulasi-title {
+  font-weight: 500;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.simulasi-amount {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.cicilan-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.simulasi-actions-modal-header {
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.simulasi-actions-modal-header h5 {
+  font-size: 1.1rem;
+  margin: 0 0 0.25rem 0;
+}
+
+.simulasi-actions-modal-header p {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.simulasi-actions-modal-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}

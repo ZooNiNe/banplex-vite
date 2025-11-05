@@ -1,0 +1,312 @@
+/* =======================================================
+ * PAGE: AUTHENTICATION (REVISED)
+ * Mengatur semua gaya spesifik untuk halaman login,
+ * status pending, dan tampilan pengguna tamu.
+ * ======================================================= */
+
+/* --- Layout Utama (Guest/Pending/Error) --- */
+body.guest-mode main,
+body.pending-mode main,
+body.error-mode main { /* Tambahkan body.error-mode */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  padding: 1.5rem;
+  background: var(--app-bg-gradient); /* Gunakan gradien background */
+}
+
+/* --- Kontainer Auth/Error Utama --- */
+.auth-container,
+.error-container { /* Tambahkan .error-container */
+  width: 100%;
+  max-width: 440px; /* Sedikit lebih lebar untuk error */
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  padding: 2rem 2.5rem 2.5rem;
+  text-align: center;
+  /* Animasi pop-in */
+  opacity: 0;
+  transform: scale(0.95) translateY(10px);
+  animation: card-pop-in 0.5s 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes card-pop-in {
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.dark-theme .auth-container,
+.dark-theme .error-container { /* Tambahkan .error-container */
+  background: var(--panel-alt);
+}
+
+/* --- Ilustrasi --- */
+.auth-illustration {
+  height: 120px;
+  margin-bottom: 1rem;
+  opacity: 0.8;
+}
+.auth-illustration .auth-svg-shape {
+  animation: auth-float 6s ease-in-out infinite alternate;
+}
+@keyframes auth-float {
+  from { transform: translateY(0px) rotate(0deg); }
+  to { transform: translateY(10px) rotate(8deg); }
+}
+
+/* --- Ilustrasi Error BARU --- */
+.error-illustration {
+  height: 120px;
+  margin-bottom: 1rem;
+  color: var(--danger); /* Beri warna dasar error */
+}
+.error-illustration .error-svg-shape {
+  animation: auth-float 5s ease-in-out infinite alternate;
+}
+.error-illustration .error-svg-line {
+  opacity: 0;
+  animation: error-pop-in 0.8s 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes error-pop-in {
+  to { opacity: 1; }
+}
+/* Style spesifik untuk offline SVG */
+.error-illustration .error-svg-shape {
+    stroke: var(--line);
+    fill: var(--surface-muted);
+}
+.error-illustration .error-svg-line {
+    stroke: var(--primary);
+    animation-delay: 0.3s;
+}
+/* Style spesifik untuk database-error SVG */
+.error-container[data-type="database-error"] .error-svg-shape {
+    fill: var(--surface-muted);
+    stroke: var(--line);
+}
+.error-container[data-type="database-error"] .error-svg-line {
+    stroke: var(--danger);
+}
+
+
+/* --- Tipografi --- */
+.auth-brand-title {
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0 0 0.5rem 0;
+}
+.auth-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 0.75rem 0;
+}
+.auth-subtitle {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  margin: -0.5rem 0 1.5rem 0;
+}
+.auth-description {
+  color: var(--text-dim);
+  margin: 0 0 1.5rem 0;
+  line-height: 1.6;
+}
+.auth-description.small {
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+}
+/* Detail error BARU */
+.error-details {
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    background-color: var(--surface-muted);
+    border: 1px solid var(--line);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    margin-top: 1rem;
+    text-align: left;
+    word-break: break-all;
+}
+
+/* --- Tampilan Returning User --- */
+.auth-container.returning-user {
+  padding-top: 2.5rem;
+}
+.profile-avatar-large {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin: 0 auto 1rem;
+  border: 4px solid var(--panel);
+  box-shadow: 0 0 0 2px var(--line), var(--shadow-sm);
+}
+.returning-user-name {
+  margin: 0.25rem 0 1.5rem 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* --- Tampilan Pending User --- */
+.pending-container .pending-illustration {
+  height: 100px;
+  margin-bottom: 1rem;
+}
+.pending-svg {
+  animation: pending-float 3s ease-in-out infinite;
+}
+.pending-svg .sand-stream circle {
+  animation: sand-fall 1.5s linear infinite;
+}
+.pending-svg .sand-stream circle:nth-child(2) { animation-delay: 0.5s; }
+.pending-svg .sand-stream circle:nth-child(3) { animation-delay: 1s; }
+
+@keyframes pending-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes sand-fall {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(15px); opacity: 0; }
+}
+
+
+/* --- Tombol Aksi --- */
+.auth-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.auth-actions .btn {
+  padding: 0.8rem 1.25rem;
+  font-size: 0.9rem;
+}
+.auth-actions .btn-google {
+  background-color: var(--primary-grad);
+  color: var(--text-fab);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+.auth-actions .btn-google:hover {
+  background-color: var(--surface-muted);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+.dark-theme .auth-actions .btn-google {
+  background-color: var(--surface-muted);
+  border-color: var(--line);
+}
+.dark-theme .auth-actions .btn-google:hover {
+  background-color: var(--panel);
+  border-color: var(--primary);
+}
+
+
+/* --- Hapus Tampilan Lama (jika ada) --- */
+.auth-card, .pending-card {
+  display: none; /* Sembunyikan style lama */
+}
+
+/* --- Perbaikan Layout & Scroll Lock --- */
+body.guest-mode #page-label,
+body.guest-mode #sidebar-nav,
+body.guest-mode #bottom-nav,
+body.pending-mode #page-label,
+body.pending-mode #sidebar-nav,
+body.pending-mode #bottom-nav,
+body.error-mode #page-label, /* TAMBAHKAN .error-mode */
+body.error-mode #sidebar-nav,
+body.error-mode #bottom-nav {
+    display: none !important;
+}
+
+body.guest-mode #app-shell,
+body.pending-mode #app-shell,
+body.error-mode #app-shell { /* TAMBAHKAN .error-mode */
+    display: block;
+}
+
+body.guest-mode .page-container,
+body.pending-mode .page-container,
+body.error-mode .page-container { /* TAMBAHKAN .error-mode */
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    width: 100%;
+    max-width: 100%; /* Pastikan page-container bisa penuh */
+    height: 100vh;
+    padding-bottom: 1rem;
+}
+
+body.guest-mode,
+body.pending-mode,
+body.error-mode, /* TAMBAHKAN .error-mode */
+body.guest-mode html,
+body.pending-mode html,
+body.error-mode html { /* TAMBAHKAN .error-mode */
+  overflow: hidden !important;
+  height: 100% !important;
+}
+
+/* Aturan desktop */
+@media (min-width: 600px) {
+  body.guest-mode .content-wrapper,
+  body.pending-mode .content-wrapper,
+  body.error-mode .content-wrapper { /* TAMBAHKAN .error-mode */
+    display: block !important;
+    grid-template-columns: 1fr !important;
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  body.guest-mode .list-pane,
+  body.pending-mode .list-pane,
+  body.error-mode .list-pane { /* TAMBAHKAN .error-mode */
+    border-right: none !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100%;
+  }
+  
+  /* Pastikan .page-container di desktop tidak mengambil max-width */
+  body.guest-mode .list-pane .page-container,
+  body.pending-mode .list-pane .page-container,
+  body.error-mode .list-pane .page-container { /* TAMBAHKAN .error-mode */
+      max-width: 440px; /* Sesuaikan dengan max-width .error-container */
+      height: auto;
+  }
+
+
+  body.guest-mode #sidebar-nav,
+  body.pending-mode #sidebar-nav,
+  body.error-mode #sidebar-nav, /* TAMBAHKAN .error-mode */
+  body.guest-mode .resizer,
+  body.pending-mode .resizer,
+  body.error-mode .resizer, /* TAMBAHKAN .error-mode */
+  body.guest-mode .detail-pane,
+  body.pending-mode .detail-pane,
+  body.error-mode .detail-pane, /* TAMBAHKAN .error-mode */
+  body.guest-mode .title-group,
+  body.pending-mode .header-right,
+  body.error-mode .title-group, /* TAMBAHKAN .error-mode */
+  body.error-mode .header-right { /* TAMBAHKAN .error-mode */
+    display: none !important;
+  }
+}
+

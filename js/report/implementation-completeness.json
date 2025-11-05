@@ -1,0 +1,136 @@
+{
+  "summary": {
+    "total": 236,
+    "migrated_full": 201,
+    "partial": 26,
+    "missing": 9
+  },
+  "functions": [
+    {
+      "name": "createMasterDataSelect",
+      "defined_in": "script.js",
+      "status": "partial",
+      "target_file": "js/utils/form.js",
+      "notes": "Fungsi telah dipindahkan tetapi tidak diekspor dari modul, sehingga tidak dapat digunakan oleh modul lain."
+    },
+    {
+      "name": "_getFormDraftKey",
+      "defined_in": "script.js",
+      "status": "partial",
+      "target_file": "js/state.js",
+      "notes": "Fungsi telah dipindahkan ke js/state.js tetapi tidak diekspor."
+    },
+    {
+      "name": "_saveFormDraft",
+      "defined_in": "script.js",
+      "status": "partial",
+      "target_file": "js/state.js",
+      "notes": "Fungsi telah dipindahkan ke js/state.js tetapi tidak diekspor."
+    },
+    {
+      "name": "_restoreFormDraft",
+      "defined_in": "script.js",
+      "status": "partial",
+      "target_file": "js/state.js",
+      "notes": "Fungsi telah dipindahkan ke js/state.js tetapi tidak diekspor."
+    },
+    {
+      "name": "_clearFormDraft",
+      "defined_in": "script.js",
+      "status": "partial",
+      "target_file": "js/state.js",
+      "notes": "Fungsi telah dipindahkan ke js/state.js tetapi tidak diekspor."
+    },
+    {
+      "name": "_attachFormDraftPersistence",
+      "defined_in": "script.js",
+      "status": "partial",
+      "target_file": "js/state.js",
+      "notes": "Fungsi telah dipindahkan ke js/state.js tetapi tidak diekspor."
+    },
+    {
+        "name": "formatNumberInput",
+        "defined_in": "script.js",
+        "status": "partial",
+        "target_file": "js/utils/form.js",
+        "notes": "Fungsi tidak diekspor dari js/utils/form.js."
+    },
+    {
+        "name": "_serializeForm",
+        "defined_in": "script.js",
+        "status": "partial",
+        "target_file": "js/utils/form.js",
+        "notes": "Fungsi tidak diekspor dari js/utils/form.js."
+    },
+    {
+        "name": "initCustomSelects",
+        "defined_in": "script.js",
+        "status": "partial",
+        "target_file": "js/utils/form.js",
+        "notes": "Fungsi tidak diekspor dari js/utils/form.js."
+    },
+    {
+        "name": "handleEditItem",
+        "defined_in": "script.js",
+        "status": "missing",
+        "target_file": "js/pages/crud.js",
+        "notes": "Fungsi ini belum dimigrasikan. Diimpor secara keliru oleh js/pages/tagihan.js dari 'js/pages/crud.js' yang tidak ada."
+    },
+    {
+        "name": "handleUpdateItem",
+        "defined_in": "script.js",
+        "status": "missing",
+        "target_file": "js/pages/crud.js",
+        "notes": "Fungsi ini belum dimigrasikan. Diimpor secara keliru oleh js/pages/tagihan.js dari 'js/pages/crud.js' yang tidak ada."
+    },
+    {
+      "name": "handleDeleteItem",
+      "defined_in": "script.js",
+      "status": "missing",
+      "target_file": "js/pages/pemasukan.js",
+      "notes": "Implementasi `handleDeleteItem` ada di `script.js` tetapi `pemasukan.js` tidak mengekspornya; implementasi `_performSoftDelete` malah digunakan."
+    },
+    {
+      "name": "triggerNotification",
+      "defined_in": "script.js",
+      "status": "missing",
+      "target_file": "js/utils/sync.js",
+      "notes": "Fungsi belum dimigrasikan dari script.js."
+    },
+    {
+      "name": "listenForNotifications",
+      "defined_in": "script.js",
+      "status": "missing",
+      "target_file": "js/main.js",
+      "notes": "Fungsi belum dimigrasikan dari script.js."
+    },
+    {
+      "name": "showUpdateNotification",
+      "defined_in": "script.js",
+      "status": "missing",
+      "target_file": "js/utils/ui.js",
+      "notes": "Fungsi belum dimigrasikan dari script.js."
+    },
+    {
+      "name": "getLastSyncTimestamp",
+      "defined_in": "script.js",
+      "status": "missing",
+      "target_file": "js/utils/sync.js",
+      "notes": "Fungsi belum dimigrasikan dari script.js."
+    },
+    {
+      "name": "setLastSyncTimestamp",
+      "defined_in": "script.js",
+      "status": "missing",
+      "target_file": "js/utils/sync.js",
+      "notes": "Fungsi belum dimigrasikan dari script.js."
+    },
+    {
+      "name": "MapsTo",
+      "defined_in": "script.js",
+      "status": "missing",
+      "target_file": "js/router.js",
+      "notes": "Fungsi belum dimigrasikan dari script.js."
+    }
+  ]
+}

@@ -1,0 +1,669 @@
+/* =======================================================
+ * COMPONENT: FORMS (Optimized)
+ * Mengatur semua gaya untuk elemen form, kontrol, dan
+ * tata letak form yang kompleks.
+ * ======================================================= */
+
+/* --- Base Form & Input Styles --- */
+
+.form-group {
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+label {
+  font-size: .8rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+input,
+select,
+textarea,
+.custom-select-trigger,
+.autocomplete-input { /* REVISI #3 */
+  width: 100%;
+  background: var(--surface-muted);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: .6rem .85rem; /* Adjusted padding */
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem; /* Standardized font size */
+  transition: border-color .2s ease, box-shadow .2s ease; /* Added transition */
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.is-invalid {
+    border-color: var(--danger) !important;
+}
+
+.input-error-text {
+    color: var(--danger);
+    font-size: 0.75rem;
+    margin-top: 4px;
+}
+
+/* Microcopy helper text for sections */
+.helper-text {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-top: 0.25rem;
+}
+
+/* Form card: global container to present forms as cards */
+.form-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+  display: grid;
+  gap: 0.85rem;
+}
+.form-card .form-group { margin-bottom: 0; }
+.form-card.accent-blue { --grad: linear-gradient(135deg, rgba(26,115,232,.35), rgba(99,102,241,.35)); background-image: radial-gradient(120% 120% at 100% 0%, rgba(26,115,232,0.10) 0%, rgba(26,115,232,0.04) 46%, transparent 70%); }
+.form-card.accent-green { --grad: linear-gradient(135deg, rgba(16,185,129,.35), rgba(34,197,94,.35)); background-image: radial-gradient(120% 120% at 100% 0%, rgba(16,185,129,0.10) 0%, rgba(16,185,129,0.04) 46%, transparent 70%); }
+.form-card.accent-amber { --grad: linear-gradient(135deg, rgba(245,158,11,.35), rgba(234,179,8,.35)); background-image: radial-gradient(120% 120% at 100% 0%, rgba(245,158,11,0.10) 0%, rgba(245,158,11,0.04) 46%, transparent 70%); }
+.form-card.accent-pink { --grad: linear-gradient(135deg, rgba(236,72,153,.35), rgba(244,63,94,.35)); background-image: radial-gradient(120% 120% at 100% 0%, rgba(236,72,153,0.10) 0%, rgba(236,72,153,0.04) 46%, transparent 70%); }
+.form-card.accent-purple { --grad: linear-gradient(135deg, rgba(124,58,237,.35), rgba(99,102,241,.35)); background-image: radial-gradient(120% 120% at 100% 0%, rgba(124,58,237,0.10) 0%, rgba(124,58,237,0.04) 46%, transparent 70%); }
+
+/* Form rows: mobile-first then split horizontally on wider screens */
+.form-row { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+@media (min-width: 600px) { .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 1.25rem; } }
+
+
+/* IMPROVEMENT: Clearer focus state for accessibility */
+input:focus,
+select:focus,
+textarea:focus,
+.custom-select-trigger:focus,
+.autocomplete-input:focus { /* REVISI #3 */
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+
+input:disabled,
+select:disabled {
+  -webkit-text-fill-color: var(--text);
+}
+
+/* --- Utility Class --- */
+.hidden {
+    display: none !important; /* Use !important to ensure override */
+}
+
+
+/* --- Custom Controls (Select, Checkbox, Radio, etc.) --- */
+/* REFACTORED: Cleaner, more robust custom select dropdown */
+.custom-select-wrapper {
+  position: relative;
+}
+
+select,
+.custom-select-trigger {
+  min-height: 42px; /* Standard height */
+  height: 42px; /* Standard height */
+  padding: .6rem .85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem; /* Standardized font size */
+  line-height: 1.4;
+}
+
+.custom-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Ensures arrow is on the right */
+  width: 100%;
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.custom-select-trigger .material-symbols-outlined {
+  color: var(--text-dim);
+  transition: transform .2s ease;
+}
+
+.custom-select-wrapper.active .custom-select-trigger .material-symbols-outlined {
+  transform: rotate(180deg);
+}
+
+.custom-select-search-wrapper {
+  padding: 0 0 .5rem 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: .5rem;
+}
+
+.custom-select-search {
+  width: 100%;
+  padding: .5rem .75rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background-color: var(--surface-muted);
+}
+
+.custom-select-option {
+  padding: .6rem .75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-select-option:hover {
+  background-color: var(--surface-muted);
+}
+
+.custom-select-option.selected {
+  background-color: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+
+/* --- Master Data Select Combination --- */
+.master-data-select {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.master-data-select .custom-select-wrapper {
+  flex-grow: 1;
+}
+.master-data-select .master-data-trigger {
+  flex-shrink: 0;
+}
+
+
+.custom-select-wrapper .custom-select-trigger span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.custom-select-trigger .material-symbols-outlined {
+  color: var(--text-dim);
+  transition: transform .2s ease;
+}
+
+.custom-select-wrapper.active .custom-select-trigger .material-symbols-outlined {
+  transform: rotate(180deg);
+}
+
+.custom-select-options {
+  display: none; /* Hidden by default */
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 2000; /* Must be above other form elements */
+  background-color: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  max-height: 250px;
+  overflow-y: auto;
+  padding: .5rem;
+}
+
+.custom-select-wrapper.active .custom-select-options {
+  display: block; /* Shown with JS */
+  animation: fade-in-sm .15s ease;
+}
+
+.custom-select-search-wrapper {
+  padding: 0 0 .5rem 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: .5rem;
+}
+
+.custom-select-search {
+  width: 100%;
+  padding: .5rem .75rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background-color: var(--surface-muted);
+}
+
+.custom-select-option {
+  padding: .6rem .75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-select-option:hover {
+  background-color: var(--surface-muted);
+}
+
+.custom-select-option.selected {
+  background-color: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+
+/* --- Master Data Select Combination --- */
+.master-data-select {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.master-data-select .custom-select-wrapper {
+  flex-grow: 1;
+}
+.master-data-select .master-data-trigger {
+  flex-shrink: 0;
+}
+
+.custom-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 0.75rem;
+}
+
+.custom-checkbox-label input[type="checkbox"],
+.custom-checkbox-label input[type="radio"] { /* Apply to radio as well */
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.custom-checkbox-label .custom-checkbox-visual {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--line);
+  border-radius: 6px; /* Square for checkbox */
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+/* Radio button visual */
+.custom-checkbox-label input[type="radio"] + .custom-checkbox-visual {
+  border-radius: 50%; /* Circle for radio */
+}
+
+
+.custom-checkbox-label .custom-checkbox-visual::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 6px;
+  height: 12px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg) scale(0);
+  opacity: 0;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Radio button checkmark (inner circle) */
+.custom-checkbox-label input[type="radio"] + .custom-checkbox-visual::after {
+  left: 50%;
+  top: 50%;
+  width: 10px; /* Adjust size */
+  height: 10px;
+  border: none; /* No border */
+  background-color: white; /* White circle */
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0); /* Center and hide */
+}
+
+
+.custom-checkbox-label input[type="checkbox"]:checked + .custom-checkbox-visual,
+.custom-checkbox-label input[type="radio"]:checked + .custom-checkbox-visual {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.custom-checkbox-label input[type="checkbox"]:checked + .custom-checkbox-visual::after,
+.custom-checkbox-label input[type="radio"]:checked + .custom-checkbox-visual::after {
+  opacity: 1;
+  transform: rotate(45deg) scale(1);
+}
+
+/* Correct transform for radio inner circle */
+.custom-checkbox-label input[type="radio"]:checked + .custom-checkbox-visual::after {
+   transform: translate(-50%, -50%) scale(1);
+}
+
+
+.custom-checkbox-label:hover .custom-checkbox-visual {
+  border-color: var(--primary);
+}
+
+.custom-checkbox-label input[type="checkbox"]:focus-visible + .custom-checkbox-visual,
+.custom-checkbox-label input[type="radio"]:focus-visible + .custom-checkbox-visual {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+/* --- Generic Segmented Control (Radio Buttons) --- */
+.segmented-control {
+  display: flex;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background-color: var(--surface-muted);
+  padding: .25rem;
+  gap: .25rem;
+}
+
+.segmented-control input[type="radio"] {
+  display: none;
+}
+
+.segmented-control label {
+  flex: 1;
+  text-align: center;
+  padding: 0.6rem 0.5rem;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: all 0.2s ease-in-out;
+  font-weight: 500;
+  font-size: 0.8rem;
+  border-radius: 6px;
+}
+
+.segmented-control input[type="radio"]:checked + label {
+  background-color: var(--panel);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* REVISI Poin 3: Gaya untuk segmented control tanpa background/border */
+.segmented-control--text-only {
+  border: none;
+  background-color: transparent;
+  padding: 0;
+  gap: 1.5rem; /* Tambah jarak antar tombol */
+  justify-content: center;
+}
+
+.segmented-control--text-only input[type="radio"]:checked + label {
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--primary); /* Biarkan warna primer saat aktif */
+  border-bottom: 2px solid var(--primary); /* Tambahkan underline tipis */
+  padding-bottom: 0.25rem; /* Sesuaikan padding agar underline terlihat */
+}
+
+.segmented-control--text-only label {
+    padding: 0.5rem 0; /* Sesuaikan padding untuk tampilan teks saja */
+    border-radius: 0;
+    font-weight: 500;
+    color: var(--text-dim);
+    transition: color 0.2s, border-bottom 0.2s;
+}
+
+/* --- Form Layouts (Grids, Groups) --- */
+/* REVISI #3: Form umum tidak lagi menjadi grid default, gunakan class helper */
+.card > form {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-grid-2col { /* REVISI #3: Class untuk mengaktifkan grid 2 kolom di desktop */
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem; /* Mobile default gap */
+}
+
+.form-notice {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  text-align: center;
+  color: var(--text-dim);
+  background-color: var(--surface-muted);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+}
+
+.project-wage-group {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background-color: var(--surface-muted);
+}
+
+.project-wage-group legend {
+  padding: 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  display: block;
+  width: 100%;
+  padding: 0.85rem 1.25rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+  margin: -0.75rem -1rem 1rem -1rem;
+}
+
+.role-wage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.role-wage-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.multi-item-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  margin-bottom: 0.75rem;
+  border-radius: 0.75rem;
+  background-color: var(--panel); /* Warna Panel agar kontras dengan latar belakang */
+  border: 1px solid var(--line);
+}
+
+.multi-item-main-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.multi-item-main-line .item-name-wrapper {
+  flex-grow: 1;
+}
+
+.multi-item-details-line {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  gap: 0.75rem;
+  padding-left: 0.25rem;
+}
+
+.multi-item-details-line .form-group {
+    margin-bottom: 0;
+}
+.multi-item-main-line .item-name-wrapper label {
+    display: none;
+}
+
+/* Perbaikan #1: Pindahkan tombol ke samping judul */
+.section-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+.section-header-flex .btn-secondary {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    line-height: 1;
+}
+
+
+.hidden-file-input {
+  display: none;
+}
+
+.file-name-display {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+
+/* --- Progress Bar Tambahan untuk Upload --- */
+.upload-progress-bar-container {
+    width: 100%;
+    height: 4px;
+    background-color: var(--line);
+    border-radius: 2px;
+    margin-top: 0.5rem;
+    overflow: hidden;
+}
+
+.upload-progress-bar {
+    height: 100%;
+    width: 0;
+    background-color: var(--primary);
+    transition: width 0.2s linear;
+}
+
+/* --- Calculation Card --- */
+.calculation-card {
+    background-color: var(--surface-muted); /* Warna latar lebih soft */
+    border-color: var(--line);
+    margin-top: 1rem;
+    padding: 1rem; /* Tambah padding */
+    border-radius: var(--radius-sm); /* Sesuaikan radius */
+}
+.calculation-title {
+    font-size: 0.8rem; /* Ukuran lebih kecil */
+    font-weight: 600;
+    color: var(--text-dim);
+    margin: 0 0 0.75rem 0;
+    text-transform: uppercase; /* Uppercase untuk judul */
+    letter-spacing: 0.5px; /* Sedikit spacing */
+}
+.calculation-grid {
+    display: flex; /* Ubah ke flexbox untuk mobile */
+    flex-direction: column; /* Tumpuk secara vertikal di mobile */
+    gap: 0.75rem; /* Jarak antar item */
+}
+/* Style untuk setiap item (Label + Value) */
+.calculation-grid > div {
+    display: flex;
+    flex-direction: column; /* Label di atas, value di bawah */
+    align-items: flex-start; /* Rata kiri */
+}
+.calculation-grid .label {
+    font-size: 0.7rem; /* Label lebih kecil */
+    color: var(--text-dim);
+    margin-bottom: 0.1rem;
+}
+.calculation-grid .value {
+    font-size: 1.1rem; /* Value lebih besar */
+    font-weight: 700;
+    color: var(--primary); /* Warna primer untuk value */
+    line-height: 1.2; /* Sedikit spacing */
+}
+
+
+/* =======================================================
+ * DESKTOP & WIDER SCREENS
+ * ======================================================= */
+
+@media (min-width: 600px) {
+
+  /* REVISI #3: Form Grid Layout */
+  .form-grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem 1.5rem;
+  }
+
+  .form-grid-2col > .form-group.full-width,
+  .form-grid-2col > .master-data-select,
+  .form-grid-2col > #invoice-items-container,
+  .form-grid-2col > .add-item-action,
+  .form-grid-2col > .invoice-total,
+  .form-grid-2col > #payment-status-wrapper,
+  .form-grid-2col > .section-header-flex,
+  .form-grid-2col > h5,
+  .form-grid-2col > .upload-buttons,
+  .form-grid-2col > .file-name-display,
+  .form-grid-2col > .form-footer-actions,
+  .form-grid-2col > button[type="submit"],
+  .form-grid-2col > .loan-details {
+    grid-column: 1 / -1;
+    display: block; /* Override flex-direction: column; from mobile */
+  }
+
+  .project-wage-group legend {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .role-wage-row {
+    display: grid;
+    grid-template-columns: 1fr 150px auto;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .add-project-wage-section {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem;
+    align-items: flex-end;
+    margin-bottom: 1.5rem;
+  }
+
+  input,
+  select,
+  textarea,
+  .custom-select-trigger,
+  .autocomplete-input { /* REVISI #3 */
+    height: 42px;
+    font-size: 0.9rem;
+    padding: 0.5rem 0.85rem;
+    border-radius: 8px;
+  }
+
+  .custom-select-trigger {
+    display: flex;
+    align-items: center;
+  }
+
+  /* Kembalikan grid 2 kolom untuk calculation card di desktop */
+  .calculation-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem 1rem;
+  }
+   .calculation-grid > div {
+       align-items: flex-start; /* Tetap rata kiri di desktop */
+   }
+
+}

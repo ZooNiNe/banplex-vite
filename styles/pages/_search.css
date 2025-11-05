@@ -1,0 +1,134 @@
+/* =======================================================
+ * PAGE: GLOBAL SEARCH
+ * ======================================================= */
+
+.global-search-active {
+  overflow: hidden;
+}
+
+.global-search-page {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background-color: var(--panel);
+  display: flex;
+  flex-direction: column;
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
+.global-search-page.show {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.dark-theme .global-search-page {
+  background-color: var(--bg-start);
+}
+
+.search-page-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.search-input-capsule {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+}
+.dark-theme .search-input-capsule {
+    background-color: var(--surface-muted);
+}
+
+
+.search-input-capsule .material-symbols-outlined {
+  color: var(--text-dim);
+}
+
+#global-search-input {
+  flex-grow: 1;
+  border: none;
+  background-color: var(--surface-muted);
+  outline: none;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+#clear-search-btn {
+    width: 28px;
+    height: 28px;
+}
+
+.search-results-container {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+}
+
+.search-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.search-result-item:hover {
+  background-color: var(--surface-muted);
+}
+
+.result-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.result-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-meta {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-result-highlight {
+  background-color: color-mix(in srgb, var(--primary) 20%, transparent);
+  color: var(--text);
+  border-radius: 3px;
+  font-weight: 700;
+}
+
+.result-secondary {
+  text-align: right;
+  flex-shrink: 0;
+  padding-left: 1rem;
+}
+
+.result-amount {
+  font-weight: 600;
+}
+
+.result-date {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}

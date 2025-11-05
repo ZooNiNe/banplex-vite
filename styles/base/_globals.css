@@ -1,0 +1,72 @@
+/* =======================================================
+ * BASE: GLOBALS
+ * Mengatur gaya dasar untuk elemen html dan body.
+ * ======================================================= */
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  height: 100%;
+  background-color: var(--panel);
+}
+
+/* Wallpaper background */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--app-bg-gradient);
+  background-size: 200% 200%;
+  animation: gradient-animation 12s ease infinite;
+}
+
+.material-symbols-outlined {
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* Sembunyikan scrollbar secara global */
+* {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+
+/* Aksesibilitas: Kurangi gerakan jika diminta oleh pengguna */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* PERBAIKAN #6: Pastikan html juga tidak memiliki overflow hidden */
+html {
+    height: 100%;
+    /* overflow: hidden; /* Hapus jika ada */
+}
+
+/* Generic hero/intro close button styling */
+.hero-close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: transparent;
+  background: transparent;
+  color: var(--text-dim);
+}
+.hero-close-btn:hover { color: var(--text); }

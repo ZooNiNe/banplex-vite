@@ -1,0 +1,916 @@
+/* =======================================================
+ * PAGE: REPORTS
+ * Mengatur semua gaya spesifik untuk halaman laporan,
+ * termasuk filter, kartu ringkasan, dan grafik.
+ * ======================================================= */
+
+/* Aksesibilitas: hanya di halaman laporan */
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+
+.report-title { 
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.report-title+.detail-list div {
+  display: flex !important;
+  grid-template-columns: unset !important;
+}
+
+.report-title+.detail-list dd {
+  text-align: right;
+}
+
+/* Page background blending: use container/panel background (no extra overlay) */
+.page--laporan { position: relative; }
+.page--laporan::before { content: none; }
+
+/* Also neutralize the global wallpaper just for the report page */
+body.page-laporan::before { background: var(--panel) !important; background-image: none !important; animation: none !important; }
+.dark-theme body.page-laporan::before { background: var(--panel) !important; background-image: none !important; animation: none !important; }
+/* Ensure report hero is not sticky */
+.page--laporan .dashboard-hero { position: static !important; top: auto !important; }
+
+/* Quick range buttons use gradient for visibility */
+.page--laporan #btn-quick-7,
+.page--laporan #btn-quick-30 {
+  background: var(--quick-grad);
+  color: #fff;
+  border-color: transparent;
+}
+.page--laporan #btn-quick-7:hover,
+.page--laporan #btn-quick-30:hover { filter: brightness(1.08); }
+
+.rekap-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem;
+  margin-top: 1.5rem;
+}
+
+.rekap-actions .btn-primary {
+  grid-column: 1 / -1;
+}
+
+.rekap-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing);
+  align-items: flex-end;
+}
+
+.rekap-filters .form-group {
+  margin-bottom: 0;
+  flex-grow: 1;
+}
+
+.rekap-results {
+  margin-top: 1.5rem;
+}
+
+.report-card-content {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.5rem !important;
+}
+
+.report-card-chart {
+  width: 100%;
+  max-width: 220px;
+  height: 150px;
+  margin: 0 auto;
+  position: relative;
+  gap: 5rem;
+}
+
+/* Summary KPI header (all screens) */
+.report-summary-header {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .75rem;
+  margin: .5rem 0 1rem 0;
+}
+
+/* Responsive 2-column grid that collapses on mobile */
+.two-col-responsive {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: stretch;
+}
+@media (min-width: 720px) {
+  .two-col-responsive {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.report-cards-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 1.25rem !important;
+}
+
+.chart-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-stat-card {
+  background-color: var(--surface-muted);
+  border: 1px solid var(--line);
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.summary-stat-card .label {
+  font-size: 0.70rem;
+  font-weight: 400;
+  color: var(--text-dim);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.summary-stat-card .value {
+  font-size: clamp(0.95rem, 2.8vw, 1.15rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+  font-variant-numeric: tabular-nums; /* ensure numeric legibility */
+}
+
+.report-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.report-filter .btn-primary {
+    margin-left: auto;
+}
+
+.date-range-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-grow: 1;
+  min-width: 220px;
+}
+
+.report-filter input[type="date"] {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Refinements: compact inputs + segmented dates */
+.page--laporan .date-range-group {
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: .25rem .5rem;
+}
+.page--laporan .date-range-group .sep { width: 10px; height: 1px; background: var(--line); display: inline-block; }
+.page--laporan .date-range-group input[type="date"] {
+  background: transparent;
+  border: none;
+  padding: .25rem .25rem;
+  height: 32px;
+}
+.dark-theme .page--laporan .date-range-group input[type="date"] { color-scheme: dark; }
+
+.page--laporan .project-select { min-width: 200px; }
+@media (max-width: 599px) { .page--laporan .project-select { min-width: 150px; flex: 1 1 150px; } }
+
+.page--laporan .report-actions { display: inline-flex; align-items: center; gap: .4rem; }
+.page--laporan .report-actions .btn { display: inline-flex; align-items: center; gap: .4rem; }
+.page--laporan .report-actions .btn.icon-only svg { margin-right: 0; }
+
+/* Icon-first buttons on phones */
+@media (max-width: 599px) {
+  .page--laporan .report-filter { gap: .5rem; }
+  .page--laporan .report-actions .btn { padding: .45rem .55rem; }
+  .page--laporan .report-actions .btn .btn-label { display: none; }
+}
+
+#reportGenerator-modal .modal-body {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+#reportGenerator-modal .modal-footer {
+  display: grid;
+  grid-template-columns: 1fr;
+  padding: 1rem 1.25rem calc(1rem + env(safe-area-inset-bottom, 0px)) 1.25rem;
+}
+
+#reportGenerator-modal #download-report-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Enhancements: Report page responsiveness and hints */
+.report-filter .filter-hint { margin-left: auto; font-size: 0.78rem; color: var(--text-dim); }
+
+/* Small toggle used in project health header */
+.health-toggle { display:inline-flex; align-items:center; gap:.35rem; font-size:.8rem; color:var(--text-dim); }
+.health-toggle input { width:28px; height:16px; appearance:none; background: color-mix(in srgb, var(--text) 20%, transparent); border-radius:999px; position:relative; outline:none; cursor:pointer; transition: background-color .2s ease; }
+.health-toggle input::after { content:''; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:#fff; transition: transform .2s ease; box-shadow:0 1px 2px rgba(0,0,0,.15); }
+.health-toggle input:checked { background: color-mix(in srgb, var(--success) 70%, white); }
+.health-toggle input:checked::after { transform: translateX(12px); }
+
+@media (max-width: 720px) {
+  .chart-summary-grid { grid-template-columns: 1fr; }
+  .report-filter { gap: 0.5rem; }
+  .report-filter .btn { padding: 0.5rem 0.6rem; }
+  .dashboard-grid-layout { gap: 1rem; }
+  .summary-stat-card .value { font-size: 0.85rem; }
+  .report-card-chart { height: 180px; }
+  /* Compact floating summary header */
+  .report-summary-header { position: sticky; top: calc(var(--sticky-group-header-offset) + 8px); z-index: 6; backdrop-filter: saturate(180%) blur(6px); background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line); border-radius: 10px; padding: .5rem .75rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin: .5rem 0 1rem 0; }
+  .report-summary-header .kpi { display:flex; flex-direction:column; }
+  .report-summary-header .kpi-label { font-size:.7rem; color: var(--text-dim); }
+  .report-summary-header .kpi-value { font-size:1rem; font-weight:700; color: var(--text); }
+}
+@media (max-width: 599px) {
+  .report-summary-header .kpi-label,
+  .report-summary-header .kpi-value { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* Small phones: typography + layout tighten (<=599px width) */
+@media (max-width: 599px) {
+  .page--laporan .card-title { font-size: 0.98rem; }
+  .page--laporan .card-header .card-icon svg { width: 18px; height: 18px; }
+  .page--laporan .report-filter { row-gap: .4rem; }
+  .page--laporan .report-filter .btn { padding: .45rem .6rem; font-size: .86rem; }
+  .page--laporan .report-filter input[type="date"],
+  .page--laporan .report-filter select { font-size: .9rem; }
+  .page--laporan .kpi-label { font-size: .68rem; }
+  .page--laporan .kpi-value { font-size: .98rem; }
+  .page--laporan .table-like { font-size: .92rem; }
+  .page--laporan .report-card-chart { height: 170px; }
+}
+
+/* Thin separators between consecutive panels in content area */
+.page--laporan #sub-page-content > section.panel { border-top: 1px solid var(--line); }
+.page--laporan #sub-page-content > section.panel:first-of-type { border-top: none; }
+.page--laporan #sub-page-content > section.panel { padding-top: .75rem; margin-top: .25rem; }
+
+/* Mobile-first: hide long tables on initial view; access via "detail" */
+@media (max-width: 599px) {
+  .page--laporan .panel .table-like { display: none; }
+}
+
+@media (min-width: 600px) {
+  .dashboard-grid-layout { grid-template-columns: 1fr 1fr; }
+  .dashboard-card.card-full-width { grid-column: 1 / -1; }
+}
+
+/* Customizable layout toggles for report page */
+body.laporan-layout-grid .dashboard-grid-layout { grid-template-columns: 1fr; }
+@media (min-width: 600px) {
+  body.laporan-layout-grid .dashboard-grid-layout { grid-template-columns: 1fr 1fr; }
+}
+body.laporan-layout-cards .dashboard-grid-layout { grid-template-columns: 1fr; }
+
+/* Report page readability & gentle visuals */
+.page--laporan .dashboard-hero {
+  /* soften background for maximum contrast */
+  background: linear-gradient(135deg, color-mix(in srgb, var(--panel) 92%, transparent) 0%, color-mix(in srgb, var(--panel-alt) 88%, transparent) 100%);
+  border-color: var(--line);
+}
+
+.page--laporan .dashboard-grid-layout { gap: 1.25rem; }
+.page--laporan .dashboard-card .card-title { color: var(--text); }
+.page--laporan .dashboard-card .card-header .card-icon:not(.income-expense):not(.balance):not(.budget) {
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+.page--laporan .dashboard-card .card-header .card-icon svg {
+  width: 20px; height: 20px;
+}
+
+.page--laporan .dashboard-card .card-body-chart {
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: .75rem;
+}
+
+/* Space between chart canvases and their companion tables */
+.page--laporan .card-body .table-like { margin-top: .75rem; }
+
+/* Mirror header/icon sizing for panel-based layout */
+.page--laporan .panel .card-header .card-icon:not(.income-expense):not(.balance):not(.budget) {
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.page--laporan .panel .card-header .card-icon svg { width: 20px; height: 20px; }
+
+/* Actions cluster on card headers */
+.page--laporan .card-header .card-actions { margin-left: auto; display: inline-flex; align-items: center; gap: .25rem; }
+.page--laporan .card-actions .btn { display: inline-flex; align-items: center; gap: .35rem; }
+@media (max-width: 599px) {
+  .page--laporan .card-actions .btn { padding: .35rem .45rem; }
+  .page--laporan .card-actions .btn .btn-label { display: none; }
+}
+@media (min-width: 600px) {
+  .page--laporan .card-actions [data-action="open-report-detail"] { display: none; }
+}
+
+.page--laporan .table-like {
+  font-size: .92rem;
+  color: var(--text);
+}
+
+/* Prefer reduced motion for report-focused view */
+@media (prefers-reduced-motion: reduce) {
+  .page--laporan .budget-bar-used { transition: none; }
+  .page--laporan .dashboard-hero { animation: none; }
+}
+/* Reports page: mobile-first responsive layout, gradients, and toggle styling */
+
+/*
+  Grid: report summary
+  - Mobile-first: single column
+  - Expands to 2/3/4 columns at wider breakpoints
+*/
+#report-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* mobile-first */
+  grid-auto-rows: minmax(0, auto);
+  grid-auto-flow: row;
+  gap: var(--sp-3, 12px);
+  align-items: stretch;
+}
+
+/* Cards inside the grid: prevent overflow/overlap */
+#report-summary-grid > * {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  position: relative; /* keep internal positioning anchored */
+}
+
+#accounting-grid > * {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Neutralize absolute-fixed internals that often cause overlap on mobile */
+@media (max-width: 599px) {
+  #report-summary-grid [data-fixed],
+  #report-summary-grid .fixed,
+  #report-summary-grid [style*="position:absolute"] {
+    position: static !important;
+    inset: auto !important;
+  }
+}
+
+/* Breakpoints: progressively enhance columns */
+@media (min-width: 600px) {
+  #report-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 900px) {
+  #report-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  #report-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Mobile restructure: switch to stacked flex to avoid overlap on long sections */
+@media (max-width: 599px) {
+  #report-summary-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3, 12px);
+  }
+  #report-summary-grid > section:nth-child(8),
+  #report-summary-grid > section:nth-child(9) {
+    isolation: isolate; /* new stacking context */
+    contain: layout paint; /* prevent bleed between siblings */
+    min-block-size: auto;
+  }
+}
+
+/* Card shell: unify base look for KPIs/panels/cards in reports */
+#report-summary-grid .summary-card,
+#report-summary-grid .card,
+#report-summary-grid .kpi,
+#report-summary-grid .panel {
+  width: 100%;
+  margin: 0;
+  border-radius: var(--rad-lg, 12px);
+  border: 1px solid var(--c-border, #e5e7eb);
+  background: var(--c-surface, #ffffff);
+  box-shadow: var(--elev-1, 0 1px 2px rgba(0,0,0,0.06));
+}
+
+/* Spacing inside cards */
+#report-summary-grid .summary-card > *,
+#report-summary-grid .card > *,
+#report-summary-grid .kpi > *,
+#report-summary-grid .panel > * {
+  padding-inline: var(--sp-4, 16px);
+}
+
+/* Title and value emphasis */
+#report-summary-grid .card .title,
+#report-summary-grid .kpi .title {
+  padding-top: var(--sp-4, 16px);
+  color: var(--c-text-2, #4b5563);
+  font-weight: 600;
+}
+#report-summary-grid .card .value,
+#report-summary-grid .kpi .value {
+  padding-bottom: var(--sp-4, 16px);
+  font-size: clamp(1.1rem, 1.7vw + 0.7rem, 1.6rem);
+  font-weight: 700;
+  color: var(--c-text, #111827);
+}
+
+/* Subtle, readable gradients via ::before overlay to maintain text contrast */
+#report-summary-grid .card.gradient,
+#report-summary-grid .kpi.gradient,
+#report-summary-grid .panel.gradient {
+  position: relative;
+  overflow: hidden;
+}
+#report-summary-grid .card.gradient::before,
+#report-summary-grid .kpi.gradient::before,
+#report-summary-grid .panel.gradient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(26, 115, 232, 0.08), rgba(16, 185, 129, 0.08));
+  pointer-events: none;
+}
+
+/* Color variants: soft accents; pair with .gradient for stronger effect */
+#report-summary-grid .accent-blue { --accent-a: 26, 115, 232; }
+#report-summary-grid .accent-green { --accent-a: 16, 185, 129; }
+#report-summary-grid .accent-amber { --accent-a: 245, 158, 11; }
+#report-summary-grid .accent-pink { --accent-a: 236, 72, 153; }
+#report-summary-grid .accent-purple { --accent-a: 124, 58, 237; }
+
+#report-summary-grid .accent-blue,
+#report-summary-grid .accent-green,
+#report-summary-grid .accent-amber,
+#report-summary-grid .accent-pink,
+#report-summary-grid .accent-purple {
+  background-image: radial-gradient(120% 120% at 100% 0%, rgba(var(--accent-a), 0.12) 0%, rgba(var(--accent-a), 0.04) 46%, transparent 70%);
+}
+
+/* Automatic variety for first few cards without touching markup */
+#report-summary-grid > :nth-child(5n+1) { background-image: radial-gradient(120% 120% at 100% 0%, rgba(26,115,232,0.10) 0%, rgba(26,115,232,0.04) 46%, transparent 70%); }
+#report-summary-grid > :nth-child(5n+2) { background-image: radial-gradient(120% 120% at 100% 0%, rgba(16,185,129,0.10) 0%, rgba(16,185,129,0.04) 46%, transparent 70%); }
+#report-summary-grid > :nth-child(5n+3) { background-image: radial-gradient(120% 120% at 100% 0%, rgba(245,158,11,0.10) 0%, rgba(245,158,11,0.04) 46%, transparent 70%); }
+#report-summary-grid > :nth-child(5n+4) { background-image: radial-gradient(120% 120% at 100% 0%, rgba(236,72,153,0.10) 0%, rgba(236,72,153,0.04) 46%, transparent 70%); }
+#report-summary-grid > :nth-child(5n+5) { background-image: radial-gradient(120% 120% at 100% 0%, rgba(124,58,237,0.10) 0%, rgba(124,58,237,0.04) 46%, transparent 70%); }
+
+/* Chart/media responsiveness in cards */
+#report-summary-grid canvas,
+#report-summary-grid svg,
+#report-summary-grid img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Optional metric list patterns for richer cards without markup changes */
+#report-summary-grid .metric-list { display: grid; gap: var(--sp-2, 8px); padding: var(--sp-3, 12px) var(--sp-4, 16px); }
+#report-summary-grid .metric { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-2, 8px); align-items: baseline; }
+#report-summary-grid .metric .label { color: var(--c-text-3, #6b7280); font-size: .92rem; }
+#report-summary-grid .metric .value { font-weight: 600; color: var(--c-text, #111827); }
+#report-summary-grid .metric .trend-up { color: #10b981; }
+#report-summary-grid .metric .trend-down { color: #ef4444; }
+#report-summary-grid .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(17,24,39,0.06); color: var(--c-text-2, #4b5563); font-weight: 500; }
+
+/* Report mode segmented toggle (aligned with dashboard look) */
+#report-mode-toggle,
+.report-mode-toggle,
+#laporan .view-toggle,
+#page-laporan .view-toggle,
+.page-laporan .view-toggle,
+[data-page="laporan"] .view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--c-border, #e5e7eb);
+  background: var(--c-surface-2, #f9fafb);
+  box-shadow: var(--elev-1, 0 1px 2px rgba(0,0,0,0.06));
+}
+
+#report-mode-toggle button,
+#report-mode-toggle .toggle-option,
+#report-mode-toggle a,
+.report-mode-toggle button,
+.report-mode-toggle .toggle-option,
+.report-mode-toggle a,
+#laporan .view-toggle button,
+#laporan .view-toggle a,
+#page-laporan .view-toggle button,
+#page-laporan .view-toggle a,
+.page-laporan .view-toggle button,
+.page-laporan .view-toggle a,
+[data-page="laporan"] .view-toggle button,
+[data-page="laporan"] .view-toggle a,
+#report-mode-toggle input[type="radio"] + label,
+.report-mode-toggle input[type="radio"] + label,
+#laporan .view-toggle input[type="radio"] + label,
+#page-laporan .view-toggle input[type="radio"] + label,
+.page-laporan .view-toggle input[type="radio"] + label,
+[data-page="laporan"] .view-toggle input[type="radio"] + label {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--c-text-2, #4b5563);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#report-mode-toggle .active,
+.report-mode-toggle .active,
+#laporan .view-toggle .active,
+#page-laporan .view-toggle .active,
+.page-laporan .view-toggle .active,
+[data-page="laporan"] .view-toggle .active,
+#report-mode-toggle [aria-pressed="true"],
+.report-mode-toggle [aria-pressed="true"],
+#laporan .view-toggle [aria-pressed="true"],
+#page-laporan .view-toggle [aria-pressed="true"],
+.page-laporan .view-toggle [aria-pressed="true"],
+[data-page="laporan"] .view-toggle [aria-pressed="true"],
+#report-mode-toggle input[type="radio"]:checked + label,
+.report-mode-toggle input[type="radio"]:checked + label,
+#laporan .view-toggle input[type="radio"]:checked + label,
+#page-laporan .view-toggle input[type="radio"]:checked + label,
+.page-laporan .view-toggle input[type="radio"]:checked + label,
+[data-page="laporan"] .view-toggle input[type="radio"]:checked + label {
+  background: var(--c-primary-50, #e8f0fe);
+  color: var(--c-primary-700, #1a73e8);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+
+#report-mode-toggle button:hover,
+#report-mode-toggle .toggle-option:hover,
+#report-mode-toggle a:hover,
+.report-mode-toggle button:hover,
+.report-mode-toggle .toggle-option:hover,
+.report-mode-toggle a:hover,
+#laporan .view-toggle button:hover,
+#laporan .view-toggle a:hover,
+#page-laporan .view-toggle button:hover,
+#page-laporan .view-toggle a:hover,
+.page-laporan .view-toggle button:hover,
+.page-laporan .view-toggle a:hover,
+[data-page="laporan"] .view-toggle button:hover,
+[data-page="laporan"] .view-toggle a:hover,
+#report-mode-toggle input[type="radio"] + label:hover,
+.report-mode-toggle input[type="radio"] + label:hover,
+#laporan .view-toggle input[type="radio"] + label:hover,
+#page-laporan .view-toggle input[type="radio"] + label:hover,
+.page-laporan .view-toggle input[type="radio"] + label:hover,
+[data-page="laporan"] .view-toggle input[type="radio"] + label:hover {
+  background: rgba(26, 115, 232, 0.08);
+}
+
+#report-mode-toggle button:focus-visible,
+#report-mode-toggle .toggle-option:focus-visible,
+#report-mode-toggle a:focus-visible,
+.report-mode-toggle button:focus-visible,
+.report-mode-toggle .toggle-option:focus-visible,
+.report-mode-toggle a:focus-visible,
+#laporan .view-toggle button:focus-visible,
+#laporan .view-toggle a:focus-visible,
+#page-laporan .view-toggle button:focus-visible,
+#page-laporan .view-toggle a:focus-visible,
+.page-laporan .view-toggle button:focus-visible,
+.page-laporan .view-toggle a:focus-visible,
+[data-page="laporan"] .view-toggle button:focus-visible,
+[data-page="laporan"] .view-toggle a:focus-visible,
+#report-mode-toggle input[type="radio"] + label:focus-visible,
+.report-mode-toggle input[type="radio"] + label:focus-visible,
+#laporan 
+.view-toggle input[type="radio"] + label:focus-visible,
+#page-laporan .view-toggle input[type="radio"] + label:focus-visible,
+.page-laporan .view-toggle input[type="radio"] + label:focus-visible,
+[data-page="laporan"] .view-toggle input[type="radio"] + label:focus-visible {
+  outline: 2px solid var(--c-primary-400, #60a5fa);
+  outline-offset: 2px;
+}
+
+@media (max-width: 599px) {
+  #report-mode-toggle,
+  .report-mode-toggle,
+  #laporan .view-toggle,
+  #page-laporan .view-toggle,
+  .page-laporan .view-toggle,
+  [data-page="laporan"] .view-toggle {
+    padding: 3px;
+    gap: 3px;
+  }
+  #report-mode-toggle button,
+  #report-mode-toggle .toggle-option,
+  #report-mode-toggle a,
+  .report-mode-toggle button,
+  .report-mode-toggle .toggle-option,
+  .report-mode-toggle a,
+  #laporan .view-toggle button,
+  #laporan .view-toggle a,
+  #page-laporan .view-toggle button,
+  #page-laporan .view-toggle a,
+  .page-laporan .view-toggle button,
+  .page-laporan .view-toggle a,
+  [data-page="laporan"] .view-toggle button,
+  [data-page="laporan"] .view-toggle a,
+  #report-mode-toggle input[type="radio"] + label,
+  .report-mode-toggle input[type="radio"] + label,
+  #laporan .view-toggle input[type="radio"] + label,
+  #page-laporan .view-toggle input[type="radio"] + label,
+  .page-laporan .view-toggle input[type="radio"] + label,
+  [data-page="laporan"] .view-toggle input[type="radio"] + label {
+    padding: 6px 10px;
+    font-size: 0.92rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  #report-mode-toggle,
+  .report-mode-toggle,
+  #laporan .view-toggle,
+  #page-laporan .view-toggle,
+  .page-laporan .view-toggle,
+  [data-page="laporan"] .view-toggle {
+    border-color: var(--c-border-dark, #374151);
+    background: var(--c-surface-2-dark, #111827);
+  }
+  #report-mode-toggle button,
+  #report-mode-toggle .toggle-option,
+  #report-mode-toggle a,
+  .report-mode-toggle button,
+  .report-mode-toggle .toggle-option,
+  .report-mode-toggle a,
+  #laporan .view-toggle button,
+  #laporan .view-toggle a,
+  #page-laporan .view-toggle button,
+  #page-laporan .view-toggle a,
+  .page-laporan .view-toggle button,
+  .page-laporan .view-toggle a,
+  [data-page="laporan"] .view-toggle button,
+  [data-page="laporan"] .view-toggle a,
+  #report-mode-toggle input[type="radio"] + label,
+  .report-mode-toggle input[type="radio"] + label,
+  #laporan .view-toggle input[type="radio"] + label,
+  #page-laporan .view-toggle input[type="radio"] + label,
+  .page-laporan .view-toggle input[type="radio"] + label,
+  [data-page="laporan"] .view-toggle input[type="radio"] + label {
+    color: var(--c-text-2-dark, #9ca3af);
+  }
+  #report-mode-toggle .active,
+  .report-mode-toggle .active,
+  #laporan .view-toggle .active,
+  #page-laporan .view-toggle .active,
+  .page-laporan .view-toggle .active,
+  [data-page="laporan"] .view-toggle .active,
+  #report-mode-toggle [aria-pressed="true"],
+  .report-mode-toggle [aria-pressed="true"],
+  #laporan .view-toggle [aria-pressed="true"],
+  #page-laporan .view-toggle [aria-pressed="true"],
+  .page-laporan .view-toggle [aria-pressed="true"],
+  [data-page="laporan"] .view-toggle [aria-pressed="true"],
+  #report-mode-toggle input[type="radio"]:checked + label,
+  .report-mode-toggle input[type="radio"]:checked + label,
+  #laporan .view-toggle input[type="radio"]:checked + label,
+  #page-laporan .view-toggle input[type="radio"]:checked + label,
+  .page-laporan .view-toggle input[type="radio"]:checked + label,
+  [data-page="laporan"] .view-toggle input[type="radio"]:checked + label {
+    background: rgba(26, 115, 232, 0.25);
+    color: var(--c-primary-200, #bfdbfe);
+  }
+}
+
+/* Panels: unified, cardless feel for report page */
+.page--laporan #report-summary-grid .panel,
+.page--laporan #accounting-grid .panel,
+.page--laporan .panel {
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  border: 1px solid transparent; /* minimalist, borderless look */
+  border-radius: var(--rad-lg, 12px);
+  box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+}
+.page--laporan .panel-full-width { grid-column: 1 / -1; }
+.page--laporan .panel-pad { padding: 0.75rem 1rem; }
+.page--laporan .panel .card-header { display:flex; align-items:center; gap:.5rem; padding:.5rem 1rem; }
+.page--laporan .panel .card-title { font-weight: 600; }
+.page--laporan .panel .card-body { padding: 0 1rem 1rem 1rem; }
+.page--laporan .panel .card-body-chart {
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: .75rem;
+}
+
+/* Decorative stickers: subtle gradients, no readability impact */
+.page--laporan #report-summary-grid .panel[data-sticker="wave"]::after,
+.page--laporan #accounting-grid .panel[data-sticker="wave"]::after {
+  content: '';
+  position: absolute; inset: auto -10% -10% auto; width: 140px; height: 140px;
+  background: radial-gradient(80% 80% at 100% 0%, rgba(26,115,232,0.12) 0%, rgba(26,115,232,0.06) 46%, transparent 70%);
+  filter: blur(1px);
+  pointer-events: none;
+  animation: drift 28s ease-in-out infinite alternate;
+}
+.page--laporan #report-summary-grid .panel[data-sticker="dots"]::after,
+.page--laporan #accounting-grid .panel[data-sticker="dots"]::after {
+  content: '';
+  position: absolute; inset: 6px 6px auto auto; width: 64px; height: 64px;
+  background-image: radial-gradient(rgba(16,185,129,0.30) 2px, transparent 2px);
+  background-size: 10px 10px; opacity: .35; border-radius: 8px;
+  pointer-events: none;
+  animation: slowPulse 18s ease-in-out infinite;
+}
+.page--laporan #report-summary-grid .panel[data-sticker="chip"]::after,
+.page--laporan #accounting-grid .panel[data-sticker="chip"]::after {
+  content: '';
+  position: absolute; inset: auto auto -6px -6px; width: 90px; height: 24px; border-radius: 999px;
+  background: linear-gradient(90deg, rgba(236,72,153,0.22), rgba(124,58,237,0.22));
+  filter: blur(0.5px);
+  pointer-events: none;
+}
+
+/* New sticker variants (finance/data themed) */
+.page--laporan .panel[data-sticker="coins"]::after {
+  content: '';
+  position: absolute; inset: auto -8px -8px auto; width: 180px; height: 120px;
+  background:
+    radial-gradient(circle at 20% 60%, rgba(245,158,11,0.25) 0 14px, transparent 15px),
+    radial-gradient(circle at 48% 35%, rgba(245,158,11,0.20) 0 10px, transparent 11px),
+    radial-gradient(circle at 70% 70%, rgba(234,179,8,0.18) 0 12px, transparent 13px),
+    radial-gradient(circle at 86% 30%, rgba(251,191,36,0.16) 0 9px, transparent 10px);
+  filter: blur(0.2px);
+  pointer-events: none;
+  animation: floatY 22s ease-in-out infinite alternate;
+}
+.page--laporan .panel[data-sticker="bars"]::after {
+  content: '';
+  position: absolute; inset: auto 8px 8px auto; width: 120px; height: 80px;
+  background:
+    linear-gradient(180deg, rgba(26,115,232,0.22), rgba(26,115,232,0.08)) 0 30% / 16px 70% no-repeat,
+    linear-gradient(180deg, rgba(16,185,129,0.22), rgba(16,185,129,0.08)) 24px 50% / 16px 50% no-repeat,
+    linear-gradient(180deg, rgba(236,72,153,0.22), rgba(236,72,153,0.08)) 48px 20% / 16px 80% no-repeat,
+    linear-gradient(180deg, rgba(124,58,237,0.22), rgba(124,58,237,0.08)) 72px 40% / 16px 60% no-repeat;
+  border-radius: 8px;
+  pointer-events: none;
+  animation: drift 26s ease-in-out infinite alternate;
+}
+.page--laporan .panel[data-sticker="line"]::after {
+  content: '';
+  position: absolute; inset: 6px 6px auto auto; width: 140px; height: 70px;
+  background:
+    linear-gradient(transparent 0 63%, rgba(26,115,232,0.25) 63% 67%, transparent 67%) 0 0/100% 100% no-repeat,
+    radial-gradient(8px 8px at 20% 62%, rgba(26,115,232,0.35) 99%, transparent 100%),
+    radial-gradient(8px 8px at 45% 66%, rgba(26,115,232,0.35) 99%, transparent 100%),
+    radial-gradient(8px 8px at 70% 60%, rgba(26,115,232,0.35) 99%, transparent 100%),
+    radial-gradient(8px 8px at 90% 64%, rgba(26,115,232,0.35) 99%, transparent 100%);
+  transform: rotate(-2deg);
+  pointer-events: none;
+  animation: floatY 20s ease-in-out infinite alternate;
+}
+.page--laporan .panel[data-sticker="pie"]::after {
+  content: '';
+  position: absolute; inset: auto -10px -10px auto; width: 100px; height: 100px;
+  background: conic-gradient(rgba(26,115,232,0.22) 0 110deg, rgba(16,185,129,0.22) 110deg 220deg, rgba(236,72,153,0.22) 220deg 360deg);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: slowPulse 24s ease-in-out infinite;
+}
+.page--laporan .panel[data-sticker="grid"]::after {
+  content: '';
+  position: absolute; inset: 10px 10px auto auto; width: 80px; height: 80px;
+  background-image: linear-gradient(rgba(148,163,184,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.25) 1px, transparent 1px);
+  background-size: 10px 10px; border-radius: 6px; opacity: .6;
+  pointer-events: none;
+}
+.page--laporan .panel[data-sticker="nodes"]::after {
+  content: '';
+  position: absolute; inset: auto 8px 8px auto; width: 130px; height: 90px;
+  background:
+    radial-gradient(5px 5px at 15% 70%, rgba(16,185,129,0.35) 99%, transparent 100%),
+    radial-gradient(5px 5px at 50% 50%, rgba(26,115,232,0.35) 99%, transparent 100%),
+    radial-gradient(5px 5px at 85% 30%, rgba(236,72,153,0.35) 99%, transparent 100%),
+    linear-gradient(120deg, rgba(148,163,184,0.25) 0 0) 10% 62% / 60% 1px no-repeat,
+    linear-gradient(60deg, rgba(148,163,184,0.25) 0 0) 55% 42% / 36% 1px no-repeat;
+  pointer-events: none;
+}
+.page--laporan .panel[data-sticker="calendar"]::after {
+  content: '';
+  position: absolute; inset: 8px 8px auto auto; width: 84px; height: 64px;
+  background:
+    linear-gradient(rgba(26,115,232,0.25), rgba(26,115,232,0.25)) 0 0/100% 8px no-repeat,
+    linear-gradient(rgba(148,163,184,0.25), rgba(148,163,184,0.25)) 0 12px/100% 1px no-repeat,
+    linear-gradient(rgba(148,163,184,0.22), rgba(148,163,184,0.22)) 0 26px/100% 1px no-repeat,
+    linear-gradient(rgba(148,163,184,0.22), rgba(148,163,184,0.22)) 0 40px/100% 1px no-repeat,
+    linear-gradient(90deg, rgba(148,163,184,0.22) 1px, transparent 1px);
+  background-size: auto, auto, auto, auto, 21px 64px;
+  border-radius: 8px;
+  pointer-events: none;
+}
+.page--laporan .panel[data-sticker="ledger"]::after {
+  content: '';
+  position: absolute; inset: 8px 8px auto auto; width: 110px; height: 74px;
+  background:
+    repeating-linear-gradient(180deg, rgba(148,163,184,0.22) 0 2px, transparent 2px 18px),
+    linear-gradient(90deg, rgba(236,72,153,0.25) 0 4px, transparent 4px 100%);
+  border-radius: 6px;
+  pointer-events: none;
+}
+.page--laporan .panel[data-sticker="scale"]::after {
+  content: '';
+  position: absolute; inset: auto 10px 10px auto; width: 120px; height: 80px;
+  background:
+    radial-gradient(8px 8px at 30% 78%, rgba(148,163,184,0.25) 99%, transparent 100%),
+    radial-gradient(8px 8px at 70% 78%, rgba(148,163,184,0.25) 99%, transparent 100%),
+    linear-gradient(90deg, rgba(148,163,184,0.22), rgba(148,163,184,0.22)) 50% 60%/60% 1px no-repeat;
+  pointer-events: none;
+}
+.page--laporan .panel[data-sticker="shield"]::after {
+  content: '';
+  position: absolute; inset: auto 10px 10px auto; width: 90px; height: 110px;
+  background: radial-gradient(60% 80% at 50% 10%, rgba(16,185,129,0.14) 0%, rgba(16,185,129,0.06) 60%, transparent 70%);
+  clip-path: polygon(50% 0%, 85% 12%, 85% 65%, 50% 100%, 15% 65%, 15% 12%);
+  pointer-events: none;
+}
+
+/* Optional animal illustrations via data-animal on panel */
+.page--laporan .panel[data-animal]::before {
+  content: '';
+  position: absolute; inset: -6px auto auto -6px; width: 100px; height: 100px; opacity: .12;
+  background-size: cover; background-repeat: no-repeat;
+  filter: saturate(110%);
+  animation: floatY 30s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.page--laporan .panel[data-animal="cat"]::before {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' fill='none'><circle cx='60' cy='68' r='36' fill='rgba(17,24,39,0.85)'/><circle cx='46' cy='62' r='6' fill='white'/><circle cx='74' cy='62' r='6' fill='white'/><path d='M48 86c8 6 16 6 24 0' stroke='white' stroke-width='4' stroke-linecap='round'/><path d='M42 36 54 20 60 36' fill='rgba(17,24,39,0.85)'/><path d='M78 36 66 20 60 36' fill='rgba(17,24,39,0.85)'/></svg>");
+}
+.page--laporan .panel[data-animal="bird"]::before {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' fill='none'><path d='M20 70c26-12 40-18 62-8 10 4 20 4 18 12-2 8-10 8-18 6-16-4-28-6-44 0-6 2-18 2-18-10z' fill='rgba(17,24,39,0.85)'/><circle cx='80' cy='64' r='3' fill='white'/></svg>");
+}
+
+/* Animations (soft and relaxed) */
+@keyframes floatY { from { transform: translateY(0px); } to { transform: translateY(-6px); } }
+@keyframes drift { from { transform: translateX(0) rotate(0deg); } to { transform: translateX(-6px) rotate(-1deg); } }
+@keyframes slowPulse { 0%,100% { opacity: .8; transform: scale(1); } 50% { opacity: 1; transform: scale(1.04); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .page--laporan [data-sticker]::after,
+  .page--laporan .panel[data-animal]::before,
+  .page--laporan .page--laporan::before { animation: none !important; }
+}
+
+/* Short-height devices: compact layout (max-height: 599px) */
+@media (max-height: 599px) {
+  .page--laporan .dashboard-hero { display: none; }
+  .page--laporan #report-filter-card.panel-pad { padding: .5rem .75rem; }
+  .page--laporan .report-filter { gap: .5rem; }
+  .page--laporan .report-summary-header { gap: .35rem; }
+  .page--laporan .panel .card-body { padding: 0 .75rem .75rem .75rem; }
+  .page--laporan .panel .card-body-chart { padding: .5rem; }
+  .page--laporan .report-card-chart { height: 140px; }
+}
+/* Typography: clearer hierarchy for reports */
+.page--laporan .card-title { font-size: clamp(1rem, 1.1vw + .8rem, 1.25rem); letter-spacing: -0.01em; color: var(--text); text-wrap: balance; }
+.page--laporan .card-title { white-space: normal; }
+@media (max-width: 599px) { .page--laporan .card-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+.page--laporan .kpi-label { font-size: .72rem; color: var(--text-dim); letter-spacing: .01em; }
+.page--laporan .kpi-value { font-size: clamp(.4rem, 2vw + .3rem, .95rem); font-weight: 600; color: var(--text); }
+.page--laporan .table-like { font-size: .95rem; line-height: 1.5; }
+.page--laporan .metric .label { letter-spacing: .01em; }
+
+/* Non-wrapping, truncation on compact screens for left columns */
+@media (max-width: 599px) {
+  #report-summary-grid > section:nth-child(9){ display: none;}
+  .page--laporan .table-like > div:nth-child(odd),
+  .page--laporan .list > div:nth-child(odd) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* Extra section spacing for readability */
+.page--laporan section.panel { margin-bottom: 1rem; }
+
+/* Boundaries for tables and charts */
+.page--laporan .table-like { border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--panel) 98%, transparent); box-shadow: var(--shadow-sm); padding: .75rem; }
+.page--laporan .card-body-chart { box-shadow: var(--shadow-sm); }

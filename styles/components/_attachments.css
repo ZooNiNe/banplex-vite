@@ -1,0 +1,293 @@
+/* =======================================================
+ * COMPONENT: ATTACHMENTS
+ * Mengatur semua gaya untuk tampilan lampiran, galeri,
+ * dan manajer file.
+ * ======================================================= */
+
+/* --- Attachments in Chat Bubbles --- */
+.attachments {
+  margin-top: .4rem;
+}
+.attachments .image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: .35rem;
+}
+.attachments .img-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.attachments .file-tile {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: .5rem;
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: .5rem .6rem;
+}
+.attachments .file-tile .file-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 15%, var(--panel));
+  border: 1px solid var(--line);
+  display: grid;
+  place-items:center;
+  color: var(--primary);
+}
+.attachments .file-tile .file-name {
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attachments .file-tile .file-size {
+  font-size: .78rem;
+  color: var(--text-dim);
+}
+
+
+/* --- Attachment Gallery (Detail Modals) --- */
+.attachment-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 1rem;
+}
+.attachment-item {
+  position: relative;
+  text-align: center;
+  gap: .5rem;
+}
+.attachment-item span {
+  font-size: .8rem;
+  font-weight: 500;
+  display: block;
+  margin-top: .5rem;
+}
+.attachment-thumbnail {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--line);
+}
+.attachment-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+.attachment-actions .btn-icon-danger {
+  background-color: rgba(0,0,0,0.5);
+  color: white;
+}
+
+
+/* --- Attachment Manager (Detail Pane & Forms) --- */
+/* REVISI #1: Ubah display agar adaptif untuk satu item */
+.attachment-manager-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+  /* Tambahkan kelas ini saat hanya ada 1 item + placeholder */
+}
+.attachment-manager-container.single-item-layout {
+  grid-template-columns: 1fr minmax(150px, 1fr); /* Atur agar item tunggal mengambil ruang lebih besar */
+}
+.attachment-manager-container.single-item-layout .attachment-manager-item:first-child:not(.placeholder) {
+    grid-column: 1 / span 1; /* Biarkan item tunggal di kolom pertama */
+}
+.attachment-manager-container .placeholder {
+    grid-column: auto;
+}
+
+
+.attachment-manager-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Center content vertically */
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background-color: var(--surface-muted);
+  min-height: 150px;
+  overflow: hidden; /* Prevent overlay spill */
+}
+
+.attachment-manager-item.placeholder {
+  justify-content: center;
+  border-style: dashed;
+  cursor: pointer;
+  min-height: 120px;
+  transition: background-color 0.2s;
+}
+.attachment-manager-item.placeholder:hover {
+  background-color: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+.attachment-manager-item.placeholder .material-symbols-outlined {
+  font-size: 32px;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+  pointer-events: none;
+}
+.attachment-manager-item.placeholder span:not(.material-symbols-outlined):not(.upload-progress-text):not(.upload-error-text) {
+  pointer-events: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.attachment-preview-thumb {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.5rem;
+}
+.attachment-manager-item strong {
+  font-weight: 600;
+  font-size: 0.9rem;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 2.7rem; /* 0.9rem * 1.5 line-height * 2 lines */
+  width: 100%; /* Ensure text wraps correctly */
+}
+.attachment-manager-overlay {
+    position: absolute;
+    inset: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    color: #fff;
+    opacity: 0;
+    transition: opacity .2s ease;
+    border-radius: var(--radius); /* Match parent radius */
+    pointer-events: none;
+    z-index: 1; /* Ensure overlay is above image */
+}
+.attachment-manager-item:hover .attachment-manager-overlay:not(.is-pending) { /* Only show hover effect if not pending */
+    opacity: 1;
+    pointer-events: auto;
+}
+.attachment-manager-overlay .btn-icon {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+.attachment-manager-overlay .btn-icon:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.attachment-manager-item.is-pending-local-upload .attachment-manager-overlay.is-pending {
+    opacity: 1; /* Always show overlay for pending items */
+    background: rgba(0,0,0,0.6);
+    pointer-events: none; /* Don't allow interaction with pending items */
+    flex-direction: column;
+    gap: .5rem;
+    color: #fff;
+}
+
+.attachment-manager-item.is-pending-local-upload .attachment-manager-overlay .spinner {
+    width: 24px; height: 24px; border-width: 3px;
+    border-color: rgba(255,255,255,0.3); border-top-color: #fff;
+    animation: spin 1s linear infinite;
+}
+.attachment-manager-item .upload-progress-text {
+    font-size: 0.8rem;
+    color: #fff;
+}
+.attachment-manager-item .upload-error-text {
+    font-size: 0.7rem;
+    color: #f87171; /* Softer red */
+    display: none; /* Hidden by default */
+}
+
+
+/* Single attachment layout (Adaptif) */
+.attachment-manager-container.single-item-layout .attachment-manager-item {
+    /* Meningkatkan ukuran item tunggal */
+    min-height: 180px;
+}
+.attachment-manager-container.single-item-layout .attachment-manager-item .attachment-preview-thumb {
+    height: 100px;
+    width: 100%;
+}
+.attachment-manager-container.single-item-layout .attachment-manager-item strong {
+    max-height: unset;
+}
+
+
+/* --- Image Viewer Modal --- */
+.image-view-modal {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0,0,0,0.8);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  z-index: 2500; /* Ensure it's above other modals */
+}
+.image-view-modal img {
+  max-width: 95vw; /* Adjust max width */
+  max-height: 90vh; /* Adjust max height */
+  object-fit: contain;
+  border-radius: var(--radius-sm); /* Smaller radius */
+}
+.image-view-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background-color: rgba(0,0,0,0.5); /* Darker background */
+  color: white;
+  z-index: 2501; /* Ensure button is above image */
+}
+.image-view-close:hover {
+    background-color: rgba(0,0,0,0.7);
+}
+
+
+/* Progress Bar inside Placeholder */
+.upload-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 80%;
+    margin-top: 0.5rem;
+}
+
+.upload-progress-bar-container {
+    width: 100%;
+    height: 4px;
+    background-color: var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.upload-progress-bar {
+    height: 100%;
+    width: 0;
+    background-color: var(--primary);
+    transition: width 0.1s linear; /* Smoother transition */
+}

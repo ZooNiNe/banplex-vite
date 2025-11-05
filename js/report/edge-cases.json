@@ -1,0 +1,91 @@
+{
+  "missing_js_extension": [
+    {
+      "file": "js/pages/crud.js",
+      "import": "https://www.gstatic.com/firebase.js"
+    },
+    {
+      "file": "js/pages/crud.js",
+      "import": "./pengeluaran"
+    },
+    {
+      "file": "js/utils/form.js",
+      "import": "../script.js"
+    }
+  ],
+  "case_mismatch": [],
+  "index_resolution": [],
+  "barrel_loops": [],
+  "unresolved": [
+    {
+      "file": "js/router.js",
+      "import": "./pages/sampah.js"
+    },
+    {
+      "file": "js/pages/pengeluaran.js",
+      "import": "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js"
+    },
+    {
+      "file": "js/pages/pengeluaran.js",
+      "import": "./crud.js"
+    },
+    {
+      "file": "js/utils/ui.js",
+      "import": "../script.js"
+    }
+  ],
+  "layer_violations": [
+    {
+      "from": "js/utils/ui.js",
+      "to": "js/pages/tagihan.js"
+    },
+    {
+      "from": "js/utils/ui.js",
+      "to": "js/pages/pengeluaran.js"
+    },
+    {
+      "from": "js/pages/crud.js",
+      "to": "js/pages/dashboard.js"
+    },
+    {
+      "from": "js/pages/crud.js",
+      "to": "js/pages/pengeluaran.js"
+    },
+    {
+      "from": "js/pages/crud.js",
+      "to": "js/pages/tagihan.js"
+    },
+    {
+      "from": "js/pages/crud.js",
+      "to": "js/pages/pemasukan.js"
+    },
+    {
+      "from": "js/pages/jurnal.js",
+      "to": "js/pages/dashboard.js"
+    },
+    {
+      "from": "js/pages/pemasukan.js",
+      "to": "js/pages/dashboard.js"
+    },
+    {
+      "from": "js/pages/simulasi.js",
+      "to": "js/pages/laporan.js"
+    },
+    {
+      "from": "js/pages/tagihan.js",
+      "to": "js/pages/dashboard.js"
+    },
+    {
+      "from": "js/pages/tagihan.js",
+      "to": "js/pages/crud.js"
+    },
+    {
+      "from": "js/pages/tagihan.js",
+      "to": "js/pages/pengeluaran.js"
+    },
+    {
+      "from": "js/main.js",
+      "to": "js/pages/dashboard.js"
+    }
+  ]
+}

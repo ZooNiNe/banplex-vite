@@ -1,0 +1,343 @@
+{
+    "modules": {
+        "js/config.js": {
+            "namedExports": [
+                "ALL_NAV_LINKS",
+                "AUTO_REBASE_TABLES",
+                "BOTTOM_NAV_BY_ROLE",
+                "OWNER_EMAIL",
+                "TEAM_ID",
+                "firebaseConfig"
+            ],
+            "defaultExport": null
+        },
+        "js/firebase.js": {
+            "namedExports": [
+                "app",
+                "attendanceRecordsCol",
+                "auth",
+                "billsCol",
+                "commentsCol",
+                "db",
+                "expensesCol",
+                "fundingCreditorsCol",
+                "fundingSourcesCol",
+                "incomesCol",
+                "logsCol",
+                "matCatsCol",
+                "masterDataConfig",
+                "materialsCol",
+                "membersCol",
+                "opCatsCol",
+                "otherCatsCol",
+                "professionsCol",
+                "projectsCol",
+                "settingsDocRef",
+                "staffCol",
+                "stockTransactionsCol",
+                "storage",
+                "suppliersCol",
+                "workersCol"
+            ],
+            "defaultExport": null
+        },
+        "js/main.js": {
+            "namedExports": [],
+            "defaultExport": null
+        },
+        "js/pages/absensi.js": {
+            "namedExports": [
+                "handleCheckIn",
+                "handleCheckOut",
+                "handleDeleteSingleAttendance",
+                "handleEditManualAttendanceModal",
+                "handleSaveManualAttendance",
+                "handleUpdateAttendance",
+                "renderAbsensiPage"
+            ],
+            "defaultExport": null
+        },
+        "js/pages/dashboard.js": {
+            "namedExports": [
+                "_calculateAndCacheDashboardTotals",
+                "renderDashboardPage"
+            ],
+            "defaultExport": null
+        },
+        "js/pages/jurnal.js": {
+            "namedExports": [
+                "generateSalaryRecap",
+                "handleDeleteSalaryBill",
+                "handleEditWorkerRecapAmount",
+                "handleFixStuckAttendanceModal",
+                "handleGenerateBulkSalaryBill",
+                "handlePaySingleWorkerFromRecap",
+                "handleRecalculateWages",
+                "handleRemoveWorkerFromRecap",
+                "handleViewJurnalHarianModal",
+                "handleViewWorkerRecapModal",
+                "renderJurnalPage",
+                "upsertJurnalHarianCardInUI"
+            ],
+            "defaultExport": null
+        },
+        "js/pages/Komentar.js": {
+            "namedExports": [
+                "handleDeleteComment",
+                "handlePostComment",
+                "openCommentsViewWithPrefill",
+                "renderKomentarPage",
+                "upsertCommentInUI"
+            ],
+            "defaultExport": null
+        },
+        "js/pages/laporan.js": {
+            "namedExports": [
+                "animateCountUp",
+                "generatePdfReport",
+                "handleCetakKwitansi",
+                "handleCetakKwitansiIndividu",
+                "handleCetakKwitansiKolektif",
+                "handleGenerateReportModal",
+                "handlePayIndividualSalaryModal",
+                "handleProcessIndividualSalaryPayment",
+                "renderLaporanPage"
+            ],
+            "defaultExport": null
+        },
+        "js/pages/log_aktivitas.js": {
+            "namedExports": [
+                "renderLogAktivitasPage"
+            ],
+            "defaultExport": null
+        },
+        "js/pages/pemasukan.js": {
+            "namedExports": [
+                "handleAddPemasukan",
+                "handleDeleteItem",
+                "handleOpenPemasukanDetail",
+                "renderPemasukanPage"
+            ],
+            "defaultExport": null
+        },
+        "js/pages/pengaturan.js": {
+            "namedExports": [
+                "handleAddMasterItem",
+                "handleDeleteMasterItem",
+                "handleEditMasterItem",
+                "handleEditPdfSettings",
+                "handleManageMasterData",
+                "handleManageUsers",
+                "handleUpdateMasterItem",
+                "handleUserAction",
+                "renderPengaturanPage"
+            ],
+            "defaultExport": null
+        },
+        "js/pages/pengeluaran.js": {
+            "namedExports": [
+                "renderPengeluaranPage"
+            ],
+            "defaultExport": null
+        },
+        "js/pages/simulasi.js": {
+            "namedExports": [
+                "renderSimulasiBayarPage"
+            ],
+            "defaultExport": null
+        },
+        "js/pages/stok.js": {
+            "namedExports": [
+                "handleDeleteStockTransaction",
+                "handleEditStockTransaction",
+                "handleStokInModal",
+                "handleStokOutModal",
+                "processStokIn",
+                "processStokOut",
+                "renderStokPage"
+            ],
+            "defaultExport": null
+        },
+        "js/pages/tagihan.js": {
+            "namedExports": [
+                "handleDeleteAttachment",
+                "handleEditDeliveryOrderItemsModal",
+                "handleEditSuratJalanModal",
+                "handleOpenBillDetail",
+                "handlePayBillModal",
+                "handlePaymentModal",
+                "handleProcessBillPayment",
+                "handleProcessPayment",
+                "handleUpdateDeliveryOrderItems",
+                "handleUpdateSuratJalan",
+                "handleUploadAttachment",
+                "handleViewAttachmentModal",
+                "handleViewInvoiceItems",
+                "initResizer",
+                "renderTagihanPage",
+                "showDetailPane",
+                "upsertBillRowInUI"
+            ],
+            "defaultExport": null
+        },
+        "js/router.js": {
+            "namedExports": [
+                "bindRouterEvents",
+                "initRouter",
+                "navigate",
+                "renderPageContent"
+            ],
+            "defaultExport": null
+        },
+        "js/state.js": {
+            "namedExports": [
+                "_attachFormDraftPersistence",
+                "_clearFormDraft",
+                "_getFormDraftKey",
+                "_restoreFormDraft",
+                "_saveFormDraft",
+                "appState",
+                "isViewer",
+                "setActivePage"
+            ],
+            "defaultExport": null
+        },
+        "js/utils/auth.js": {
+            "namedExports": [
+                "_getAuthScreenHTML",
+                "attachRoleListener",
+                "getAuthScreenHTML",
+                "getPendingScreenHTML",
+                "handleLogout",
+                "listenForPendingUsers",
+                "signInWithGoogle"
+            ],
+            "defaultExport": null
+        },
+        "js/utils/domain/crud.js": {
+            "namedExports": [
+                "_performSoftDelete"
+            ],
+            "defaultExport": null
+        },
+        "js/utils/form.js": {
+            "namedExports": [],
+            "defaultExport": null
+        },
+        "js/utils/helpers.js": {
+            "namedExports": [
+                "$",
+                "$$",
+                "_apiRequest",
+                "_enforceLocalFileStorageLimit",
+                "_getFilteredReportData",
+                "getJSDate",
+                "_getSyncIndicatorHTML",
+                "_mapDeleteEndpoint",
+                "_resolveUserDisplay",
+                "fmtIDR",
+                "generateUUID",
+                "getTerbilang",
+                "parseFormattedNumber",
+                "parseLocaleNumber",
+                "updateOnlineStatusUI"
+            ],
+            "defaultExport": null
+        },
+        "js/utils/sync.js": {
+            "namedExports": [
+                "ALL_NAV_LINKS",
+                "AUTO_REBASE_TABLES",
+                "BOTTOM_NAV_BY_ROLE",
+                "OWNER_EMAIL",
+                "TEAM_ID",
+                "initCustomSelects",
+                "_logActivity",
+                "_offerRestoreOrphanLoansOnce",
+                "_safeFirestoreWrite",
+                "_setActiveListeners",
+                "_verifyDataIntegrity",
+                "appState",
+                "auth",
+                "createMasterDataSelect",
+                "fetchAndCacheData",
+                "firebaseConfig",
+                "firebaseServices",
+                "fmtIDR",
+                "generateUUID",
+                "hideToast",
+                "isViewer",
+                "localDB",
+                "loadAllLocalDataToState",
+                "parseFormattedNumber",
+                "parseLocaleNumber",
+                "subscribeToAllRealtimeData",
+                "syncFromServer",
+                "toast",
+                "updateSyncIndicator"
+            ],
+            "defaultExport": null
+        },
+        "js/utils/ui.js": {
+            "namedExports": [
+                "addItemToListWithAnimation",
+                "_animateTabSwitch",
+                "_createPageToolbarHTML",
+                "_createPaymentHistoryHTML",
+                "_createPaymentHistoryListHTML",
+                "getEmptyStateHTML",
+                "_getSkeletonForListPage",
+                "_getSkeletonLoaderHTML",
+                "_initAdvancedPTR",
+                "_initInfiniteScrollObserver",
+                "_initToastSwipeHandler",
+                "removeItemFromListWithAnimation",
+                "updateItemInListWithAnimation",
+                "closeAllModals",
+                "closeModal",
+                "createModal",
+                "getModalContent",
+                "handleOpenPaymentHistoryModal",
+                "hideMobileDetailPage",
+                "hideToast",
+                "renderBottomNav",
+                "renderSidebar",
+                "renderUI",
+                "showMobileDetailPage",
+                "toast"
+            ],
+            "defaultExport": null
+        }
+    },
+    "mismatches": [
+        {
+            "file": "js/utils/form.js",
+            "expected": [],
+            "actual": [
+                "_attachClientValidation",
+                "_attachFormDraftPersistence",
+                "attachStaffFormListeners",
+                "_buildApiPayload",
+                "_clearFormDraft",
+                "_clearInvalid",
+                "_createCustomDateInputHTML",
+                "_createFormGroupHTML",
+                "_fallbackLocalFormHandler",
+                "formatNumberInput",
+                "_getFormDraftKey",
+                "_initAutocomplete",
+                "_initCustomDateInputs",
+                "initCustomSelects",
+                "_markInvalid",
+                "_recalculateAndApplyUsageCounts",
+                "_restoreFormDraft",
+                "_saveFormDraft",
+                "_serializeForm",
+                "_submitFormAsync",
+                "_validateAndPrepareData",
+                "createMasterDataSelect",
+                "handleRecalculateUsageCount"
+            ]
+        }
+    ]
+}

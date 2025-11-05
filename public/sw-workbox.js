@@ -3,20 +3,25 @@ importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox
 if (workbox) {
   console.log(`Workbox berhasil dimuat.`);
   
+  workbox.core.setCacheNameDetails({ prefix: 'banplex' });
   workbox.core.clientsClaim();
   self.skipWaiting();
+  // perf: enable navigation preload to speed up first paint on slow 3G
+  try { workbox.navigationPreload.enable(); } catch(_) {}
 
   // Perbaikan di sini: Gunakan path relatif
+  // precache app shell & key assets (keep list small to minimize install time)
   workbox.precaching.precacheAndRoute([
     { url: './', revision: null },
     { url: 'index.html', revision: null },
-    { url: 'script.js', revision: null }, // <-- DIUBAH
     { url: 'style.css', revision: null },
-    { url: 'desktop-styles.css', revision: null }, // <-- DITAMBAHKAN
-    { url: 'manifest.json', revision: null },
-    { url: 'logo-data.js', revision: null },
-    { url: 'icons-logo.png', revision: null },
-    { url: 'logo-main.png', revision: null },
+    { url: 'desktop-styles.css', revision: null },
+    { url: 'public/manifest.json', revision: null },
+    { url: 'public/icons-logo.png', revision: null },
+    { url: 'public/logo-cv-aba.png', revision: null },
+    { url: 'public/icons-logo.webp', revision: null }, // optional modern format
+    { url: 'public/logo-cv-aba.webp', revision: null }, // optional modern format
+    { url: 'root_files/app.js', revision: null },
   ]);
 
   workbox.routing.registerRoute(
@@ -27,13 +32,13 @@ if (workbox) {
   );
 
   workbox.routing.registerRoute(
-    ({ request }) => 
-      request.destination === 'style' ||
-      request.destination === 'script' ||
-      request.destination === 'worker',
-    new workbox.strategies.StaleWhileRevalidate({
-      cacheName: 'banplex-static-assets',
-    })
+    ({ request }) => request.destination === 'style' || request.destination === 'worker',
+    new workbox.strategies.StaleWhileRevalidate({ cacheName: 'banplex-static-assets' })
+  );
+  // scripts benefit from SWR too, fallback to preload/network
+  workbox.routing.registerRoute(
+    ({ request }) => request.destination === 'script',
+    new workbox.strategies.StaleWhileRevalidate({ cacheName: 'banplex-scripts' })
   );
 
   // ... sisa kode tetap sama ...
@@ -61,22 +66,21 @@ if (workbox) {
     new workbox.strategies.CacheFirst({
       cacheName: 'banplex-images',
       plugins: [
-        new workbox.expiration.ExpirationPlugin({
-          maxEntries: 60, // Simpan hingga 60 gambar
-          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 hari
-        }),
+        new workbox.expiration.ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 }),
       ],
     })
   );
 
   workbox.routing.registerRoute(
-    ({ url }) => url.origin === 'https://fonts.googleapis.com' || url.origin === 'https://fonts.gstatic.com',
-    new workbox.strategies.StaleWhileRevalidate({
-      cacheName: 'banplex-google-fonts',
-      plugins: [
-        new workbox.expiration.ExpirationPlugin({ maxEntries: 10 }),
-      ],
-    })
+    ({ url }) => (
+      url.origin === 'https://fonts.googleapis.com' ||
+      url.origin === 'https://fonts.gstatic.com' ||
+      url.origin === 'https://cdn.jsdelivr.net' ||
+      url.origin === 'https://cdnjs.cloudflare.com' ||
+      url.origin === 'https://unpkg.com' ||
+      url.origin === 'https://www.gstatic.com'
+    ),
+    new workbox.strategies.StaleWhileRevalidate({ cacheName: 'banplex-external-cdn' })
   );
 
   self.addEventListener('message', (event) => {

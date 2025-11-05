@@ -1,0 +1,610 @@
+{
+    "nodes": [
+        {
+            "file": "js/config.js",
+            "layer": "L0"
+        },
+        {
+            "file": "js/firebase.js",
+            "layer": "L1"
+        },
+        {
+            "file": "js/state.js",
+            "layer": "L1"
+        },
+        {
+            "file": "js/utils/helpers.js",
+            "layer": "L1"
+        },
+        {
+            "file": "js/utils/auth.js",
+            "layer": "L2"
+        },
+        {
+            "file": "js/utils/domain/crud.js",
+            "layer": "L2"
+        },
+        {
+            "file": "js/utils/form.js",
+            "layer": "L2"
+        },
+        {
+            "file": "js/utils/sync.js",
+            "layer": "L2"
+        },
+        {
+            "file": "js/utils/ui.js",
+            "layer": "L3"
+        },
+        {
+            "file": "js/pages/absensi.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/pages/dashboard.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/pages/jurnal.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/pages/Komentar.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/pages/laporan.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/pages/log_aktivitas.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/pages/pemasukan.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/pages/pengaturan.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/pages/pengeluaran.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/pages/simulasi.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/pages/stok.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/pages/tagihan.js",
+            "layer": "L4"
+        },
+        {
+            "file": "js/router.js",
+            "layer": "L5"
+        },
+        {
+            "file": "js/main.js",
+            "layer": "L6"
+        }
+    ],
+    "edges": [
+        {
+            "from": "js/firebase.js",
+            "to": "js/config.js",
+            "type": "static"
+        },
+        {
+            "from": "js/main.js",
+            "to": "js/config.js",
+            "type": "static"
+        },
+        {
+            "from": "js/main.js",
+            "to": "js/firebase.js",
+            "type": "static"
+        },
+        {
+            "from": "js/main.js",
+            "to": "js/pages/dashboard.js",
+            "type": "static"
+        },
+        {
+            "from": "js/main.js",
+            "to": "js/router.js",
+            "type": "static"
+        },
+        {
+            "from": "js/main.js",
+            "to": "js/state.js",
+            "type": "static"
+        },
+        {
+            "from": "js/main.js",
+            "to": "js/utils/auth.js",
+            "type": "static"
+        },
+        {
+            "from": "js/main.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/main.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/main.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/absensi.js",
+            "to": "js/utils/auth.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/absensi.js",
+            "to": "js/utils/form.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/absensi.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/absensi.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/absensi.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/dashboard.js",
+            "to": "js/config.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/dashboard.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/dashboard.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/dashboard.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/jurnal.js",
+            "to": "js/pages/dashboard.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/jurnal.js",
+            "to": "js/utils/auth.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/jurnal.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/jurnal.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/jurnal.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/Komentar.js",
+            "to": "js/utils/auth.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/Komentar.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/Komentar.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/Komentar.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/laporan.js",
+            "to": "js/utils/form.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/laporan.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/laporan.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/laporan.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/log_aktivitas.js",
+            "to": "js/utils/form.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/log_aktivitas.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/log_aktivitas.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/log_aktivitas.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pemasukan.js",
+            "to": "js/pages/dashboard.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pemasukan.js",
+            "to": "js/utils/auth.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pemasukan.js",
+            "to": "js/utils/domain/crud.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pemasukan.js",
+            "to": "js/utils/form.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pemasukan.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pemasukan.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pemasukan.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pengaturan.js",
+            "to": "js/config.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pengaturan.js",
+            "to": "js/utils/auth.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pengaturan.js",
+            "to": "js/utils/form.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pengaturan.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pengaturan.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pengaturan.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/pengeluaran.js",
+            "to": "js/pages/dashboard.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/simulasi.js",
+            "to": "js/pages/laporan.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/simulasi.js",
+            "to": "js/utils/form.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/simulasi.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/simulasi.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/simulasi.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/stok.js",
+            "to": "js/utils/form.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/stok.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/stok.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/stok.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/tagihan.js",
+            "to": "js/pages/dashboard.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/tagihan.js",
+            "to": "js/pages/pengeluaran.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/tagihan.js",
+            "to": "js/utils/auth.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/tagihan.js",
+            "to": "js/utils/form.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/tagihan.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/tagihan.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/pages/tagihan.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/config.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/pages/absensi.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/pages/dashboard.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/pages/jurnal.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/pages/Komentar.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/pages/laporan.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/pages/log_aktivitas.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/pages/pemasukan.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/pages/pengaturan.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/pages/pengeluaran.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/pages/stok.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/pages/tagihan.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/state.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/router.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/state.js",
+            "to": "js/config.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/auth.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/auth.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/domain/crud.js",
+            "to": "js/firebase.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/domain/crud.js",
+            "to": "js/state.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/domain/crud.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/domain/crud.js",
+            "to": "js/utils/sync.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/domain/crud.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/form.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/form.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/helpers.js",
+            "to": "js/state.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/sync.js",
+            "to": "js/config.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/sync.js",
+            "to": "js/state.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/sync.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/sync.js",
+            "to": "js/utils/ui.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/ui.js",
+            "to": "js/utils/auth.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/ui.js",
+            "to": "js/utils/form.js",
+            "type": "static"
+        },
+        {
+            "from": "js/utils/ui.js",
+            "to": "js/utils/helpers.js",
+            "type": "static"
+        }
+    ],
+    "invalid_edges": [
+        {
+            "from": "js/router.js",
+            "to": "js/pages/sampah.js",
+            "reason": "unresolved_import"
+        },
+        {
+            "from": "js/pages/pengeluaran.js",
+            "to": "js/pages/crud.js",
+            "reason": "unresolved_import"
+        },
+        {
+            "from": "js/utils/ui.js",
+            "to": "script.js",
+            "reason": "unresolved_import"
+        }
+    ]
+}

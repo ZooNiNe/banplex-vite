@@ -1,0 +1,87 @@
+/* =======================================================
+ * COMPONENT: TABLES
+ * Mengatur semua gaya untuk elemen <table>, 
+ * seperti tabel rekap, detail pembayaran, dll.
+ * ======================================================= */
+
+/* --- Payment Details Table (Invoice) --- */
+.payment-details table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.payment-details th,
+.payment-details td {
+  padding: 8px;
+}
+
+.payment-details thead {
+  background-color: #f1f5f9;
+  color: #64748b;
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.payment-details tbody tr {
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.payment-details tbody td {
+  font-size: 11px;
+}
+
+
+/* --- Recap Table (Laporan) --- */
+.recap-table-wrapper {
+  overflow-x: auto;
+}
+
+.recap-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.recap-table th, .recap-table td {
+  padding: .75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.recap-table th {
+  font-weight: 600;
+  color: var(--text-dim);
+  font-size: .85rem;
+}
+
+.recap-table tr:last-child td {
+  border-bottom: none;
+}
+
+.recap-table strong {
+  color: var(--primary);
+}
+
+.recap-table td.positive {
+  color: var(--success);
+}
+
+.recap-table td.negative {
+  color: var(--danger);
+}
+
+.recap-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-right: 0.5rem;
+}
+
+.recap-table tbody tr.recap-row {
+  transition: background-color 0.2s ease;
+}
+
+.recap-table tbody tr.recap-row:hover {
+  background-color: var(--surface-muted);
+}

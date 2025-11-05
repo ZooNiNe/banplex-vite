@@ -1,0 +1,63 @@
+{
+  "violations": [
+    {
+      "severity": "error",
+      "file": "js/utils/ui.js",
+      "rule": "no-upward-import",
+      "detail": "Modul L3 mengimpor `handleEditItem` dan `handleUpdateItem` dari `js/pages/crud.js` (L4), yang melanggar aturan layering."
+    },
+    {
+      "severity": "error",
+      "file": "js/utils/ui.js",
+      "rule": "no-upward-import",
+      "detail": "Modul L3 mengimpor `_showPaymentSuccessPreviewPanel` dari `js/pages/pengeluaran.js` (L4), yang melanggar aturan layering."
+    },
+    {
+      "severity": "error",
+      "file": "js/pages/tagihan.js",
+      "rule": "unresolved-import",
+      "detail": "Mengimpor dari modul 'js/pages/crud.js' yang tidak ada."
+    },
+    {
+      "severity": "error",
+      "file": "js/router.js",
+      "rule": "unresolved-import",
+      "detail": "Mengimpor dari modul 'js/pages/sampah.js' yang tidak ada. Seharusnya 'js/pages/recycle_bin.js'."
+    },
+    {
+      "severity": "warn",
+      "file": "js/utils/form.js",
+      "rule": "missing-exports",
+      "detail": "Modul ini berisi 20+ fungsi helper (seperti `formatNumberInput`, `_serializeForm`) yang tidak diekspor, sehingga tidak dapat digunakan kembali oleh modul lain."
+    },
+    {
+      "severity": "warn",
+      "file": "js/state.js",
+      "rule": "missing-exports",
+      "detail": "Fungsi-fungsi terkait draft form (`_getFormDraftKey`, `_saveFormDraft`, dll.) tidak diekspor, membatasi penggunaannya."
+    },
+    {
+      "severity": "warn",
+      "file": "js/main.js",
+      "rule": "layering-violation",
+      "detail": "Modul L6 (main.js) mengimpor `_calculateAndCacheDashboardTotals` langsung dari L4 (pages/dashboard.js), melewati L5 (router)."
+    }
+  ],
+  "suggestions": [
+    {
+      "file": "js/utils/ui.js",
+      "action": "move_page_specific_logic_out",
+      "rationale": "Pindahkan pemanggilan `_showPaymentSuccessPreviewPanel` dari `ui.js` ke dalam fungsi `handleProcessBillPayment` di `tagihan.js` agar `ui.js` tetap presentational murni (L3)."
+    },
+    {
+      "file": "js/pages/tagihan.js",
+      "action": "repoint_import",
+      "rationale": "Ubah impor `handleEditItem` dan `handleUpdateItem` untuk menunjuk ke modul utilitas domain yang benar (misal: `../utils/domain/crud.js`) setelah fungsi-fungsi tersebut dimigrasikan."
+    },
+    {
+      "file": "js/utils/form.js",
+      "action": "export_all_helpers",
+      "rationale": "Tambahkan `export` ke semua deklarasi fungsi di `js/utils/form.js` untuk memungkinkan modularitas dan penggunaan kembali yang semestinya."
+    }
+  ]
+}

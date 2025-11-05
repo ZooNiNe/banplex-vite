@@ -1,0 +1,177 @@
+/* =======================================================
+ * ANIMATIONS & KEYFRAMES
+ * Berisi semua deklarasi @keyframes dan kelas utilitas
+ * untuk animasi yang digunakan di seluruh aplikasi.
+ * ======================================================= */
+
+/* General Purpose Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes fade-in-sm {
+  from { opacity: 0; transform: scale(.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes pop-in {
+  to {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+}
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.9;
+  }
+}
+@keyframes pulse-sync {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.8); opacity: 0.7; }
+}
+@keyframes gradient-animation {
+	0% { background-position: 0% 50%; }
+	50% { background-position: 100% 50%; }
+	100% { background-position: 0% 50%; }
+}
+
+
+/* Page & View Transitions */
+@keyframes pageEnter {
+  from { opacity:0; transform: translateY(8px) }
+  to { opacity:1; transform: translateY(0) }
+}
+@keyframes pageExit {
+  from { opacity:1 }
+  to { opacity:0 }
+}
+@keyframes subEnterRight {
+  from { opacity:0; transform: translateX(10px) }
+  to { opacity:1; transform: translateX(0) }
+}
+@keyframes subEnterLeft {
+  from { opacity:0; transform: translateX(-10px) }
+  to { opacity:1; transform: translateX(0) }
+}
+@keyframes subExitLeft {
+  from { opacity:1; transform: translateX(0) }
+  to { opacity:0; transform: translateX(-6px) }
+}
+@keyframes subExitRight {
+  from { opacity:1; transform: translateX(0) }
+  to { opacity:0; transform: translateX(6px) }
+}
+@keyframes slideInFromRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideOutToLeft {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-30%); opacity: 0; }
+}
+
+/* Component-Specific Animations */
+@keyframes card-enter-animation {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fab-pop-in {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes success-pop-in {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes slide-fade-in {
+  from { opacity: 0; transform: translateY(-10px); max-height: 0; }
+  to { opacity: 1; transform: translateY(0); max-height: 150px; }
+}
+
+/* List Item Animations */
+@keyframes item-pop-in {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes item-slide-out {
+  from { opacity: 1; transform: translateX(0); max-height: 200px; }
+  to { opacity: 0; transform: translateX(-20px); max-height: 0px; padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0; border-width: 0; }
+}
+@keyframes item-updated-flash {
+  0% { background-color: rgba(245, 158, 11, 0.2); }
+  100% { background-color: transparent; }
+}
+@keyframes item-entering {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0px); }
+}
+
+
+/* Loader & Feedback Animations */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes skeleton-pulse {
+  50% { opacity: 0.6; }
+}
+@keyframes ptr-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* SVG Drawing Animations */
+@keyframes draw-circle { to { stroke-dashoffset: 0; } }
+@keyframes draw-checkmark { to { stroke-dashoffset: 0; } }
+@keyframes draw-circle-error { to { stroke-dashoffset: 0; } }
+@keyframes draw-cross { to { stroke-dashoffset: 0; } }
+
+/* Timed UI Animations */
+@keyframes countdown-anim {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 88; }
+}
+@keyframes snackbar-countdown {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+
+/* =======================================================
+ * Animation Utility Classes
+ * ======================================================= */
+.fade-in { animation: fadeIn .25s ease both; }
+.spin { animation: spin 1s linear infinite; }
+.fade-in-fast { animation: fadeIn .18s ease both; }
+.fade-out-fast { animation: fadeOut .18s ease both; }
+
+.page-enter { animation: pageEnter .28s cubic-bezier(.4,0,.2,1) both; }
+.page-exit { animation: pageExit .22s ease both; }
+
+.sub-page-enter-from-right { animation: subEnterRight .24s cubic-bezier(.4,0,.2,1) both; }
+.sub-page-enter-from-left { animation: subEnterLeft .24s cubic-bezier(.4,0,.2,1) both; }
+.sub-page-exit-to-left { animation: subExitLeft .2s ease both; }
+.sub-page-exit-to-right { animation: subExitRight .2s ease both; }
+
+.view-enter { animation: slideInFromRight 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.view-exit { animation: slideOutToLeft 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+
+.card-is-entering { animation: card-enter-animation 0.4s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.fab.fab-pop-in { animation: fab-pop-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+.item-entering { animation: item-entering 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.item-exiting { animation: item-slide-out 0.4s ease-out forwards; }
+.item-updated-flash { animation: item-updated-flash 0.8s ease-out; }
+
+.content-fade-out { opacity: 0 !important; transition: opacity 0.15s ease-out; }
+.content-fade-in { opacity: 1 !important; transition: opacity 0.25s ease-in; }

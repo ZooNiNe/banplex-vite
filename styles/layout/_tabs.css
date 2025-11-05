@@ -1,0 +1,185 @@
+/* =======================================================
+ * LAYOUT: TABS
+ * Mengatur semua gaya untuk navigasi berbasis tab.
+ * ======================================================= */
+
+/* --- Tab Containers & Groups --- */
+.tab-group,
+.sub-nav,
+.category-sub-nav {
+  display: flex;
+  margin: 0 var(--spacing) 1rem var(--spacing);
+  gap: 4px;
+}
+
+.tab-group {
+  background-color: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.tab-group::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  background-image: var(--grad);
+  opacity: .10;
+}
+.dark-theme .tab-group {
+  background-color: var(--panel);
+}
+
+.tab-group .sub-nav {
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+
+/* --- Tab Layouts (Grid vs. Scroll) --- */
+.sub-nav.two-tabs { grid-template-columns: 1fr 1fr; }
+.sub-nav.three-tabs { grid-template-columns: 1fr 1fr 1fr; }
+
+.sub-nav.two-tabs,
+.sub-nav.three-tabs {
+  display: grid;
+  padding: 0;
+  overflow: hidden;
+}
+
+.sub-nav:not(.two-tabs):not(.three-tabs),
+.category-sub-nav {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.sub-nav:not(.two-tabs):not(.three-tabs)::-webkit-scrollbar,
+.category-sub-nav::-webkit-scrollbar {
+  display: none;
+}
+
+
+/* --- Base Tab Item Style --- */
+.sub-nav-item {
+  flex-shrink: 0;
+  border: none;
+  background-color: transparent;
+  padding: 0.6rem 0.5rem;
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.25s ease, transform 0.15s ease;
+  text-align: center;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+.sub-nav-item:active { transform: scale(0.97); }
+
+
+/* --- Underline Style Variant (Reusable) --- */
+.tabs-underline {
+    display: grid;
+    background-color: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    margin: 0 !important;
+    border-bottom: 1px solid var(--line) !important;
+    position: relative;
+}
+
+.tabs-underline .sub-nav-item {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    color: var(--text-dim) !important;
+    font-weight: 500 !important;
+    font-size: 0.9rem !important;
+    padding: 0.85rem 0.5rem !important;
+    border-radius: 0 !important;
+    position: relative;
+}
+
+.tabs-underline .sub-nav-item.active {
+    color: var(--primary) !important;
+    font-weight: 600 !important;
+}
+
+.active-tab-indicator {
+    position: absolute;
+    bottom: -1px;
+    height: 3px;
+    background-color: var(--primary);
+    border-radius: 3px;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- Capsule Style Variant (for Filters) --- */
+.category-sub-nav {
+  margin-top: 0.2rem !important; /* tighter spacing under main tabs */
+  margin-bottom: 0 !important; /* no extra gap below */
+  border: none !important;
+  padding: 0 !important;
+  background-color: transparent !important;
+}
+
+/* When used inside content panel body, keep it close to previous block */
+.content-panel .category-sub-nav {
+  margin-top: 0.2rem !important;
+}
+
+/* Panel header manages horizontal padding; remove inner margins */
+.panel-header > .sub-nav,
+.panel-header > .category-sub-nav {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.category-sub-nav .sub-nav-item {
+  background-color: var(--surface-muted);
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  margin-right: 0.5rem;
+  font-size: 0.8rem;
+  box-shadow: none;
+}
+
+.category-sub-nav .sub-nav-item.active {
+  background-color: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  font-weight: 600;
+}
+.category-sub-nav .sub-nav-item.active::after {
+    display: none;
+}
+
+.tab-count {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background-color: var(--line);
+  color: var(--text-dim);
+  margin-left: 0.4rem;
+}
+
+.sub-nav-item.active .tab-count {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}

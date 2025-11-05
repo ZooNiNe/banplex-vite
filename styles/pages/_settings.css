@@ -1,0 +1,221 @@
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Background gradient layer for Settings page (all modes) */
+.settings-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--app-bg-gradient);
+  background-size: 200% 200%;
+  animation: gradient-animation 15s ease infinite;
+}
+
+/* Make toolbar transparent in Settings (light and dark) */
+.settings-panel .toolbar.sticky-toolbar {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Transparent panel-header background for Settings in all modes */
+#page-container > div.content-panel.settings-panel > div.panel-header {
+  background: transparent !important;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.settings-section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  padding: 0 0.5rem;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-list-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: var(--panel);
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+  text-align: left;
+  width: 100%;
+}
+
+.settings-list-item:hover {
+  background-color: var(--surface-muted);
+  transform: scale(1.01);
+}
+
+.settings-list-item .icon-wrapper {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+
+.settings-list-item .icon-wrapper .material-symbols-outlined {
+  font-size: 22px;
+}
+
+.settings-list-item .label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  flex-grow: 1;
+}
+
+.settings-list-item .material-symbols-outlined:last-child {
+  color: var(--text-dim);
+}
+
+.profile-card-settings {
+  background-color: var(--panel);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+}
+
+.profile-avatar {
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  margin-bottom: 0rem;
+  object-fit: cover;
+}
+
+.profile-card-settings .profile-name {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.profile-card-settings .profile-email {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin: 0.25rem 0 0 0;
+}
+
+.profile-role-badge {
+  margin-top: 0.5rem;
+  background-image: var(--secondary-grad);
+  color: #fff;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.profile-actions {
+  margin-top: 1rem;
+}
+
+.theme-toggle-btn {
+position: absolute;
+top: .5rem;
+right: .5rem;
+width: 36px;
+height: 36px;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+border-radius: 10px;
+border: 1px solid var(--line);
+background: var(--surface-muted);
+color: var(--text-dim);
+cursor: pointer;
+}
+
+.theme-toggle-btn:hover {
+background: color-mix(in srgb, var(--surface-muted) 60%, transparent);
+color: var(--text);
+}
+
+/* PERBAIKAN #4: Gaya untuk grid master data */
+.master-data-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.master-data-grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 1.25rem 1rem;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.master-data-grid-item:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary);
+}
+
+.master-data-grid-item .icon-wrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: var(--surface-muted);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.master-data-grid-item .icon-wrapper .material-symbols-outlined {
+  font-size: 28px;
+}
+
+.master-data-grid-item .label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+#master-data-content{
+  margin-top: 1rem;
+}
+
+#detail-pane > div.mobile-detail-content > div > div > h5{
+  display: block;
+  margin-left: 1rem;
+}
+
+#detail-pane > div.mobile-detail-content > div > div > div > div{
+}
