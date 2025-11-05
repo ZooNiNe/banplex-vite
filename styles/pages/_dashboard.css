@@ -440,6 +440,7 @@ body.dashboard-layout-cards .dashboard-grid-layout {
 }
 
 .dashboard-card {
+  position: relative;
   background-color: var(--panel);
   border-radius: var(--radius);
   border: 1px solid var(--line);

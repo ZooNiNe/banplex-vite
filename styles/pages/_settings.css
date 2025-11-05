@@ -208,10 +208,6 @@ color: var(--text);
   color: var(--text);
 }
 
-#master-data-content{
-  margin-top: 1rem;
-}
-
 #detail-pane > div.mobile-detail-content > div > div > h5{
   display: block;
   margin-left: 1rem;

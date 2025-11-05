@@ -21,7 +21,7 @@
     flex-shrink: 0;
     z-index: 10;
     background-color: var(--panel);
-    padding: 0 1.5rem 0.5rem;
+    padding: 0 1rem 0.5rem;
     position: sticky;
     top: 0;
 }
@@ -29,9 +29,7 @@
 .panel-body {
     flex-grow: 1;
     overflow-y: auto;
-    padding: 1.25rem 1.5rem 1.5rem; /* Reduce top padding slightly */
-    /* REVISI: Menambahkan padding-bottom untuk memberi ruang dari bottom-nav di mobile */
-    /* Padding-bottom dipindahkan ke panel-footer jika ada, atau diatur per halaman */
+    padding: 1.25rem 1rem 1.5rem; /* Reduce top padding slightly */
     padding-bottom: 1.5rem; 
 }
 
@@ -154,9 +152,4 @@ body:not(.page-dashboard):not(.page-pengaturan) .panel-body {
       display: none;
   } 
   */
-}
-
-/* When panel-body follows a panel-header, tighten the top gap further */
-.content-panel .panel-header + .panel-body {
-  padding-top: 0.75rem;
 }

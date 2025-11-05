@@ -1,6 +1,5 @@
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
 import { auth } from "./config/firebase.js";
-// MODIFIKASI: Impor localDB dan setupLocalDatabase di sini
 import { setupLocalDatabase, localDB } from "./services/localDbService.js";
 import { initializeAppSession } from "./services/authService.js";
 import { _initQuotaResetScheduler, updateSyncIndicator, syncToServer } from "./services/syncService.js";
@@ -10,29 +9,24 @@ import { initServiceUIBridge } from "./ui/bridges/serviceUIBridge.js";
 import { initResizeHandle } from "./ui/components/resizeHandle.js";
 import { on, emit } from "./state/eventBus.js";
 import { appState } from "./state/appState.js";
-// MODIFIKASI: Impor renderErrorPage
 import { renderErrorPage } from "./ui/errorScreens.js";
+import { subscribeToPushNotifications } from "./services/notificationService.js";
 
-// MODIFIKASI: Tambahkan timer fallback di level modul
+
 let globalFallbackTimer = null;
 
-// Fungsi untuk memastikan elemen loader ada (diperbarui)
 function ensureGlobalLoader() {
     let loader = document.getElementById('global-loader');
     if (loader) {
-        // Jika sudah ada, pastikan terlihat jika app belum siap
-        if (!appState.isReady) { // Anda mungkin perlu menambahkan appState.isReady
+        if (!appState.isReady) {
             loader.style.display = 'flex';
             loader.style.opacity = '1';
         }
         return loader;
     }
-
     loader = document.createElement('div');
     loader.id = 'global-loader';
-    loader.className = 'global-loader'; // Gunakan kelas untuk styling
-
-    // Konten loader (SVG animasi + pesan)
+    loader.className = 'global-loader';
     loader.innerHTML = `
         <div class="loader-content">
             <div class="loader-logo">
@@ -57,15 +51,12 @@ function ensureGlobalLoader() {
         </div>
     `;
     document.body.appendChild(loader);
-
-    // Apply dark theme styles if necessary
     if (document.documentElement.classList.contains('dark-theme')) {
         loader.style.backgroundColor = 'var(--bg-end, #0f172a)';
     }
     return loader;
 }
 
-// Fungsi untuk update pesan loading (diperbarui)
 function updateLoadingMessage(message) {
     const msgElement = document.getElementById('loading-message');
     if (msgElement) {
@@ -73,32 +64,28 @@ function updateLoadingMessage(message) {
         setTimeout(() => {
             msgElement.textContent = message;
             msgElement.classList.add('show');
-        }, 150); // Delay kecil untuk efek transisi
+        }, 150);
     }
 }
 
-// Fungsi untuk menyembunyikan loader global (diperbarui)
 function hideGlobalLoader() {
-    // MODIFIKASI: Hapus timer fallback jika loader disembunyikan
     if (globalFallbackTimer) {
         clearTimeout(globalFallbackTimer);
         globalFallbackTimer = null;
     }
-    
     const loader = document.getElementById('global-loader');
     if (loader && !loader.classList.contains('hidden')) {
-        loader.classList.add('hidden'); // Tambah kelas .hidden
+        loader.classList.add('hidden');
         loader.addEventListener('transitionend', () => {
             if (loader.classList.contains('hidden')) {
-                loader.style.display = 'none'; // Sembunyikan setelah transisi
+                loader.style.display = 'none';
             }
         }, { once: true });
-        // Fallback jika transisi tidak berjalan
         setTimeout(() => {
             if (loader.style.display !== 'none' && loader.classList.contains('hidden')) {
                 loader.style.display = 'none';
             }
-        }, 600); // Sedikit lebih lama dari durasi transisi
+        }, 600);
     }
 }
 
@@ -119,7 +106,6 @@ function showUpdateNotification(reg) {
     notificationElement.id = 'update-notification';
     notificationElement.innerHTML = notificationHTML;
     document.body.appendChild(notificationElement);
-
     const restartBtn = document.getElementById('restart-app-btn');
     if (restartBtn && reg && reg.waiting) {
         restartBtn.addEventListener('click', () => {
@@ -133,22 +119,30 @@ function showUpdateNotification(reg) {
     }, 100);
 }
 
-// Fungsi main aplikasi (DIMODIFIKASI)
 async function main() {
-  const loader = ensureGlobalLoader(); // Pastikan loader ada
-  updateLoadingMessage('Menyiapkan database lokal...'); // Update pesan
+  const loader = ensureGlobalLoader();
+  updateLoadingMessage('Menyiapkan database lokal...');
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.register('/sw-workbox.js');
+      console.log('Service Worker berhasil terdaftar:', reg);
 
-  // MODIFIKASI: Tambahkan timer fallback
+      if (reg && reg.waiting) {
+        showUpdateNotification(reg);
+      }
+    } catch (e) {
+        console.error('Registrasi Service Worker gagal:', e);
+    }
+  }
+
   if (globalFallbackTimer) clearTimeout(globalFallbackTimer);
   globalFallbackTimer = setTimeout(() => {
       updateLoadingMessage("Memuat data... (Ini mungkin butuh waktu lebih lama.)");
-  }, 4000); // 4 detik fallback
+  }, 4000);
 
   try {
-    // 1. Setup DB
     await setupLocalDatabase();
   } catch (dbError) {
-      // 2. Handle *critical* DB failure (e.g., private browsing, corrupted)
       console.error("KRITIS: Gagal total setup database lokal.", dbError);
       hideGlobalLoader();
       renderErrorPage({
@@ -158,10 +152,9 @@ async function main() {
           illustrationKey: "database-error",
           showRetryButton: true
       });
-      return; // Hentikan eksekusi
+      return;
   }
 
-  // 3. Check for "Offline + No Cache"
   if (!navigator.onLine) {
       const projectCount = await localDB.projects.count();
       if (projectCount === 0) {
@@ -173,25 +166,37 @@ async function main() {
               illustrationKey: "offline",
               showRetryButton: true
           });
-          return; // Stop
+          return;
       }
-      // Jika kita sampai di sini, artinya kita offline TAPI punya data lokal, jadi lanjutkan.
   }
 
+  updateLoadingMessage('Menghubungkan...');
 
-  updateLoadingMessage('Menghubungkan...'); // Update pesan
-
-  // Inisialisasi komponen lain
   initRouter();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'SHOW_IN_APP_NOTIFICATION') {
+        console.log('Menerima notifikasi in-app dari Service Worker:', event.data.payload);
+        
+        const payload = event.data.payload;
+        emit('ui.toast', {
+          args: [
+            'info', // tipe toast
+            payload.body || 'Anda memiliki pembaruan baru.', // pesan
+            5000 // durasi
+          ]
+        });
+      }
+    });
+  }
+
   initServiceUIBridge();
   _initToastSwipeHandler();
   initResizeHandle();
 
-  // Defer event listeners & search init until app is ready
   on('app.ready', async () => {
     const appShell = document.getElementById('app-shell');
-    if (appShell) appShell.style.display = 'flex'; // Tampilkan shell utama
-    // Impor dan inisialisasi listener & search
+    if (appShell) appShell.style.display = 'flex';
     try {
       const { initializeEventListeners } = await import('./ui/eventListeners/index.js');
       const { initGlobalSearch } = await import('./ui/pages/search.js');
@@ -202,35 +207,43 @@ async function main() {
     }
   });
 
-  // Listener status autentikasi
   onAuthStateChanged(auth, async (user) => {
     console.log('[App Log] onAuthStateChanged triggered. User:', user ? user.uid : 'null');
     if (user) {
       console.log(`[App Log] User ditemukan. Memanggil initializeAppSession. ActivePage saat ini: ${appState.activePage}`);
-      updateLoadingMessage('Memuat sesi pengguna...'); // Update pesan
-      await initializeAppSession(user); // Tunggu sesi selesai
-      hideGlobalLoader(); // Sembunyikan loader SETELAH sesi siap
+      updateLoadingMessage('Memuat sesi pengguna...');
+      await initializeAppSession(user);
+      
+      // --- TAMBAHAN: LANGKAH 2 (Panggil Subskripsi) ---
+      // Panggil ini SETELAH sesi siap dan user ada
+      try {
+        console.log("Mencoba mendaftarkan untuk Push Notifications...");
+        await subscribeToPushNotifications();
+      } catch (pushError) {
+        console.error("Gagal mendaftar push notifications:", pushError);
+      }
+      // --- AKHIR TAMBAHAN ---
+
+      hideGlobalLoader();
     } else {
       console.log("[App Log] Tidak ada user. Merender UI guest.");
       try {
         const { renderUI } = await import('./ui/mainUI.js');
-        renderUI(); // Render UI untuk guest
+        renderUI();
       } catch (e) {
           console.error("Gagal merender UI guest:", e);
       }
-      hideGlobalLoader(); // Sembunyikan loader untuk guest juga
-      emit('app.ready'); // Emit ready agar event listener bisa diinisialisasi untuk guest
+      hideGlobalLoader();
+      emit('app.ready');
     }
   });
 
-  // Inisialisasi scheduler & listener online/offline
   _initQuotaResetScheduler();
   try {
     window.addEventListener('online', () => { try { appState.isOnline = true; updateSyncIndicator(); syncToServer({ silent: true }); } catch(_){} });
     window.addEventListener('offline', () => { try { appState.isOnline = false; updateSyncIndicator(); } catch(_){} });
   } catch(_){}
 
-  // Cek Service Worker untuk update
   if ('serviceWorker' in navigator) {
     try {
       const reg = await navigator.serviceWorker.getRegistration();
@@ -246,7 +259,4 @@ async function main() {
   }
 }
 
-// Jalankan aplikasi
 main();
-
-

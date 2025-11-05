@@ -4,6 +4,7 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   position: relative;
+  margin-top: 1rem;
 }
 
 .card::after {
@@ -138,8 +139,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  padding: 0.85rem 1.5rem;
+  gap: .5rem;
+  padding: 0.85rem;
+  padding-right: .25rem;
   cursor: default;
   position: relative;
   z-index: 2;
@@ -370,7 +372,6 @@ body.selection-active .wa-card-v2 {
     }
 }
 
-
 body.selection-active .wa-card-v2__main {
     max-width: calc(100% - 36px);
 }
@@ -431,6 +432,7 @@ body.selection-active .meta-badge span {
 .card.card-pad.notes-card > h5 > span{
   font-size: .9rem;
 }
+
 .notes-title {
   margin-top: 0;
   display: flex;

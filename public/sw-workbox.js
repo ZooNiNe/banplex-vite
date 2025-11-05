@@ -3,25 +3,22 @@ importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox
 if (workbox) {
   console.log(`Workbox berhasil dimuat.`);
   
-  workbox.core.setCacheNameDetails({ prefix: 'banplex' });
+  workbox.core.setCacheNameDetails({ prefix: 'banplex'});
   workbox.core.clientsClaim();
   self.skipWaiting();
-  // perf: enable navigation preload to speed up first paint on slow 3G
   try { workbox.navigationPreload.enable(); } catch(_) {}
-
-  // Perbaikan di sini: Gunakan path relatif
-  // precache app shell & key assets (keep list small to minimize install time)
   workbox.precaching.precacheAndRoute([
     { url: './', revision: null },
     { url: 'index.html', revision: null },
-    { url: 'style.css', revision: null },
-    { url: 'desktop-styles.css', revision: null },
+    { url: 'style/main.css', revision: null },
     { url: 'public/manifest.json', revision: null },
     { url: 'public/icons-logo.png', revision: null },
     { url: 'public/logo-cv-aba.png', revision: null },
     { url: 'public/icons-logo.webp', revision: null }, // optional modern format
     { url: 'public/logo-cv-aba.webp', revision: null }, // optional modern format
-    { url: 'root_files/app.js', revision: null },
+    { url: 'public/logo-header-pdf.png', revision: null },
+    { url: 'public/logo-footer-pdf.png', revision: null },
+    { url: 'js/app.js', revision: null },
   ]);
 
   workbox.routing.registerRoute(
@@ -35,28 +32,22 @@ if (workbox) {
     ({ request }) => request.destination === 'style' || request.destination === 'worker',
     new workbox.strategies.StaleWhileRevalidate({ cacheName: 'banplex-static-assets' })
   );
-  // scripts benefit from SWR too, fallback to preload/network
   workbox.routing.registerRoute(
     ({ request }) => request.destination === 'script',
     new workbox.strategies.StaleWhileRevalidate({ cacheName: 'banplex-scripts' })
   );
 
-  // ... sisa kode tetap sama ...
   try {
     const bgSyncPlugin = new workbox.backgroundSync.BackgroundSyncPlugin('banplex-api-queue', {
-      maxRetentionTime: 24 * 60 // Retry for up to 24 hours
+      maxRetentionTime: 24 * 60
     });
-
     const isApi = ({url}) => url.pathname.startsWith('/api/');
-
     workbox.routing.registerRoute(isApi, new workbox.strategies.NetworkOnly({ plugins: [bgSyncPlugin] }), 'POST');
     workbox.routing.registerRoute(isApi, new workbox.strategies.NetworkOnly({ plugins: [bgSyncPlugin] }), 'PUT');
     workbox.routing.registerRoute(isApi, new workbox.strategies.NetworkOnly({ plugins: [bgSyncPlugin] }), 'PATCH');
     workbox.routing.registerRoute(isApi, new workbox.strategies.NetworkOnly({ plugins: [bgSyncPlugin] }), 'DELETE');
-    // GETs to /api should also bypass cache completely
     workbox.routing.registerRoute(isApi, new workbox.strategies.NetworkOnly(), 'GET');
   } catch (e) {
-    // BackgroundSync may be unavailable in some environments; fall back to NetworkOnly
     const isApi = ({url}) => url.pathname.startsWith('/api/');
     workbox.routing.registerRoute(isApi, new workbox.strategies.NetworkOnly());
   }
@@ -92,3 +83,75 @@ if (workbox) {
 } else {
   console.log(`Workbox gagal dimuat.`);
 }
+
+
+self.addEventListener('push', (event) => {
+  console.log('[Service Worker] Push Received.');
+  let data = {};
+  try {
+    data = event.data.json();
+  } catch (e) {
+    console.error('[Service Worker] Push data error:', e);
+    data = { title: 'Notifikasi Baru', body: 'Anda memiliki pembaruan.' };
+  }
+
+  const title = data.title || 'BanPlex Notifikasi';
+  const options = {
+    body: data.body || 'Ada sesuatu yang baru.',
+    icon: data.icon || '/public/icons-logo.png', 
+    badge: '/public/icons-logo.png',
+    vibrate: [200, 100, 200],
+    data: {
+      url: data.data?.url || '/index.html?page=dashboard'
+    },
+    actions: data.actions || []
+  };
+
+  event.waitUntil(
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    }).then((clientList) => {
+      
+      for (let i = 0; i < clientList.length; i++) {
+        const client = clientList[i];
+        if (client.url.includes('index.html') && client.focused) {
+          
+          console.log('[Service Worker] App is focused, sending message to UI.');
+          client.postMessage({
+            type: 'SHOW_IN_APP_NOTIFICATION',
+            payload: data // Kirim data notifikasi ke UI
+          });
+          return; // Berhenti di sini
+        }
+      }
+
+      console.log('[Service Worker] App not focused, showing OS notification.');
+      return self.registration.showNotification(title, options);
+    })
+  );
+});
+
+
+self.addEventListener('notificationclick', (event) => {
+  console.log('[Service Worker] Notification click Received.');
+  event.notification.close();
+
+  const urlToOpen = event.notification.data?.url || '/index.html?page=dashboard';
+
+  event.waitUntil(
+    clients.matchAll({
+      type: 'window'
+    }).then((clientList) => {
+      for (let i = 0; i < clientList.length; i++) {
+        const client = clientList[i];
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
+});

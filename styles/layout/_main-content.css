@@ -38,7 +38,6 @@ body.is-resizing {
   overflow-y: auto;
   position: relative;
   -webkit-overflow-scrolling: touch;
-  padding: var(--spacing);
   padding-bottom: calc(65px + 1rem + env(safe-area-inset-bottom, 0px));
   -ms-overflow-style: none;
   scrollbar-width: none;

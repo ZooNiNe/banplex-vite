@@ -265,8 +265,6 @@ body.selection-active .quote-hero {
     }
 }
 
-/* ... (file _toolbar.css bagian atas) ... */
-
 @media (max-width: 599px) {
     .mobile-sidebar-toggle {
       display: inline-flex;

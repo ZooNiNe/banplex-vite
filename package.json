@@ -27,6 +27,8 @@
     "@capacitor/core": "7.4.4",
     "@capacitor/haptics": "7.0.2",
     "@capacitor/keyboard": "7.0.3",
-    "@capacitor/status-bar": "7.0.3"
+    "@capacitor/status-bar": "7.0.3",
+    "ioredis": "^5.8.2",
+    "web-push": "^3.6.7"
   }
 }
