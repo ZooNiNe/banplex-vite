@@ -140,12 +140,10 @@ export async function handleOpenStockUsageModal(context) {
     `;
 
     const footer = `
-        <div class="form-footer-actions" style="grid-template-columns: 1fr 1fr;">
             <button type="button" class="btn btn-ghost" data-action="history-back">Batal</button>
             <button type="button" id="save-stock-usage-btn" class="btn btn-primary" disabled>
-                ${createIcon('save')} Simpan Penyaluran
+                ${createIcon('save')} Simpan
             </button>
-        </div>
     `;
 
     const isMobile = window.matchMedia('(max-width: 599px)').matches;

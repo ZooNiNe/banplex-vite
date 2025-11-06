@@ -50,10 +50,8 @@ export function openAdjustStockModal(materialId, mode = 'in') {
         </div>
         ${material?.unit ? `<div class="hint">Satuan: ${material.unit}</div>` : ''}
       </div>
-      <div class="form-footer-actions">
         <button type="button" class="btn" data-action="cancel">Batal</button>
         <button type="button" class="btn btn-primary" data-action="save">Simpan</button>
-      </div>
     </form>`;
 
   const modal = createModal('dataForm', { title, content });

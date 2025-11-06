@@ -39,9 +39,7 @@ export default defineConfig({
 
       includeAssets: [
           '/icons-logo.png', 
-          '/logo-cv-aba.png', 
           '/icons-logo.webp', 
-          '/logo-cv-aba.webp', 
           '/logo-header-pdf.png', 
           '/logo-footer-pdf.png'
         ]

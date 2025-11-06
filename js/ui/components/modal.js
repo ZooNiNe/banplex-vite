@@ -46,6 +46,7 @@ function confirmClose(element, proceedAction) {
         return;
     }
 
+    // Jangan tampilkan konfirmasi untuk dialog konfirmasi itu sendiri
     if (element.id.startsWith('confirm')) {
         proceedAction();
         return;
@@ -56,6 +57,7 @@ function confirmClose(element, proceedAction) {
         emit('ui.modal.create', 'confirmUserAction', {
             title: 'Batalkan Aksi?',
             message: 'Perubahan yang belum disimpan akan hilang. Anda yakin ingin keluar?',
+            isUtility: true, // Pastikan dialog konfirmasi adalah utility
             onConfirm: () => {
                 resetFormDirty();
                 proceedAction();
@@ -102,6 +104,7 @@ export function closeModalImmediate(modalEl) {
         resetFormDirty();
     };
 
+    // Fallback jika transisi tidak terdeteksi (mis. elemen sudah tersembunyi)
     const fallbackTimeout = setTimeout(handleTransitionEnd, 350);
 
     modalEl.addEventListener('transitionend', () => {
@@ -109,6 +112,7 @@ export function closeModalImmediate(modalEl) {
         handleTransitionEnd();
     }, { once: true });
 
+    // Jika elemen sudah tidak terlihat, langsung hapus
     if (getComputedStyle(modalEl).opacity === '0') {
          clearTimeout(fallbackTimeout);
          handleTransitionEnd();
@@ -141,6 +145,7 @@ export function createModal(type, data = {}) {
     modalEl.className = `modal-bg ${layoutClass}`;
     modalEl.innerHTML = contentHTML;
 
+    // Tandai modal sebagai 'utility' jika flag-nya ada
     if (data.isUtility) {
          modalEl.dataset.utilityModal = 'true';
     }
@@ -151,13 +156,19 @@ export function createModal(type, data = {}) {
 
     try {
         const routerReady = typeof window !== 'undefined' && window.__banplex_history_init === true;
-        if (routerReady) {
+        
+        // *** PERUBAHAN DI SINI ***
+        // Hanya push history jika BUKAN utility modal
+        if (routerReady && !data.isUtility) {
             const currentState = history.state || { page: appState.activePage };
             const isOverlayOnOverlay = currentState.modal || currentState.detailView;
             const isSuccess = data.isSuccessPanel === true;
+            // Ganti state jika sudah ada overlay, push jika belum
             const historyAction = isOverlayOnOverlay || isSuccess ? 'replaceState' : 'pushState';
             history[historyAction]({ ...currentState, modal: true, modalType: type, isSuccessPanel: isSuccess }, '');
         }
+        // *** AKHIR PERUBAHAN ***
+
     } catch (_) {
         console.warn("History state update failed for modal.");
     }
@@ -167,12 +178,15 @@ export function createModal(type, data = {}) {
         modalEl.classList.add('show');
     }, 10);
 
+    // Menutup modal jika mengklik background (hanya untuk non-utility)
     modalEl.addEventListener('click', (e) => {
         if (e.target === modalEl) {
             closeModal(modalEl);
         }
     }, { signal });
 
+    // Pasang listener untuk tombol "Batal" / "Ya, Lanjutkan"
+    // Gunakan history.back() sebagai aksi tutup default untuk modal non-utility
     attachModalEventListeners(type, data, () => history.back(), modalEl, signal);
 
     const formInsideModal = modalEl.querySelector('form');
@@ -193,10 +207,22 @@ export function createModal(type, data = {}) {
 export function closeModal(modalEl) {
     if (!modalEl) return;
     const modalId = modalEl.id || 'unknown';
+    
     confirmClose(modalEl, () => {
-        closeModalImmediate(modalEl);
+        if (modalEl.dataset.utilityModal === 'true') {
+            closeModalImmediate(modalEl);
+        } else {
+            modalEl.classList.remove('show');
+            
+            if (history.state?.modal) {
+                history.back();
+            } else {
+                closeModalImmediate(modalEl);
+            }
+        }
     });
 }
+
 
 export function showDetailPane({ title, subtitle, content, footer, headerActions, fabHTML, isMasterDataGrid = false, paneType = '', isSuccessPanel = false }, isGoingBack = false) {
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
@@ -209,11 +235,13 @@ export function showDetailPane({ title, subtitle, content, footer, headerActions
     const detailPane = document.getElementById('detail-pane');
     if (!detailPane) return null;
 
+    // Abort controller sebelumnya jika ada
     if (detailPane.__controller) {
         console.log('[Detail Pane Cleanup] Aborting previous controller for desktop pane.');
         detailPane.__controller.abort();
         delete detailPane.__controller;
     }
+    // Buat controller baru untuk panel ini
     const controller = new AbortController();
     detailPane.__controller = controller;
     const { signal } = controller;
@@ -232,6 +260,7 @@ export function showDetailPane({ title, subtitle, content, footer, headerActions
             console.warn("History state update failed for desktop detail pane.");
         }
 
+        // Simpan state UI sebelumnya jika ini adalah navigasi panel bertingkat
         if (document.body.classList.contains('detail-pane-open') && !isMasterDataGrid && !isSuccessPanel) {
             const fabEl = detailPane.querySelector('.fab');
             const previousState = {
@@ -276,6 +305,7 @@ export function showDetailPane({ title, subtitle, content, footer, headerActions
         }
     } catch(_) {}
 
+    // Jika tombol submit ada di dalam body, hapus footer (karena double)
     try {
         const bodyHasSubmit = !!detailPane.querySelector('.detail-pane-body form button[type="submit"], .detail-pane-body form .btn[type="submit"]');
         if (bodyHasSubmit) {
@@ -291,12 +321,12 @@ export function showDetailPane({ title, subtitle, content, footer, headerActions
     document.body.classList.add('detail-pane-open');
     checkAndRestoreBottomNav();
 
+    // Setup form dirty checking
     const formInsidePane = detailPane.querySelector('form');
     if (formInsidePane) {
          if (!isGoingBack) resetFormDirty();
          const dirtyListener = () => markFormDirty(true);
-         const controller = new AbortController();
-         detailPane.__formController = controller;
+         // Gunakan controller panel untuk listener ini
          formInsidePane.addEventListener('input', dirtyListener, { signal });
          formInsidePane.addEventListener('change', dirtyListener, { signal, capture: true });
     } else {
@@ -310,6 +340,7 @@ export function closeDetailPaneImmediate() {
     const detailPane = document.getElementById('detail-pane');
     if (!detailPane) return;
 
+    // Abort controller terkait panel ini
     try {
         if (detailPane.__controller) {
             console.log('[Detail Pane Cleanup] Aborting controller for desktop pane (immediate).');
@@ -326,15 +357,22 @@ export function closeDetailPaneImmediate() {
     delete detailPane.dataset.paneType;
     delete detailPane.dataset.isSuccessPanel;
     resetFormDirty();
-    detailPane.innerHTML = '';
+    detailPane.innerHTML = ''; // Hapus konten
     checkAndRestoreBottomNav();
 }
 
 export function closeDetailPane() {
     const detailPane = document.getElementById('detail-pane');
     if (!detailPane) return;
+    
     confirmClose(detailPane, () => {
-        closeDetailPaneImmediate();
+        document.body.classList.remove('detail-pane-open');
+        
+        if (history.state?.detailView) {
+            history.back();
+        } else {
+            closeDetailPaneImmediate();
+        }
     });
 }
 
@@ -342,11 +380,13 @@ export function showMobileDetailPage({ title, subtitle, content, footer, headerA
     const detailPane = $('.detail-pane');
     if (!detailPane) return null;
 
+    // Abort controller sebelumnya jika ada
     if (detailPane.__controller) {
         console.log('[Detail Pane Cleanup] Aborting previous controller for mobile pane.');
         detailPane.__controller.abort();
         delete detailPane.__controller;
     }
+    // Buat controller baru untuk panel ini
     const controller = new AbortController();
     detailPane.__controller = controller;
     const { signal } = controller;
@@ -365,6 +405,7 @@ export function showMobileDetailPage({ title, subtitle, content, footer, headerA
             console.warn("History state update failed for mobile detail view.");
         }
 
+        // Simpan state UI sebelumnya jika ini adalah navigasi panel bertingkat
         if (document.body.classList.contains('detail-view-active') && !isMasterDataGrid && !isSuccessPanel) {
             const currentFabHTML = detailPane.querySelector('.fab')?.outerHTML || '';
             const previousState = {
@@ -385,6 +426,7 @@ export function showMobileDetailPage({ title, subtitle, content, footer, headerA
     let titleHTML = `<strong>${title}</strong>`;
     let iconHTML = ''; // Variabel baru untuk ikon
 
+    // Cek jika judul adalah HTML (untuk Chat)
     if (paneType === 'comments') {
         const titleText = title.replace(/<span.*?>.*?<\/span>/, '').trim();
         const iconMatch = title.match(/(<span class="avatar-badge is-icon">.*?<\/span>)/);
@@ -408,10 +450,14 @@ export function showMobileDetailPage({ title, subtitle, content, footer, headerA
         ? `<button class="btn-icon" data-action="detail-pane-back" title="Kembali">${createIcon('arrow-left')}</button>`
         : `<button class="btn-icon" data-action="close-detail-pane" title="Tutup">${createIcon('x')}</button>`;
 
+    // Konten header baru
     const headerHTML = `
     <div class="mobile-detail-header">
         ${backOrCloseButtonHTML}
-        ${iconHTML}<div class="breadcrumb-nav">            ${titleHTML}</div>
+        ${iconHTML}
+        <div class="breadcrumb-nav">
+            ${titleHTML}
+        </div>
         <div class="header-actions">${headerActions || ''}</div>
     </div>`;
     
@@ -429,15 +475,16 @@ export function showMobileDetailPage({ title, subtitle, content, footer, headerA
     document.body.classList.add('detail-view-active');
     checkAndRestoreBottomNav();
 
+    // Inisialisasi form di dalam panel
     initCustomSelects(detailPane);
     detailPane.querySelectorAll('input[inputmode="numeric"]').forEach(i => i.addEventListener('input', formatNumberInput));
 
+     // Setup form dirty checking
      const formInsidePane = detailPane.querySelector('form');
      if (formInsidePane) {
          if (!isGoingBack) resetFormDirty();
          const dirtyListener = () => markFormDirty(true);
-         const controller = new AbortController();
-         detailPane.__formController = controller;
+         // Gunakan controller panel untuk listener ini
          formInsidePane.addEventListener('input', dirtyListener, { signal });
          formInsidePane.addEventListener('change', dirtyListener, { signal, capture: true });
      } else {
@@ -448,32 +495,19 @@ export function showMobileDetailPage({ title, subtitle, content, footer, headerA
 }
 
 
+
 export function hideMobileDetailPage() {
     const detailPane = $('.detail-pane');
     if (!detailPane) return;
 
     confirmClose(detailPane, () => {
-        try {
-            if (detailPane.__controller) {
-                console.log('[Detail Pane Cleanup] Aborting controller for mobile pane.');
-                detailPane.__controller.abort();
-                delete detailPane.__controller;
-            }
-        } catch (e) {
-            console.warn('[Detail Pane Cleanup] Error aborting controller for mobile pane:', e);
-        }
-
         document.body.classList.remove('detail-view-active');
-        document.body.classList.remove('comments-view-active');
-        appState.detailPaneHistory = [];
-        try { setCommentsScope(null); } catch (_) {}
-        delete detailPane.dataset.isMasterDataGrid;
-        delete detailPane.dataset.paneType;
-        delete detailPane.dataset.isSuccessPanel;
-        resetFormDirty();
-        detailPane.innerHTML = '';
-
-        hideMobileDetailPageImmediate();
+        
+        if (history.state?.detailView) {
+            history.back();
+        } else {
+            hideMobileDetailPageImmediate();
+        }
     });
 }
 
@@ -481,6 +515,7 @@ export function hideMobileDetailPageImmediate() {
     const detailPane = document.querySelector('.detail-pane');
     if (!detailPane) return;
 
+    // Abort controller terkait panel ini
     try {
         if (detailPane.__controller) {
             console.log('[Modal Cleanup] Aborting controller for mobile pane (immediate).');
@@ -499,7 +534,7 @@ export function hideMobileDetailPageImmediate() {
     delete detailPane.dataset.paneType;
     delete detailPane.dataset.isSuccessPanel;
     resetFormDirty();
-    detailPane.innerHTML = '';
+    detailPane.innerHTML = ''; // Hapus konten
     checkAndRestoreBottomNav();
 }
 
@@ -507,14 +542,19 @@ export function closeAllModals() {
     const container = $('#modal-container');
     if (container) {
         const openModals = container.querySelectorAll('.modal-bg');
+        // Panggil immediate close untuk semua modal
         openModals.forEach(modal => closeModalImmediate(modal));
     }
 
+    // Ini sudah memanggil ...Immediate()
     if (document.body.classList.contains('detail-pane-open')) {
         closeDetailPaneImmediate();
     }
     if (document.body.classList.contains('detail-view-active')) {
-        hideMobileDetailPageImmediate();
+        // PERBAIKAN: Fungsi ini memanggil confirmClose, kita harus panggil immediate
+        hideMobileDetailPageImmediate(); 
+        
+        // Ulangi logika cleanup dari hideMobileDetailPageImmediate untuk memastikan
         resetFormDirty();
         const detailPane = document.querySelector('.detail-pane');
         try {
@@ -534,8 +574,12 @@ export function closeAllModals() {
         delete detailPane?.dataset.paneType;
         delete detailPane?.dataset.isSuccessPanel;
         if(detailPane) detailPane.innerHTML = '';
+
+        // Jika kita menutup paksa, kita harus cek history
         if (history.state?.detailView && history.state?.pane === 'mobile') {
-             history.back();
+             // Kita tidak bisa `history.back()` karena itu akan memicu popstate
+             // Kita biarkan router.js menangani ini saat navigasi halaman
+             console.warn("[closeAllModals] Menutup paksa mobile detail view. History state mungkin tertinggal.");
         }
     }
     resetFormDirty();
@@ -548,9 +592,13 @@ export function checkAndRestoreBottomNav() {
         const isDetailPaneOpen = document.body.classList.contains('detail-pane-open');
         const isDetailViewActive = document.body.classList.contains('detail-view-active');
         
+        // Halaman chat juga harus menyembunyikan bottom nav
         const isChatPage = appState.activePage === 'chat';
+        
+        // Overlay = Modal ATAU Panel Desktop ATAU Panel Mobile ATAU Halaman Chat
         const isAnyOverlayOpen = isModalOpen || isDetailPaneOpen || isDetailViewActive || isChatPage;
 
+        // Set body class HANYA untuk modal, bukan untuk panel
         document.body.classList.toggle('modal-open', isModalOpen);
 
         const bottomNav = document.getElementById('bottom-nav');
@@ -577,68 +625,30 @@ export function handleDetailPaneBack() {
     if (!detailPane) return;
 
     const isSuccess = detailPane?.dataset.isSuccessPanel === 'true';
-    const isMasterDataGrid = detailPane?.dataset.isMasterDataGrid === 'true';
-    const hasHistory = appState.detailPaneHistory.length > 0;
-    const isMobile = window.matchMedia('(max-width: 599px)').matches;
 
     const goBack = () => {
         if (isSuccess) {
-            const originalPageType = detailPane.dataset.paneType?.replace('success-', '');
-            let targetNavPage = 'dashboard';
-            if (originalPageType === 'termin' || originalPageType === 'pinjaman') {
-                targetNavPage = 'pemasukan';
-            } else if (['expense', 'operasional', 'material', 'lainnya', 'bill'].includes(originalPageType)) {
-                targetNavPage = 'pengeluaran';
-            }
-
-            emit('ui.navigate', targetNavPage, { push: false });
-
-            if (isMobile) {
-                hideMobileDetailPage();
-            } else {
-                closeDetailPaneImmediate();
-            }
+            history.back();
             return;
         }
 
-        if (hasHistory && !isMasterDataGrid) {
-            const previousState = appState.detailPaneHistory.pop();
-            if (isMobile) {
-                showMobileDetailPage(previousState, true);
-            } else {
-                showDetailPane(previousState, true);
-            }
-             try {
-                const currentState = history.state || {};
-                const { modal, modalType, ...paneState } = currentState;
-                paneState.paneType = previousState.paneType;
-                paneState.isMasterDataGrid = previousState.isMasterDataGrid;
-                paneState.isSuccessPanel = previousState.isSuccessPanel;
-                history.replaceState(paneState, '');
-            } catch (_) {}
-        } else {
-             if (history.state?.detailView) {
-                history.back();
-            } else {
-                if (isMobile) hideMobileDetailPage();
-                else closeDetailPane();
-            }
-        }
+        history.back();
     };
 
-    if (!hasHistory || isSuccess || isMasterDataGrid || !checkFormDirty()) {
+    if (!checkFormDirty()) {
         resetFormDirty();
         goBack();
         return;
     }
 
-    if (hasHistory && checkFormDirty()) {
+    if (checkFormDirty()) {
          emit('ui.modal.create', 'confirmUserAction', {
             title: 'Batalkan Perubahan?',
             message: 'Perubahan yang belum disimpan akan hilang. Anda yakin ingin kembali?',
+            isUtility: true, // Pastikan ini utility modal
             onConfirm: () => {
                 resetFormDirty();
-                goBack();
+                goBack(); // Panggil goBack setelah konfirmasi
                 return true;
             },
             onCancel: () => {}

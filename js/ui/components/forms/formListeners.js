@@ -4,8 +4,8 @@ import { toProperCase } from "../../../utils/helpers.js";
 // PERBAIKAN: Impor 'serializeForm' dari 'formPersistence'
 import { submitFormAsync, fallbackLocalFormHandler, serializeForm } from "../../../utils/formPersistence.js";
 import { handleAddMasterItem, handleUpdateMasterItem } from "../../../services/data/masterDataService.js";
-// PERBAIKAN: Impor 'createModal'
-import { createModal, closeModal, resetFormDirty, markFormDirty, closeDetailPane, closeDetailPaneImmediate, hideMobileDetailPage, hideMobileDetailPageImmediate } from "../modal.js";
+// PERBAIKAN: Impor 'createModal' dan 'closeModalImmediate'
+import { createModal, closeModal, resetFormDirty, markFormDirty, closeDetailPane, closeDetailPaneImmediate, hideMobileDetailPage, hideMobileDetailPageImmediate, closeModalImmediate } from "../modal.js";
 import { handleUpdatePemasukan, handleAddPemasukan } from "../../../services/data/transactions/pemasukanService.js";
 import { handleUpdatePengeluaran, handleAddPengeluaran } from "../../../services/data/transactions/pengeluaranService.js";
 import { handleDeleteAttachment, handleReplaceAttachment } from "../../../services/data/transactions/attachmentService.js";
@@ -40,6 +40,9 @@ export function attachStaffFormListeners(context = document) {
             if (feeAmountGroup) feeAmountGroup.style.display = type === 'fixed_per_termin' ? '' : 'none';
         };
         updateVisibility();
+        // PERHATIAN: 'change' event mungkin tidak reliable untuk custom select.
+        // Jika ini custom select, listener harus ada di 'initCustomSelects' atau event bus.
+        // Asumsi ini adalah <select> atau radio group standar untuk saat ini.
         paymentTypeSelect.addEventListener('change', updateVisibility);
     }
 }
@@ -49,6 +52,7 @@ function initializeFormSpecificListeners() {
 
     emit('ui.forms.init', document);
 
+    // Listener 'blur' untuk proper-case
     document.body.addEventListener('blur', (e) => {
         if (e.target.matches('input[data-proper-case="true"], textarea[data-proper-case="true"]')) {
             e.target.value = toProperCase(e.target.value);
@@ -56,36 +60,39 @@ function initializeFormSpecificListeners() {
     }, true);
 
 
+    // Listener 'submit' global
     document.addEventListener('submit', async (e) => {
 
         const form = e.target;
         if (!(form instanceof HTMLFormElement)) {
-
+            // Bukan submit form, abaikan
             return;
         }
 
+        // 1. Handle Master Data Form
         if (form.id === 'master-data-form') {
             e.preventDefault();
             e.stopImmediatePropagation();
 
 
             if (!validateForm(form)) {
-
+                 // Pesan error sudah ditampilkan oleh validateForm
                  return;
             }
 
             const action = form.dataset.action;
             if (action === 'addMasterItem') {
-
+                // Fungsi ini akan menangani modal konfirmasi dan penutupan panel
                 await handleAddMasterItem(form);
             } else if (action === 'updateMasterItem') {
-
+                // Fungsi ini akan menangani modal konfirmasi dan penutupan panel
                 await handleUpdateMasterItem(form);
             }
-            resetFormDirty();
+            resetFormDirty(); // Bersihkan flag kotor setelah submit
             return;
         }
 
+        // 2. Handle Edit Item Form
         if (form.id === 'edit-item-form') {
             e.preventDefault();
             e.stopPropagation();
@@ -108,48 +115,47 @@ function initializeFormSpecificListeners() {
                  return;
             }
 
+            // Tampilkan modal konfirmasi (ini adalah modal UTILITY)
             createModal('confirmEdit', {
                 message: isConversion ? 'Anda yakin ingin mengubah Surat Jalan ini menjadi Tagihan?' : 'Anda yakin ingin menyimpan perubahan?',
+                isUtility: true, // Tandai sebagai utility agar tidak push history
                 onConfirm: async () => {
+                    // Tombol "Ya, Simpan" diklik
                     const panel = form.closest('#detail-pane');
                     const isMobile = window.matchMedia('(max-width: 599px)').matches;
 
                     const savingToast = toast('syncing', 'Menyimpan...');
-                    const result = await updateFunction(form);
+                    const result = await updateFunction(form); // Coba update
                     if (savingToast && typeof savingToast.close === 'function') savingToast.close();
 
                     if (result.success) {
                         toast('success', isConversion ? 'Surat Jalan berhasil diubah menjadi Tagihan!' : 'Perubahan berhasil disimpan!');
                         resetFormDirty();
 
-                        if (isMobile) {
-                            hideMobileDetailPageImmediate();
-                        } else if (panel) {
-                            closeDetailPaneImmediate();
+                        // PERUBAIKAN: Panggil history.back() untuk menutup panel
+                        // Ini akan memicu 'popstate' listener di router.js
+                        if (panel || isMobile) {
+                            history.back();
                         }
-
-                        const navTarget = (result.itemType === 'termin' || result.itemType === 'pinjaman') ? 'pemasukan' : 'tagihan';
                         
-                        // --- PERBAIKAN BUG 1 ---
-                        // Cek apakah kita sudah di halaman target.
+                        // Navigasi tidak lagi diperlukan di sini, 'popstate' akan
+                        // menangani pembaruan halaman jika panel adalah level terakhir.
+                        // Cukup refresh halaman saat ini jika kita kembali ke sana.
+                        const navTarget = (result.itemType === 'termin' || result.itemType === 'pinjaman') ? 'pemasukan' : 'tagihan';
                         if (appState.activePage === navTarget) {
-                            // Jika ya, panggil 'ui.page.render' untuk me-refresh list.
                             emit('ui.page.render'); 
-                        } else {
-                            // Fallback: navigasi ke halaman yang benar
-                            emit('ui.navigate', navTarget);
                         }
-                        // --- AKHIR PERBAIKAN BUG 1 ---
 
                     } else {
                         toast('error', 'Gagal menyimpan. Coba lagi.');
                     }
-                    return result.success;
+                    return result.success; // Kembalikan status untuk modalEventListeners
                 }
             });
             return;
         }
 
+        // 3. Handle Form Pengeluaran Baru
         const isExpenseForm = form.id === 'pengeluaran-form' || form.id === 'material-invoice-form';
         if (isExpenseForm) {
             e.preventDefault();
@@ -165,13 +171,11 @@ function initializeFormSpecificListeners() {
                 return;
             }
 
-
+            // (Logika deskripsi... tetap sama)
             const type = form.dataset.type || appState.activeSubPage.get('pengeluaran') || 'operasional';
             const description = form.elements['pengeluaran-deskripsi']?.value || form.elements['description']?.value || 'Pengeluaran Baru';
             const formType = form.elements['formType']?.value;
-
             let message, contextType;
-
             if (formType === 'surat_jalan') {
                 message = `Anda akan menyimpan <strong>Surat Jalan</strong>: <strong>${description}</strong>. Lanjutkan?`;
                 contextType = 'expense-submit';
@@ -183,32 +187,37 @@ function initializeFormSpecificListeners() {
                  contextType = 'expense-submit';
             }
 
+            // Tampilkan modal konfirmasi (UTILITY)
             createModal('confirmUserAction', {
                 title: 'Konfirmasi Simpan Pengeluaran',
                 message: message,
                 contextType: contextType,
                 formType: formType,
+                isUtility: true, // Tandai sebagai utility
                 onConfirm: async (statusOverride) => {
                     const loadingBtn = form.querySelector('[type="submit"], .btn-primary');
                     if (loadingBtn) loadingBtn.disabled = true;
                     let success = false;
                     try {
+                        // handleAddPengeluaran akan menampilkan panel sukses
+                        // Panel sukses (non-utility) akan push history baru
                         await handleAddPengeluaran(form, type, statusOverride);
                         success = true;
                         resetFormDirty();
                         if (form._clearDraft) form._clearDraft();
                     } catch (err) {
-
+                        // Jika gagal, kita tetap di panel form
                         toast('error', err.message || 'Gagal menyimpan, coba lagi.');
                     } finally {
                         if (loadingBtn) loadingBtn.disabled = false;
                     }
-                    return success;
+                    return success; // Kembalikan status
                 }
             });
             return;
         }
 
+        // 4. Handle Form Pemasukan Baru
         if (form.id === 'pemasukan-form') {
             e.preventDefault();
             e.stopPropagation();
@@ -218,183 +227,120 @@ function initializeFormSpecificListeners() {
 
              if (!appState.currentUser || !appState.currentUser.uid) {
                  toast('error', 'Sesi pengguna tidak valid atau belum siap. Coba lagi sebentar.');
-
                  return;
              }
 
+             // (Logika deskripsi... tetap sama)
              const type = form.dataset.type || 'termin';
              let description = '';
              let safeToProceed = false;
-
              const formDataObject = serializeForm(form);
-
-
              try {
                  let selectedName = 'Item ?';
                  let inputName = '';
                  let selectedId = null;
                  let selectedItem = null;
-
-                 if (type === 'termin') {
-                    inputName = 'pemasukan-proyek';
-                 } else if (type === 'pinjaman') {
-                    inputName = 'pemasukan-kreditur';
-                 } else {
-
-                      throw new Error(`Tipe pemasukan tidak valid: ${type}`);
-                 }
-
-
+                 if (type === 'termin') inputName = 'pemasukan-proyek';
+                 else if (type === 'pinjaman') inputName = 'pemasukan-kreditur';
+                 else throw new Error(`Tipe pemasukan tidak valid: ${type}`);
                  const formElement = form.elements[inputName];
-                 if (!formElement) {
-
-                     throw new Error(`Elemen form '${inputName}' tidak ditemukan.`);
-                 }
-
-
-                 if (!formDataObject.hasOwnProperty(inputName)) {
-
-                     throw new Error(`Data '${inputName}' tidak ditemukan setelah serialisasi.`);
-                 }
+                 if (!formElement) throw new Error(`Elemen form '${inputName}' tidak ditemukan.`);
+                 if (!formDataObject.hasOwnProperty(inputName)) throw new Error(`Data '${inputName}' tidak ditemukan setelah serialisasi.`);
                  selectedId = formDataObject[inputName];
-
-
                  if (selectedId) {
                     if (type === 'termin') {
-
-                        if (!Array.isArray(appState.projects)) {
-
-                            throw new Error("Data proyek belum siap.");
-                        }
+                        if (!Array.isArray(appState.projects)) throw new Error("Data proyek belum siap.");
                         selectedItem = appState.projects.find(p => p.id === selectedId);
-
                     } else {
-
-                        if (!Array.isArray(appState.fundingCreditors)) {
-
-                            throw new Error("Data kreditur belum siap.");
-                        }
+                        if (!Array.isArray(appState.fundingCreditors)) throw new Error("Data kreditur belum siap.");
                         selectedItem = appState.fundingCreditors.find(c => c.id === selectedId);
-
                     }
-
                     if (selectedItem) {
-
                         const potentialName = selectedItem.projectName || selectedItem.creditorName;
                         if (typeof potentialName === 'string' && potentialName.trim() !== '') {
                             selectedName = potentialName;
-
-                        } else {
-
-
                         }
-                    } else {
-
-
                     }
-                 } else {
-
-
                  }
-
-
-                 if (typeof selectedName === 'undefined') {
-
-                    selectedName = 'Item (Error)';
-                 }
-
-
-
-                 if (type === 'termin') {
-                     description = `Termin ${selectedName}`;
-                 } else {
-                     description = `Pinjaman ${selectedName}`;
-                 }
-
-
-                 if (selectedName === 'Item ?' || selectedName === 'Item (Error)') {
-
-
-                 }
-
+                 if (typeof selectedName === 'undefined') selectedName = 'Item (Error)';
+                 if (type === 'termin') description = `Termin ${selectedName}`;
+                 else description = `Pinjaman ${selectedName}`;
                  safeToProceed = true;
              } catch (error) {
-
                  toast('error', error.message || 'Gagal memproses pilihan Proyek/Kreditur.');
                  safeToProceed = false;
                  return;
              }
-
-             if (!safeToProceed) {
-
-                 return;
-             }
+             if (!safeToProceed) return;
 
 
-            // PERBAIKAN 1.1: Simpan referensi modal
+            // Tampilkan modal konfirmasi (UTILITY)
             const confirmModal = createModal('confirmUserAction', {
                  title: `Konfirmasi Simpan ${type === 'termin' ? 'Termin' : 'Pinjaman'}`,
                  message: `Anda yakin ingin menyimpan data ${type === 'termin' ? 'Termin' : 'Pinjaman'}: <strong>${description || '(Deskripsi Gagal Dibuat)'}</strong>?`,
+                 isUtility: true, // Tandai sebagai utility
                  onConfirm: async () => {
-                    // PERBAIKAN 1.1: Tutup modal konfirmasi ini
+                    // *** PERUBAHAN KRUSIAL DI SINI ***
+                    // Kita harus menutup modal konfirmasi (utility) secara manual
+                    // sebelum handleAddPemasukan menampilkan panel sukses (non-utility)
                     if (confirmModal) {
-                        closeModal(confirmModal);
+                        closeModalImmediate(confirmModal); // Gunakan immediate
                     }
+                    // *** AKHIR PERUBAHAN ***
+
                      const loadingBtn = form.querySelector('[type="submit"], .btn-primary');
                      if (loadingBtn) loadingBtn.disabled = true;
                      let success = false;
                      try {
-
+                         // Fungsi ini akan menampilkan panel sukses (non-utility)
                          await handleAddPemasukan(formDataObject, type);
                          success = true;
                          resetFormDirty();
                          try {
                              form.reset();
                              if (form._clearDraft) form._clearDraft();
-                         } catch (resetErr) {
-
-                         }
+                         } catch (resetErr) {}
                      } catch (err) {
-
                          toast('error', err instanceof Error ? err.message : 'Gagal menyimpan, coba lagi.');
                      } finally {
                          if (loadingBtn) loadingBtn.disabled = false;
                      }
-
-                     return success;
+                     return success; // Kembalikan status
                  }
              });
             return;
         }
 
+        // 5. Handle form absensi (sudah benar, tidak perlu diubah)
         if (form.id === 'manual-attendance-form') {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
-
             if (!validateForm(form)) {
                 toast('error', 'Pastikan semua peran pekerja sudah dipilih.');
                 return;
             }
-            return;
+            // Biarkan event bus 'form.submit.manualattendanceform' menanganinya
+            // return; // Hapus return eksplisit agar bisa lanjut ke
         }
 
+        // 6. Fallback untuk form lain (stok-in, payment, dll.)
         const isAsync = form.matches('form[data-async]');
         const knownAppFormIds = new Set([
             'stok-in-form', 'stok-out-form',
             'payment-form', 'edit-attendance-form',
+            'manual-attendance-form' // Tambahkan ini ke set
         ]);
 
         if (!isAsync && !knownAppFormIds.has(form.id)) {
-
+            // Form browser biasa, jangan dicegat
             return;
         }
 
-
+        // Cegat semua form yang dikenal
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-
 
          if (!validateForm(form)) return;
 
@@ -404,10 +350,10 @@ function initializeFormSpecificListeners() {
         try {
             if (knownAppFormIds.has(form.id)) {
                  const eventName = `form.submit.${form.id.replace(/-/g, '')}`;
-
+                 // Emit event (cth: 'form.submit.paymentform')
                  emit(eventName, e);
             } else {
-
+                // (Logika form async fallback... tetap sama)
                 try {
                     await submitFormAsync(form);
                 } catch (_) {
@@ -418,21 +364,19 @@ function initializeFormSpecificListeners() {
                     toast('success', successMsg);
                 }
                  resetFormDirty();
-
                 if (form._clearDraft) form._clearDraft();
+                
+                // PERUBAIKAN: Gunakan history.back() untuk menutup modal/panel
                 const modal = form.closest('.modal-bg, .detail-pane');
+                if (modal) {
+                    history.back();
+                }
+                // ---
 
                 emit('ui.page.render');
-
-                if (modal && modal.classList.contains('modal-bg')) {
-                     closeModal(modal);
-                } else if (modal && modal.id === 'detail-pane') {
-                     closeDetailPane();
-                }
                 emit('ui.sync.updateIndicator');
             }
         } catch (err) {
-
             toast('error', err.message || 'Gagal menyimpan, coba lagi.');
         } finally {
             if (loadingBtn) loadingBtn.disabled = false;
@@ -446,6 +390,7 @@ export function initializeFormListeners() {
 
     initializeFormSpecificListeners();
 
+    // Listener untuk upah pekerja (sudah benar, tidak perlu diubah)
     on('ui.form.openWorkerWageDetail', ({ target } = {}) => {
         try {
             const form = (target && target.closest && target.closest('form#master-data-form[data-type="workers"]')) || null;
@@ -520,6 +465,7 @@ export function initializeFormListeners() {
         } catch (e) { console.error(e); }
     });
 
+    // Listener untuk tombol "Bayar Lunas/Setengah" (sudah benar)
     on('ui.form.setPaymentAmount', (mode) => {
         try {
             const modal = document.querySelector('#modal-container .modal-bg.show:last-of-type, #detail-pane') || document;
@@ -533,6 +479,7 @@ export function initializeFormListeners() {
             markFormDirty(true);
         } catch (_) {}
     });
+
      on('ui.form.addInvoiceItemRow', () => {
          const context = document.querySelector('#material-invoice-form, #edit-item-form');
          if(context) {
@@ -541,11 +488,13 @@ export function initializeFormListeners() {
          }
      });
 
+     // Listener untuk form staff (sudah benar)
      on('ui.forms.init', (context) => {
          attachStaffFormListeners(context);
      });
 }
 
+// Fungsi _switchMaterialFormMode (tetap sama)
 function _switchMaterialFormMode(form, newType) {
     const isSuratJalan = newType === 'surat_jalan';
     const totalWrapper = form.querySelector('#total-faktur-wrapper');
@@ -573,6 +522,7 @@ function _switchMaterialFormMode(form, newType) {
 }
 
 
+// Fungsi attachPengeluaranFormListeners (tetap sama)
 export function attachPengeluaranFormListeners(type, context = document) {
     initCustomSelects(context);
     const form = (type === 'material')
@@ -592,6 +542,7 @@ export function attachPengeluaranFormListeners(type, context = document) {
                 if (window.matchMedia('(max-width: 599px)').matches) {
                     e.preventDefault();
                     emit('ui.modal.create', 'uploadSource', {
+                        isUtility: true, // Tandai sebagai utility
                         onSelect: (source) => {
                             fileInput.removeAttribute('capture');
                             if (source === 'camera') {
@@ -641,13 +592,14 @@ export function attachPengeluaranFormListeners(type, context = document) {
             for (const file of files) {
                 await handleAttachmentUpload(file, form, 'attachment', false);
             }
-            fileInput.value = '';
+            fileInput.value = ''; // Reset input file
         });
     }
 
 
     form.querySelectorAll('.segmented-control input[name="status"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
+            // (Logika jika diperlukan...)
         });
     });
 
@@ -675,7 +627,7 @@ export function attachPengeluaranFormListeners(type, context = document) {
         });
 
         if (itemsContainer) {
-            handleInvoiceItemChange(form);
+            handleInvoiceItemChange(form); // Hitung total awal
             itemsContainer.addEventListener('input', (e) => {
                 if(e.target.classList.contains('item-qty') || e.target.classList.contains('item-price')) {
                     handleInvoiceItemChange(form);

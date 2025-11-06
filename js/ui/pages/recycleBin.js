@@ -391,7 +391,6 @@ function initRecycleBinPage() {
     `;
 
     trashObserverInstance = initInfiniteScroll('#sub-page-content');
-    emit('ui.recycleBin.renderContent');
 
     const cleanupRecycleBin = () => {
         try { cleanupInfiniteScroll(); } catch(_) {}
@@ -410,6 +409,7 @@ function initRecycleBinPage() {
     on('app.unload.recycle_bin', cleanupRecycleBin);
     on('ui.recycleBin.renderContent', () => renderRecycleBinContent(false), { signal: listenerSignal });
     on('request-more-data', loadMoreRecycleBin, { signal: listenerSignal });
+    emit('ui.recycleBin.renderContent');
 }
 
 function getRecycleBinHeaderOverflowActions() {

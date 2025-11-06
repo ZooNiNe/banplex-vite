@@ -8,6 +8,7 @@ import { syncToServer, requestSync } from "../../syncService.js";
 import { toast } from "../../../ui/components/toast.js";
 import { _logActivity } from "../../logService.js";
 import { parseFormattedNumber, parseLocaleNumber } from "../../../utils/formatters.js";
+import { notify } from "../../../state/liveQuery.js";
 import { queueOutbox } from "../../outboxService.js";
 
 export async function handleAddPengeluaran(form, type, statusOverride) {
@@ -194,6 +195,14 @@ export async function handleAddPengeluaran(form, type, statusOverride) {
         if (form._clearDraft) form._clearDraft();
 
         await loadAllLocalDataToState();
+        
+        notify('expenses');
+        notify('bills');
+        if (formMode === 'faktur' && specificExpenseType === 'material') {
+            notify('materials');
+            notify('stock_transactions');
+        }
+
         emit('ui.page.recalcDashboardTotals');
 
         emit('uiInteraction.showSuccessPreviewPanel', { expense: expenseToStore, bill: billDataForPreview }, specificExpenseType);
@@ -342,6 +351,12 @@ export async function handleUpdatePengeluaran(form) {
 
         await _logActivity(`Memperbarui Data (Lokal): ${config.title}`, { docId: id });
         await loadAllLocalDataToState();
+                notify('expenses');
+                notify('bills');
+                if (specificExpenseType === 'material') {
+                    notify('materials');
+                }
+        
         requestSync({ silent: true });
 
         const updatedExpense = appState.expenses?.find(i => i.id === id);

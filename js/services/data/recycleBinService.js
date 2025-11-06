@@ -328,7 +328,9 @@ export async function handleDeleteItem(id, type) {
             appState.recycledItemsCache = null; 
             _logActivity(`Memindahkan ke Sampah: ${itemName}`, { docId: id });
             emit('ui.page.recalcDashboardTotals');
-        
+            if (appState.activePage === 'recycle_bin') {
+                emit('ui.recycleBin.renderContent');
+            }
             const deleteMsg = 'Item dipindahkan ke Sampah.';
             toast('info', deleteMsg, 6000, {
                 actionText: 'Urungkan',

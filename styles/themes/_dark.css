@@ -353,12 +353,6 @@
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-.dark-theme .modal-footer {
-  background-color: var(--panel-alt); /* Match panel */
-  border-top-color: var(--line);
-  box-shadow: 0 -2px 5px rgba(0,0,0,0.1), 0 0 10px -3px rgba(96, 165, 250, 0.1); /* Glow effect */
-}
-
 .dark-theme .payment-modal-header {
   background-color: var(--panel); /* Match panel */
   border-bottom-color: var(--line);
