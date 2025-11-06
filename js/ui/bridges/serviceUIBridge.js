@@ -59,7 +59,16 @@ export function initServiceUIBridge() {
   on('ui.modal.showMobileDetail', (...args) => { try { return showMobileDetailPage(...args); } catch (_) {} });
   on('ui.modal.hideMobileDetail', () => { try { hideMobileDetailPage(); } catch (_) {} });
   on('ui.modal.closeDetailPane', () => { try { closeDetailPane(); } catch (_) {} });
-  on('ui.modal.detailPaneBack', () => { try { handleDetailPaneBack(); } catch (_) {} });
+  
+  // --- PERBAIKAN: Mengubah 'ui.modal.detailPaneBack' menjadi 'ui.action.detail-pane-back' ---
+  // Listener 'detail-pane-back' dipicu oleh globalClickListeners sebagai 'ui.action.detail-pane-back'
+  on('ui.action.detail-pane-back', () => { 
+      try { 
+          console.log("[Service Bridge] Menerima event 'ui.action.detail-pane-back'. Memanggil handleDetailPaneBack...");
+          handleDetailPaneBack(); 
+      } catch (_) {} 
+  });
+  // --- AKHIR PERBAIKAN ---
 
   on('ui.modal.openBill', (id, expenseId) => { try { handleOpenBillDetail(id, expenseId); } catch (_) {} });
   on('ui.modal.openPemasukan', (...args) => { try { handleOpenPemasukanDetail(...args); } catch (_) {} });

@@ -398,14 +398,14 @@ export function showMobileDetailPage({ title, subtitle, content, footer, headerA
     if (!isGoingBack) {
         const currentState = history.state || { page: appState.activePage };
         const isOverlayOnOverlay = currentState.modal || currentState.detailView;
-        const historyAction = isOverlayOnOverlay || isSuccessPanel || isMasterDataGrid ? 'replaceState' : 'pushState';
+
+        const historyAction = isOverlayOnOverlay || isSuccessPanel ? 'replaceState' : 'pushState';
         try {
             history[historyAction]({ ...currentState, detailView: true, pane: 'mobile', paneType, isMasterDataGrid, isSuccessPanel }, '');
         } catch (_) {
             console.warn("History state update failed for mobile detail view.");
         }
 
-        // Simpan state UI sebelumnya jika ini adalah navigasi panel bertingkat
         if (document.body.classList.contains('detail-view-active') && !isMasterDataGrid && !isSuccessPanel) {
             const currentFabHTML = detailPane.querySelector('.fab')?.outerHTML || '';
             const previousState = {

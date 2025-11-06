@@ -116,8 +116,7 @@ export async function handleManageMasterData(type, options = {}) {
         </div>
     `;
 
-    // --- PERBAIKAN 1: Dihapus ---
-    // Baris ini salah dan menghapus riwayat panel induk
+    // --- PERBAIKAN 1: Baris ini dihapus ---
     // if (activeTab === 'list' && justSaved) {
     //     appState.detailPaneHistory = [];
     // }
@@ -299,9 +298,8 @@ export async function handleManageMasterData(type, options = {}) {
 
                 if (newTabId === 'list') {
                      currentItemId = null;
-                     // --- PERBAIKAN 2: Dihapus ---
-                     // Baris ini salah dan menghapus riwayat panel induk
-                     // appState.detailPaneHistory = [];
+                     // --- PERBAIKAN 2: Baris yang menyebabkan bug dihapus ---
+                     // appState.detailPaneHistory = []; 
                      // --- AKHIR PERBAIKAN 2 ---
                 }
 
