@@ -24,7 +24,6 @@
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
-  padding-bottom: 10vh; /* Sedikit ke atas */
   text-align: center;
 }
 

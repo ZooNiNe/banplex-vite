@@ -53,11 +53,17 @@ body.is-resizing {
 }
 
 .scrollable-content {
-    flex-grow: 1;
-    overflow-y: auto;
-    min-height: 0;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: calc( 60px + 1rem + env(safe-area-inset-bottom, 24px));
+  flex-grow: 1;
+  overflow-y: auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--bottom-nav-height) + 1rem); /* Contoh: 56px + 1rem */
+}
+
+.scrollable-content.has-padding {
+  padding-top: 1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
 }
 
 .scrollable-content.has-form-padding {

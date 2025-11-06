@@ -77,7 +77,7 @@ function initPengaturanPage() {
             <div class="panel-header">
                 ${createPageToolbarHTML({ title: 'Pengaturan' })}
             </div>
-            <div id="sub-page-content" class="scrollable-content" style="padding: 1rem;"></div>
+            <div id="sub-page-content" class="scrollable-content has-padding"></div>
         </div>
     `;
     emit('ui.pengaturan.renderContent');

@@ -30,18 +30,11 @@
   text-align: center; /* Pastikan teks rata tengah */
 }
 
-/* Hapus atau sesuaikan gaya fab-extended jika tidak lagi diperlukan */
-/*
-.fab.fab-extended {
-  width: auto;
-  border-radius: 999px; // Bentuk pil
-  padding: 0 1.25rem;
-  flex-direction: row; // Kembali ke baris jika extended
-  width: auto;
-  height: 60px; // Kembalikan tinggi asli jika extended
+@media (max-width:600px){
+#page.dashboard.fab-extended.fab.pop.in{
+display:none;
 }
-*/
-
+}
 /* Pastikan label terlihat dan bisa wrap */
 .fab .fab-label {
   font-size: 0.5rem; /* Kecilkan sedikit font untuk 2 baris */

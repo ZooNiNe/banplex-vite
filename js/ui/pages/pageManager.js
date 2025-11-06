@@ -133,8 +133,8 @@ function restorePageFab() {
         pemasukan: { action: 'open-pemasukan-form', icon: 'account_balance_wallet', label: 'Buat Pemasukan', tooltip: 'Tambah Pemasukan Baru' },
         tagihan: { action: 'navigate', nav: 'pengeluaran', icon: 'post_add', label: 'Buat Tagihan', tooltip: 'Buat Pengeluaran / Tagihan Baru' },
         jurnal: { action: 'navigate', nav: 'absensi', icon: 'person_add', label: 'Input Absensi', tooltip: 'Buka Halaman Input Absensi' },
-        dashboard: { action: 'navigate', nav: 'komentar', icon: 'chat', label: 'Chat', tooltip: 'Buka Halaman Chat' },
-        komentar: { action: 'navigate', nav: 'chat', icon: 'post_add', label: 'Diskusi Baru', tooltip: 'Mulai Diskusi Baru' },
+        // dashboard: { action: 'navigate', nav: 'komentar', icon: 'chat', label: 'Chat', tooltip: 'Buka Halaman Chat' },
+        // komentar: { action: 'navigate', nav: 'chat', icon: 'post_add', label: 'Diskusi Baru', tooltip: 'Mulai Diskusi Baru' },
     };
 
     const config = fabConfigs[page];

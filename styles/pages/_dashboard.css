@@ -301,6 +301,7 @@ to { opacity: 1; }
   white-space: nowrap; /* Cegah judul wrap */
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 .stat-header .refresh-btn {
   width: 28px; /* Ukuran tombol refresh */
@@ -332,6 +333,7 @@ to { opacity: 1; }
   white-space: nowrap; /* Cegah teks value wrap */
   overflow: hidden;
   text-overflow: ellipsis; /* Tampilkan ... jika terlalu panjang */
+  min-width: 0;
 }
 .stat-label {
   font-size: 0.7rem; /* Ukuran label */
@@ -561,7 +563,6 @@ body.dashboard-layout-cards .dashboard-grid-layout {
   color: var(--text-dim);
   font-size: 0.85rem;
 }
-
 /* --- Style Kartu Anggaran --- */
 .budget-list {
   display: flex;
@@ -581,16 +582,17 @@ body.dashboard-layout-cards .dashboard-grid-layout {
 .budget-item-name {
   font-weight: 500;
   font-size: 0.85rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 70%;
   color: var(--text);
+
+  /* HAPUS/GANTI PROPERTI LAMA DENGAN INI: */
+  word-break: break-word; /* Paksa teks patah jika mentok */
+  /* Hapus: white-space, overflow, text-overflow, max-width, min-width */
 }
 .budget-item-percent {
   font-size: 0.8rem;
   font-weight: 600;
-  white-space: nowrap;
+  white-space: nowrap; /* <-- BIARKAN INI */
+  flex-shrink: 0; /* Tambahkan ini agar aman */
 }
 .budget-item-percent.near-limit-text { color: var(--warn); }
 .budget-item-percent.over-budget-text { color: var(--danger); }
@@ -664,19 +666,41 @@ body.dashboard-layout-cards .dashboard-grid-layout {
  }
 }
 
+/* Di styles/pages/_dashboard.css */
+
 /* Tweak untuk ponsel sangat kecil */
 @media (max-width: 360px) {
-.dashboard-stats-grid,
-.dashboard-worker-stats-grid { gap: 0.75rem; } /* Kurangi jarak grid */
-.stat-item { padding: 0.6rem; } /* Kurangi padding kartu */
-.stat-header .card-icon { width: 26px; height: 26px; }
-.stat-header .card-title { font-size: 0.75rem; }
-.stat-value { font-size: clamp(0.9rem, 4vw, 1.1rem); } /* Kecilkan sedikit */
-.stat-label { font-size: 0.65rem; }
-.stat-header .refresh-btn { width: 22px; height: 22px; top: 4px; right: 4px; }
-.stat-header .refresh-btn .lucide { width: 12px; height: 12px; }
-.hero-content h1 { font-size: 1.5rem; }
-.hero-content p { font-size: 0.85rem; }
-.stat-footer { gap: 0.1rem; } /* Kurangi gap di footer stat */
-.action-hint { font-size: 0.65rem; } /* Kecilkan hint */
+  .dashboard-stats-grid,
+  .dashboard-worker-stats-grid { gap: 0.75rem; } /* Kurangi jarak grid */
+  .stat-item { padding: 0.6rem; } /* Kurangi padding kartu */
+  .stat-header .card-icon { width: 26px; height: 26px; }
+  .stat-header .card-title { font-size: 0.75rem; }
+  .stat-value { font-size: clamp(0.9rem, 4vw, 1.1rem); } /* Kecilkan sedikit */
+  .stat-label { font-size: 0.65rem; }
+  .stat-header .refresh-btn { width: 22px; height: 22px; top: 4px; right: 4px; }
+  .stat-header .refresh-btn .lucide { width: 12px; height: 12px; }
+  .hero-content h1 { font-size: 1.5rem; }
+  .hero-content p { font-size: 0.85rem; }
+  .stat-footer { gap: 0.1rem; } /* Kurangi gap di footer stat */
+  .action-hint { font-size: 0.65rem; } /* Kecilkan hint */
+
+  /* * ===============================================
+   * PERBAIKAN ADAPTIF UNTUK GRID KECIL (320px)
+   * ===============================================
+   */
+
+  /* [BARU] Perkecil jarak antar kartu chart/budget */
+  .dashboard-grid-layout {
+    gap: 0.75rem; /* Turunkan dari 1.5rem */
+  }
+
+  /* [BARU] Perkecil padding di dalam kartu chart/budget */
+  .dashboard-card {
+    padding: 0.75rem; /* Turunkan dari 1rem 1.25rem */
+  }
+
+  /* [BARU] Perkecil padding di dalam kartu info-hero (jika ada) */
+  .info-hero-card {
+    padding: 0.75rem 1rem;
+  }
 }

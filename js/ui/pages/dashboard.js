@@ -435,11 +435,10 @@ function initDashboardPage() {
                 { icon: 'bell', label: 'Aktivitas', action: 'navigate', nav: 'log_aktivitas', id: 'open-activity-log' }
             ]
         })}
-        <div id="sub-page-content" class="scrollable-content" style="padding: 1rem;"></div>
+        <div id="sub-page-content" class="scrollable-content has-padding"></div>
     `;
 
   emit('ui.dashboard.renderContent');
-  // Update badges (activity + comments) + start realtime listener
   setTimeout(() => { try { updateActivityLogBadge(); startActivityLogRealtimeBadge(); renderCommentsBadge(); } catch(_) {} }, 0);
     try {
         const pref = localStorage.getItem('ui.layout.dashboard') || 'grid';
