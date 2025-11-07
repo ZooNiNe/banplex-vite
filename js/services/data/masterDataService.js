@@ -221,6 +221,7 @@ export async function handleAddMasterItem(form) {
                 _logActivity(`Menambah Master Data: ${config.title}`, { name: itemName });
                 
                 emit('masterData.updated', { type });
+                emit('ui.form.markDirty', false); 
                 
                 if (appState.activePage === 'master_data') {
                     const tabsContainer = document.querySelector('#master-data-tabs');
@@ -237,6 +238,8 @@ export async function handleAddMasterItem(form) {
                 try { await queueOutbox({ table: config.dbTable, docId: dataToAdd.id, op: 'upsert', payload: localDoc, priority: 6 }); } catch(_) {}
                 
                 emit('masterData.updated', { type });
+                emit('ui.form.markDirty', false); 
+
                 if (appState.activePage === 'master_data') {
                     const tabsContainer = document.querySelector('#master-data-tabs');
                     const listTab = tabsContainer?.querySelector('[data-tab="list"]');
@@ -424,6 +427,8 @@ export async function handleUpdateMasterItem(form) {
                 await fetchAndCacheData(config.stateKey, collectionRef, config.nameField);
                 _logActivity(`Memperbarui Master: ${config.title}`, { docId: id });
                 emit('masterData.updated', { type });
+                emit('ui.form.markDirty', false); 
+
                 
                 if (appState.activePage === 'master_data') {
                     const tabsContainer = document.querySelector('#master-data-tabs');
@@ -439,6 +444,7 @@ export async function handleUpdateMasterItem(form) {
                 await localDB[config.dbTable].update(id, localUpdate);
                 try { await queueOutbox({ table: config.dbTable, docId: id, op: 'upsert', payload: { id, ...localUpdate }, priority: 6 }); } catch(_) {}
                 emit('masterData.updated', { type });
+                emit('ui.form.markDirty', false); 
 
                 if (appState.activePage === 'master_data') {
                     const tabsContainer = document.querySelector('#master-data-tabs');

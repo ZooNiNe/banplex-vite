@@ -758,7 +758,7 @@ export function showSuccessPreviewPanel(itemData, type) {
     }
 
     const navTargetPage = (isPengeluaran || type === 'bill') ? 'tagihan' : 'pemasukan';
-    const navTargetSubPage = (isPemasukan) ? `&subpage=${type}` : '';
+    const navTargetSubPage = (isPemasukan) ? `&sub-page=${type}` : '';
     const navTargetFull = `${navTargetPage}${navTargetSubPage}`;
 
     let firstButtonHTML = '';

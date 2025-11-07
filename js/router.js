@@ -1,5 +1,6 @@
 import { renderPageContent } from './ui/pages/pageManager.js';
-import { handleNavigation, renderSidebar, renderBottomNav } from './ui/mainUI.js';
+// PERBAIKAN: Tambahkan 'renderUI' ke impor ini
+import { handleNavigation, renderSidebar, renderBottomNav, renderUI } from './ui/mainUI.js';
 import { appState } from './state/appState.js';
 import {
     closeModal,
@@ -28,76 +29,166 @@ function cleanupPopstateListener() {
     }
 }
 
+/**
+ * FUNGSI BARU: Membersihkan listener DAN state history browser saat logout.
+ */
+function resetHistoryOnLogout() {
+    console.log("[Router] Logout terdeteksi. Membersihkan listener dan state history.");
+    cleanupPopstateListener(); // Hapus listener 'popstate'
+    
+    // Atur ulang tumpukan panel internal kita
+    appState.detailPaneHistory = [];
+
+    // Manuver history untuk membersihkan tumpukan
+    try {
+        // 1. Dorong state "logout" baru. Ini menjadi entri baru di history.
+        history.pushState({ page: null, loggedOut: true }, '', '#logged_out');
+        // 2. Ganti state "logout" tersebut dengan state "login".
+        // Ini secara efektif membuat 'login' sebagai state dasar baru,
+        // membersihkan history "forward" dan "menjebak" tombol "back".
+        history.replaceState({ page: 'login' }, '', window.location.pathname); 
+    } catch(e) {
+        console.warn("Gagal membersihkan history state saat logout.", e);
+    }
+}
+
+
+/**
+ * Menangani event 'popstate' (ketika pengguna menekan tombol kembali browser).
+ * Logika ini diubah untuk memprioritaskan penutupan overlay (Modal -> Pane)
+ * sebelum melakukan navigasi halaman, meniru perilaku aplikasi native.
+ * @param {PopStateEvent} e
+ */
 function handlePopstateEvent(e) {
     console.log('[Popstate] Event fired. New state:', e.state, 'Current appPage:', appState.activePage);
 
-    const topModal = document.querySelector('#modal-container .modal-bg.show:not([data-utility-modal="true"])');
-    const isMobileDetailOpen = document.body.classList.contains('detail-view-active');
-    const isDesktopDetailOpen = document.body.classList.contains('detail-pane-open');
-    
-    const state = e.state || {};
-    const targetPage = state.page || 'dashboard';
+    // PERBAIKAN: Cek overlay dengan urutan prioritas yang benar (dari atas ke bawah).
+    // Modal > Mobile Detail Pane > Desktop Detail Pane.
 
-    if (isMobileDetailOpen) {
-        console.log('[Popstate] Menutup mobile detail pane...');
-  
-        if (appState.detailPaneHistory.length > 0) {
-            console.log('[Popstate] Kembali ke panel sebelumnya.');
-            const prevState = appState.detailPaneHistory.pop();
-            emit('ui.modal.showMobileDetail', prevState, true);
-            return; 
-        } else {
-            hideMobileDetailPageImmediate();
-            return; 
-        }
-    }
-    if (isDesktopDetailOpen) {
-        console.log('[Popstate] Menutup desktop detail pane...');
+    // 1. Cek Modal (non-utility)
+    // Modal adalah UI paling atas, jadi kita cek ini dulu.
+    const topModal = document.querySelector('#modal-container .modal-bg.show:not([data-utility-modal="true"])');
+    if (topModal) {
+        console.log('[Popstate] Menutup modal...');
+        // Gunakan 'closeModalImmediate' karena 'popstate' SUDAH terjadi.
+        // Memanggil closeModal() biasa akan memicu history.back() lagi dan menyebabkan loop.
+        closeModalImmediate(topModal); 
+        return;
+    }
+
+    // 2. Cek Mobile Detail Pane
+    const isMobileDetailOpen = document.body.classList.contains('detail-view-active');
+    if (isMobileDetailOpen) {
+        console.log('[Popstate] Menutup mobile detail pane...');
+        
+        // Cek apakah ada riwayat panel bertingkat (misal: Buka Detail -> Buka Edit)
         if (appState.detailPaneHistory.length > 0) {
-            console.log('[Popstate] Kembali ke panel desktop sebelumnya.');
+            console.log('[Popstate] Kembali ke panel sebelumnya.');
             const prevState = appState.detailPaneHistory.pop();
-            emit('ui.modal.showDetail', prevState, true);
-            return;
+            // Render ulang panel sebelumnya tanpa push history baru
+            emit('ui.modal.showMobileDetail', prevState, true); // true = isGoingBack
+            return; 
         } else {
-            closeDetailPaneImmediate();
+            // PERBAIKAN: Pindahkan 'hideMobileDetailPageImmediate' ke dalam 'else'
+            // Ini adalah panel terakhir, tutup immediate
+            hideMobileDetailPageImmediate();
+            return; 
         }
     }
 
-    if (topModal) {
-        console.log('[Popstate] Menutup modal...');
-        closeModalImmediate(topModal);
-        return;
+    // 3. Cek Desktop Detail Pane
+    const isDesktopDetailOpen = document.body.classList.contains('detail-pane-open');
+    if (isDesktopDetailOpen) {
+        console.log('[Popstate] Menutup desktop detail pane...');
+        
+        // Cek history panel bertingkat
+        if (appState.detailPaneHistory.length > 0) {
+            console.log('[Popstate] Kembali ke panel desktop sebelumnya.');
+            const prevState = appState.detailPaneHistory.pop();
+            // Render ulang panel sebelumnya tanpa push history baru
+            emit('ui.modal.showDetail', prevState, true); // true = isGoingBack
+            return;
+        } else {
+            // PERBAIKAN: Pindahkan 'closeDetailPaneImmediate' ke dalam 'else'
+            // Ini adalah panel terakhir, tutup immediate
+            closeDetailPaneImmediate();
+            return;
+        }
     }
     
+    // 4. Jika tidak ada overlay, baru tangani navigasi halaman
+    const state = e.state || {};
+    const targetPage = state.page || 'dashboard';
+
+    // Logika khusus saat meninggalkan halaman absensi
     if (appState.activePage === 'absensi' && targetPage !== 'absensi') {
         emit('ui.selection.deactivate');
     }
 
+    // Mencegah keluar dari app jika di dashboard
     if (appState.activePage === 'dashboard' && (!state.page || state.page === 'dashboard')) {
         console.log('[Popstate] Di Dashboard, menekan "back". Mencegah navigasi keluar.');
         try {
+            // Dorong state dashboard kembali untuk "menangkap" tombol kembali
             history.pushState({ page: 'dashboard' }, '', '#dashboard');
         } catch (_) {}
         return;
     }
 
+    // Navigasi halaman
+    // PERBAIKAN UTAMA:
+    // Panggil logika render ulang secara langsung, JANGAN panggil handleNavigation.
+    // handleNavigation adalah untuk *membuat* navigasi baru (dan pushState).
+    // Kita *merespon* state yang sudah diubah oleh browser.
     if (appState.activePage !== targetPage) { 
         console.log(`[Popstate] Navigasi halaman: ${appState.activePage} -> ${targetPage}`);
-        handleNavigation(targetPage, { source: 'history', push: false }); 
+        
+        // --- AWAL BLOK YANG DIPINDAHKAN DARI 'proceedNavigation' ---
+        const oldPage = appState.activePage;
+        if (oldPage && oldPage !== targetPage) {
+            emit(`app.unload.${oldPage}`);
+            try { emit('app.unload'); } catch(_) {}
+        }
+
+        appState.activePage = targetPage;
+        // Kita menggunakan sessionStorage, jadi kita update juga
+        sessionStorage.setItem('lastActivePage', targetPage);
+        
+        emit('ui.modal.closeAll');
+        renderUI();
+    
+        try {
+            document.body.className = (document.body.className || '')
+                .split(/\s+/)
+                .filter(c => c && !c.startsWith('page-'))
+                .join(' ');
+            document.body.classList.add(`page-${targetPage}`);
+        } catch (_) {}
+        
+        renderPageContent(); // Render UI halaman baru
+        // --- AKHIR BLOK YANG DIPINDAHKAN ---
+
     } else {
          console.log(`[Popstate] State sama, tidak ada navigasi. Page: ${targetPage}`);
-         checkAndRestoreBottomNav();
+         checkAndRestoreBottomNav(); // Pastikan bottom nav terlihat
     }
 }
 
 function initRouter() {
-    cleanupPopstateListener();
+    // PERBAIKAN: Selalu bersihkan listener sebelumnya jika init dipanggil lagi
+    if (window.__banplex_history_init) {
+        console.log("[Router] Router sudah diinisialisasi, membersihkan listener lama.");
+        cleanupPopstateListener();
+    }
+    // cleanupPopstateListener(); // Hapus pemanggilan ganda dari sini
 
-    if (window.__banplex_history_init) return;
     window.__banplex_history_init = true;
 
     try {
         if ('replaceState' in history) {
+            // Ganti state saat ini dengan halaman yang aktif
+            // PERBAIKAN: Ini sekarang menjadi "base state" untuk sesi BARU
+            console.log(`[Router] Mengatur base history state ke: ${appState.activePage}`);
             history.replaceState({ page: appState.activePage }, '', window.location.href);
         }
     } catch (_) {}
@@ -107,9 +198,12 @@ function initRouter() {
     
     window.addEventListener('popstate', handlePopstateEvent, { signal });
 
-    on('app.unload', cleanupPopstateListener);
+    // Hapus listener 'app.unload' lama jika ada, karena 'auth.loggedOut' lebih spesifik
+    // on('app.unload', cleanupPopstateListener); // Ganti ini
 }
 
-on('auth.loggedOut', cleanupPopstateListener);
+// PERBAIKAN: Ganti listener 'auth.loggedOut'
+// on('auth.loggedOut', cleanupPopstateListener); // <-- Hapus ini
+on('auth.loggedOut', resetHistoryOnLogout); // <-- Gunakan fungsi reset yang baru
 
 export { renderPageContent, navigate, initRouter };

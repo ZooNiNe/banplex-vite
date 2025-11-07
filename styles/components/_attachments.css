@@ -94,14 +94,14 @@
 /* REVISI #1: Ubah display agar adaptif untuk satu item */
 .attachment-manager-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 1rem;
   margin-top: 1rem;
   margin-bottom: 1rem;
   /* Tambahkan kelas ini saat hanya ada 1 item + placeholder */
 }
 .attachment-manager-container.single-item-layout {
-  grid-template-columns: 1fr minmax(150px, 1fr); /* Atur agar item tunggal mengambil ruang lebih besar */
+  grid-template-columns: 1fr minmax(180px, 1fr); /* Atur agar item tunggal mengambil ruang lebih besar */
 }
 .attachment-manager-container.single-item-layout .attachment-manager-item:first-child:not(.placeholder) {
     grid-column: 1 / span 1; /* Biarkan item tunggal di kolom pertama */

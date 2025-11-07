@@ -534,6 +534,8 @@ export function hideMobileDetailPageImmediate() {
     delete detailPane.dataset.isSuccessPanel;
     resetFormDirty();
     detailPane.innerHTML = ''; // Hapus konten
+    checkAndRestoreBottomNav();
+
 }
 
 export function closeAllModals() {

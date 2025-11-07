@@ -46,7 +46,7 @@ function getModalLayout(type, data = {}) {
                  } else {
                      extraContent = `
                         <div class="form-group full-width" style="margin-top: 1rem;">
-                            <label>Status Pembayaran</label>
+                            <label>Pilih Status Pembayaran</label>
                             <div class="${controlClass}">
                                 <input type="radio" id="status-unpaid-modal" name="status-override" value="unpaid" checked>
                                 <label for="status-unpaid-modal">Jadikan Tagihan</label>

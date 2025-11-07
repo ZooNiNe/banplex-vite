@@ -5,8 +5,10 @@ import { $ } from "../utils/dom.js";
 import { renderPageContent } from "./pages/pageManager.js";
 import { checkFormDirty, resetFormDirty, closeModal, closeDetailPane, closeAllModals } from "./components/modal.js";
 import { emit } from "../state/eventBus.js";
-import { commentsCol } from "../config/firebase.js";
+// PERBAIKAN: Impor lengkap untuk onSnapshot
 import { onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+import { commentsCol } from "../config/firebase.js";
+
 
 function createIcon(iconName, size = 22, classes = '') {
     const icons = {
@@ -183,35 +185,39 @@ function proceedNavigation(targetPage, push = true) {
 }
 
 export function renderUI() {
-        const { currentUser, userStatus } = appState;
-        const pageContainer = $('#page-container');
+    const { currentUser, userStatus } = appState;
+    const pageContainer = $('#page-container');
     
-        if (!currentUser) {
-            document.body.className = 'guest-mode';
-            if (pageContainer) pageContainer.innerHTML = getAuthScreenHTML();
-            const sidebar = $('#sidebar-nav');
-            if (sidebar) sidebar.style.display = 'none';
-            const bottomNav = $('#bottom-nav');
-            if (bottomNav) bottomNav.style.display = 'none';
-            $('#mobile-sidebar-overlay')?.remove(); 
-        } else if (userStatus === 'pending') {
-            document.body.className = 'pending-mode';
-            if (pageContainer) pageContainer.innerHTML = getPendingScreenHTML();
-            const sidebar = $('#sidebar-nav');
-            if (sidebar) sidebar.style.display = 'none';
-            const bottomNav = $('#bottom-nav');
-            if (bottomNav) bottomNav.style.display = 'none';
-            
-            $('#mobile-sidebar-overlay')?.remove();
-        } else if (userStatus === 'active') {
+    if (!currentUser) {
+        document.body.className = 'guest-mode';
+        if (pageContainer) pageContainer.innerHTML = getAuthScreenHTML();
+        const sidebar = $('#sidebar-nav');
+        if (sidebar) sidebar.style.display = 'none';
+        const bottomNav = $('#bottom-nav');
+        if (bottomNav) bottomNav.style.display = 'none';
+        $('#mobile-sidebar-overlay')?.remove(); 
+    } else if (userStatus === 'pending') {
+        document.body.className = 'pending-mode';
+        if (pageContainer) pageContainer.innerHTML = getPendingScreenHTML();
+        const sidebar = $('#sidebar-nav');
+        if (sidebar) sidebar.style.display = 'none';
+        const bottomNav = $('#bottom-nav');
+        if (bottomNav) bottomNav.style.display = 'none';
+        
+        $('#mobile-sidebar-overlay')?.remove();
+    } else if (userStatus === 'active') {
         document.body.className = '';
         const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === '1';
         document.body.classList.toggle('sidebar-collapsed', sidebarCollapsed);
         renderSidebar();
         renderBottomNav();
         try { ensureGlobalCommentsListener(); } catch(_) {}
-        const pageContainer = $('#page-container');
-        if (pageContainer) pageContainer.innerHTML = '';
+        
+        // !!! PERBAIKAN DI SINI !!!
+        // Hapus baris yang mengosongkan pageContainer.
+        // const pageContainer = $('#page-container'); // <-- Dihapus
+        // if (pageContainer) pageContainer.innerHTML = ''; // <-- Dihapus
+        // !!! AKHIR PERBAIKAN !!!
     }
 }
 
@@ -232,6 +238,6 @@ function ensureGlobalCommentsListener() {
             console.warn('Comments listener error:', err?.code || err);
         });
     } catch (e) {
-        console.warn('Failed to start global comments listener:', e);
+        console.warn('Gagal memulai global comments listener:', e);
     }
 }

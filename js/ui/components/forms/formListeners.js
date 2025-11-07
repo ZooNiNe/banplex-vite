@@ -171,7 +171,6 @@ function initializeFormSpecificListeners() {
                 return;
             }
 
-            // (Logika deskripsi... tetap sama)
             const type = form.dataset.type || appState.activeSubPage.get('pengeluaran') || 'operasional';
             const description = form.elements['pengeluaran-deskripsi']?.value || form.elements['description']?.value || 'Pengeluaran Baru';
             const formType = form.elements['formType']?.value;
@@ -180,10 +179,10 @@ function initializeFormSpecificListeners() {
                 message = `Anda akan menyimpan <strong>Surat Jalan</strong>: <strong>${description}</strong>. Lanjutkan?`;
                 contextType = 'expense-submit';
             } else if (type === 'material' && formType === 'faktur') {
-                message = `Anda yakin ingin menyimpan <strong>Faktur Material</strong>: <strong>${description}</strong>? Pilih status pembayaran.`;
+                message = `Anda yakin ingin menyimpan <strong>Faktur Material</strong>: <strong>${description}</strong>`;
                 contextType = 'expense-submit';
             } else {
-                 message = `Anda yakin ingin menyimpan pengeluaran: <strong>${description}</strong>? Pilih status pembayaran.`;
+                 message = `Anda yakin ingin menyimpan pengeluaran: <strong>${description}</strong>`;
                  contextType = 'expense-submit';
             }
 
@@ -277,7 +276,7 @@ function initializeFormSpecificListeners() {
             // Tampilkan modal konfirmasi (UTILITY)
             const confirmModal = createModal('confirmUserAction', {
                  title: `Konfirmasi Simpan ${type === 'termin' ? 'Termin' : 'Pinjaman'}`,
-                 message: `Anda yakin ingin menyimpan data ${type === 'termin' ? 'Termin' : 'Pinjaman'}: <strong>${description || '(Deskripsi Gagal Dibuat)'}</strong>?`,
+                 message: `Anda yakin ingin menyimpan ${type === 'termin' ? 'Termin' : 'Pinjaman'}: <strong>${description || '(Deskripsi Gagal Dibuat)'}</strong>?`,
                  isUtility: true, // Tandai sebagai utility
                  onConfirm: async () => {
                     // *** PERUBAHAN KRUSIAL DI SINI ***
