@@ -14,6 +14,8 @@ import { projectsCol, suppliersCol } from '../../config/firebase.js';
 import { ensureMasterDataFresh } from '../../services/data/ensureMasters.js';
 import { loadDataForPage } from '../../services/localDbService.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
+import { initPullToRefresh, destroyPullToRefresh } from "../components/pullToRefresh.js";
+import { showLoadingModal, hideLoadingModal } from "../components/modal.js";
 
 const ITEMS_PER_PAGE = 15;
 const INITIAL_LOAD_THRESHOLD = 20;
@@ -450,7 +452,7 @@ function initTagihanPage() {
     if (pageAbortController) pageAbortController.abort();
     pageAbortController = null;
     pageObserverInstance = null;
-
+    destroyPullToRefresh();
     const container = $('.page-container');
     container.classList.add('page-container--has-panel');
 
@@ -487,6 +489,30 @@ function initTagihanPage() {
     `;
 
     pageObserverInstance = initInfiniteScroll('#sub-page-content');
+
+    initPullToRefresh({
+        triggerElement: '.panel-header', // Area statis di atas
+        scrollElement: '#sub-page-content',  // Konten yang di-scroll
+        indicatorContainer: '#ptr-indicator-container', // Target dari index.html
+        
+        onRefresh: async () => {
+            showLoadingModal('Memperbarui tagihan...');
+            try {
+                const activeTab = appState.activeSubPage.get('tagihan') || 'tagihan';
+                const paginationKey = `bills_${activeTab}`;
+
+                appState.pagination[paginationKey] = { isLoading: false, hasMore: true, page: -1 };
+
+                await renderTagihanContent(false);
+
+            } catch (err) {
+                console.error("PTR Error (Tagihan):", err);
+                emit('ui.toast', { message: 'Gagal memperbarui tagihan', type: 'error' });
+            } finally {
+                hideLoadingModal();
+            }
+        }
+    });
 
     if (unsubscribeLiveQuery && typeof unsubscribeLiveQuery.unsubscribe === 'function') {
         unsubscribeLiveQuery.unsubscribe();

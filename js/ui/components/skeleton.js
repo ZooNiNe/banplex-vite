@@ -294,7 +294,6 @@ export function createDashboardPageSkeletonHTML() {
         </div>`;
 
     return `
-        <div class="dashboard-background"></div>
         ${createToolbarSkeleton('Dashboard')}
         <div id="sub-page-content" class="scrollable-content" style="padding: 1rem;">
             ${createHeroSkeleton('110px')}

@@ -1099,7 +1099,7 @@ async function initLaporanPage() {
         { id: 'open-report-generator-btn', action: 'open-report-generator', icon: 'download', label: 'Buat/Unduh Laporan' },
         { id: 'open-simulasi-btn', action: 'navigate', nav: 'simulasi', icon: 'payments', label: 'Simulasi' }
     ];
-    const toolbarTitle = appState.reportAccountingMode ? 'Laporan Akuntansi' : 'Laporan Keuangan';
+    const toolbarTitle = appState.reportAccountingMode ? 'Laporan' : 'Laporan';
 
     // Use sticky toolbar inside panel-header for consistency across pages
     const pageToolbarHTML = createPageToolbarHTML({ title: toolbarTitle, actions });
@@ -1140,10 +1140,10 @@ async function initLaporanPage() {
         const isOn = !!appState.reportAccountingMode;
         btn.classList.toggle('active', isOn);
         btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
-        btn.title = isOn ? 'Mode Akuntansi' : 'Mode Laporan';
+        btn.title = isOn ? 'Mode Pro' : 'Mode Basic';
         btn.innerHTML = `
             <span class="toggle-dot" aria-hidden="true"></span>
-            <span class="toggle-label">${isOn ? 'Akuntansi' : 'Laporan'}</span>
+            <span class="toggle-label">${isOn ? 'Pro' : 'Basic'}</span>
         `;
     }
 

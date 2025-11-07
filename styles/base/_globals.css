@@ -10,7 +10,7 @@ body {
   font-size: 14px;
   line-height: 1.5;
   height: 100%;
-  background-color: var(--panel);
+  background-color: var(--panel-alt);
 }
 
 /* Wallpaper background */

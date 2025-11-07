@@ -37,7 +37,7 @@ export function createPageToolbarHTML({ title, searchId, searchPlaceholder, acti
         </button>
     `).join('');
 
-    const pagesWithoutMoreVert = new Set(['pengeluaran', 'pengaturan', 'jurnal', 'dashboard', 'laporan', 'absensi', 'simulasi', 'log_aktivitas', 'stok']);
+    const pagesWithoutMoreVert = new Set(['pengeluaran', 'pengaturan', 'jurnal', 'dashboard', 'laporan', 'absensi', 'simulasi', 'log_aktivitas', 'stok', 'master_data']);
     const showMoreVert = !pagesWithoutMoreVert.has(appState.activePage) && !validActions.some(a => a.action === 'open-page-overflow'); // Jangan tampilkan jika sudah ada tombol more
 
     const moreVertButtonHTML = showMoreVert ? `

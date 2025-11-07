@@ -208,24 +208,36 @@ async function main() {
   });
 
   onAuthStateChanged(auth, async (user) => {
-    console.log('[App Log] onAuthStateChanged triggered. User:', user ? user.uid : 'null');
-    if (user) {
-      console.log(`[App Log] User ditemukan. Memanggil initializeAppSession. ActivePage saat ini: ${appState.activePage}`);
-      updateLoadingMessage('Memuat sesi pengguna...');
-      await initializeAppSession(user);
-      
-      // --- TAMBAHAN: LANGKAH 2 (Panggil Subskripsi) ---
-      // Panggil ini SETELAH sesi siap dan user ada
-      try {
-        console.log("Mencoba mendaftarkan untuk Push Notifications...");
-        await subscribeToPushNotifications();
-      } catch (pushError) {
-        console.error("Gagal mendaftar push notifications:", pushError);
-      }
-      // --- AKHIR TAMBAHAN ---
-
-      hideGlobalLoader();
-    } else {
+        console.log('[App Log] onAuthStateChanged triggered. User:', user ? user.uid : 'null');
+        if (user) {
+            
+            try {
+                console.log(`[App Log] User ditemukan. Memanggil initializeAppSession. ActivePage saat ini: ${appState.activePage}`);
+                updateLoadingMessage('Memuat sesi pengguna...');
+                await initializeAppSession(user); // <-- Sekarang di dalam try
+          
+                try {
+                    console.log("Mencoba mendaftarkan untuk Push Notifications...");
+                    await subscribeToPushNotifications();
+                } catch (pushError) {
+                    console.error("Gagal mendaftar push notifications:", pushError);
+                }
+    
+                hideGlobalLoader();
+    
+            } catch (initError) {
+                console.error("KRITIS: Gagal total inisialisasi sesi.", initError);
+                hideGlobalLoader(); 
+                
+                renderErrorPage({
+                    title: "Gagal Memuat Sesi",
+                    message: "Tidak dapat memuat data pengguna atau profil Anda. Periksa koneksi internet Anda dan coba lagi.",
+                    details: initError.message,
+                    illustrationKey: "database-error",
+                    showRetryButton: true
+                });
+            }
+          } else {
       console.log("[App Log] Tidak ada user. Merender UI guest.");
       try {
         const { renderUI } = await import('./ui/mainUI.js');

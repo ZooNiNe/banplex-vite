@@ -9,10 +9,12 @@ import { _renderFinancialSummaryChart, _renderIncomeExpenseBarChart } from '../c
 import { calculateAndCacheDashboardTotals } from '../../services/data/calculationService.js';
 import { logsCol } from '../../config/firebase.js';
 import { getDocs, query, orderBy, limit, onSnapshot, where } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js';
-import { localDB } from '../../services/localDbService.js';
+import { localDB, loadDataForPage } from '../../services/localDbService.js';
 import { getJSDate } from '../../utils/helpers.js';
 import { ensureMasterDataFresh } from '../../services/data/ensureMasters.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
+import { initPullToRefresh, destroyPullToRefresh } from "../components/pullToRefresh.js";
+import { showLoadingModal, hideLoadingModal } from "../components/modal.js";
 
 function createIcon(iconName, size = 18, classes = '') {
     const icons = {
@@ -281,7 +283,7 @@ async function renderDashboardContent() {
             <div class="quote-content">
                 <div class="quote-header">
                     <span class="quote-mark" aria-hidden="true">“</span>
-                    <span class="quote-title">Inspirasi Hari Ini</span>
+                    <span class="quote-title">Quotes</span>
                 </div>
                 <blockquote class="quote-text" id="quote-text">Memuat kutipan...</blockquote>
                 <div class="quote-meta">
@@ -386,7 +388,7 @@ async function renderDashboardContent() {
             <div class="dashboard-card card-full-width" id="dashboard-card-income_vs_expense">
                 <div class="card-header">
                     <div class="card-icon income-expense">${createIcon('wallet')}</div>
-                    <span class="card-title">Pemasukan vs Pengeluaran (7 Hari)</span>
+                    <span class="card-title">Uang Masuk vs Keluar 7H</span>
                      <button class="btn-icon refresh-btn" data-action="refresh-dashboard-card" data-card-type="income_vs_expense" data-tooltip="Refresh Perbandingan">${createIcon('list_refresh', 16)}</button>
                       <button class="btn-icon btn-sm" data-action="navigate" data-nav="laporan" style="margin-left: auto;" data-tooltip="Lihat Laporan Lengkap">${createIcon('arrow_right', 16)}</button>
                 </div>
@@ -425,9 +427,12 @@ async function renderDashboardContent() {
 }
 
 function initDashboardPage() {
+    destroyPullToRefresh();
     const container = $('.page-container');
+    
+    if (!container) return; 
+
     container.innerHTML = `
-        <div class="dashboard-background"></div>
         ${createPageToolbarHTML({
             title: 'Dashboard',
             isTransparent: true,
@@ -438,15 +443,40 @@ function initDashboardPage() {
         <div id="sub-page-content" class="scrollable-content has-padding"></div>
     `;
 
-  emit('ui.dashboard.renderContent');
-  setTimeout(() => { try { updateActivityLogBadge(); startActivityLogRealtimeBadge(); renderCommentsBadge(); } catch(_) {} }, 0);
+    const dashboardContent = $('#sub-page-content');
+    if (!dashboardContent) {
+        console.error("Dashboard content container '#sub-page-content' not found!");
+        return; 
+    }
+
+    initPullToRefresh({
+        triggerElement: '.toolbar',
+        scrollElement: dashboardContent,   // 2. Cek scroll di konten
+        indicatorContainer: '#ptr-indicator-container', // 3. Indikator di luar
+        pushDownElement: '#page-container', // 4. Dorong seluruh halaman
+        onRefresh: async () => {
+            showLoadingModal('Memperbarui data...');
+            try {
+                appState.dashboardData = null; 
+                await loadDataForPage('Dashboard', true);
+                emit('ui.dashboard.renderContent'); 
+            } catch (err) {
+                console.error("PTR Error:", err);
+                emit('ui.toast', { message: 'Gagal memperbarui', type: 'error' });
+            } finally {
+                hideLoadingModal();
+            }
+        }
+    });
+
+    setTimeout(() => { try { updateActivityLogBadge(); startActivityLogRealtimeBadge(); renderCommentsBadge(); } catch(_) {} }, 0);
+    
     try {
         const pref = localStorage.getItem('ui.layout.dashboard') || 'grid';
         document.body.classList.toggle('dashboard-layout-grid', pref === 'grid');
         document.body.classList.toggle('dashboard-layout-cards', pref === 'cards');
     } catch(_) {}
 
-    // Subscribe to live appState updates and rerender dashboard
     try {
         if (initDashboardPage._live) { initDashboardPage._live.unsubscribe?.(); initDashboardPage._live = null; }
         initDashboardPage._live = liveQueryMulti(['bills','expenses','incomes','attendance_records','funding_sources'], () => {
@@ -459,7 +489,6 @@ function initDashboardPage() {
   async function updateActivityLogBadge() {
     const btn = document.getElementById('open-activity-log');
     if (!btn) return;
-    // Remove previous badge inside button
     btn.querySelector('.notification-badge')?.remove();
     let lastSeen = 0;
     try {

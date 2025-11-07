@@ -11,11 +11,12 @@ import { isViewer, getJSDate } from "../../utils/helpers.js";
 import { _safeFirestoreWrite } from "./adminService.js";
 import { fetchAndCacheData } from "./fetch.js";
 import { parseFormattedNumber } from "../../utils/formatters.js";
-import { showDetailPane, closeDetailPaneImmediate } from "../../ui/components/modal.js";
+// [PERBAIKAN] Impor 'closeAllModals' dari eventBus
+import { showDetailPane, closeDetailPaneImmediate, closeModalImmediate } from "../../ui/components/modal.js";
 import { createTabsHTML } from "../../ui/components/tabs.js";
 import { getEmptyStateHTML } from "../../ui/components/emptyState.js";
 import { _getMasterDataListHTML } from "../../ui/components/cards.js";
-import { getMasterDataFormHTML, openWorkerWageDetailModal, initCustomSelects, formatNumberInput, updateCustomSelectOptions } from "../../ui/components/forms/index.js"; // [PERBAIKAN] Impor updateCustomSelectOptions
+import { getMasterDataFormHTML, openWorkerWageDetailModal, initCustomSelects, formatNumberInput, updateCustomSelectOptions } from "../../ui/components/forms/index.js";
 import { createMasterDataFormSkeletonHTML, createMasterDataListSkeletonHTML } from "../../ui/components/skeleton.js";
 import { attachStaffFormListeners } from "../../ui/components/forms/index.js";
 import { removeItemFromListWithAnimation } from "../../utils/dom.js";
@@ -95,252 +96,43 @@ export function openMasterDataGrid() {
 
 
 export async function handleManageMasterData(type, options = {}) {
+    if (!type || !masterDataConfig[type]) {
+        console.error(`[handleManageMasterData] Tipe master data tidak valid: ${type}`);
+        toast('error', 'Tipe master data tidak dikenal.');
+        return;
+    }
 
-    const config = masterDataConfig[type];
-    if (!config) return;
+    const { itemId = null, activeTab = 'list' } = options;
 
-    const { itemId = null, fromList = false, justSaved = false } = options;
-    let { activeTab = 'list' } = options;
-
-    if (itemId) activeTab = 'form';
-
-    const title = `Kelola ${config.title}`;
-    const tabs = [
-        { id: 'list', label: 'Daftar Data' },
-        { id: 'form', label: itemId ? 'Edit Data' : 'Input Baru' }
-    ];
-
-    const content = `
-        ${createTabsHTML({ id: 'master-data-tabs', tabs, activeTab, customClasses: 'tabs-underline two-tabs' })}
-        <div id="master-data-content" class="scrollable-content">
-        </div>
-    `;
-
-    // --- PERBAIKAN 1: Baris ini dihapus ---
-    // if (activeTab === 'list' && justSaved) {
-    //     appState.detailPaneHistory = [];
-    // }
-    // --- AKHIR PERBAIKAN 1 ---
-
-    showDetailPane({
-        title,
-        content,
-        footer: '',
-        paneType: `master-data-${type}`
-    });
-
-    const detailPane = document.getElementById('detail-pane');
-    const contentContainer = detailPane.querySelector('#master-data-content');
-    const tabsContainer = detailPane.querySelector('#master-data-tabs');
-    let isFormDirty = false;
-    let currentItemId = itemId;
-
-
-    let formUpdateListener = null;
-
-    const renderTabContent = async (tabId, currentItemIdForRender) => {
-
-        if (formUpdateListener) {
-             off('masterData.updated', formUpdateListener);
-             formUpdateListener = null;
-        }
-
-        contentContainer.classList.toggle('has-sticky-footer', tabId === 'form');
-
-        const editorRestricted = (appState.userRole === 'Editor' && !['materials', 'suppliers', 'professions', 'workers', 'op-cats', 'other-cats', 'creditors'].includes(type));
-
-        if (tabId === 'form' && editorRestricted) {
-            contentContainer.innerHTML = getEmptyStateHTML({
-                icon: 'lock',
-                title: 'Akses Dibatasi',
-                desc: 'Hanya Owner yang dapat menambah atau mengedit data master ini.'
-            });
-            return;
-        }
-
-        if (tabId === 'list') {
-            contentContainer.innerHTML = createMasterDataListSkeletonHTML();
-            await fetchAndCacheData(config.stateKey, COLLECTIONS[type], config.nameField);
-            const items = (appState[config.stateKey] || []);
-
-            if (items.filter(item => !item.isDeleted).length > 0) {
-                 contentContainer.innerHTML = `<div class="wa-card-list-wrapper master-data-list">${_getMasterDataListHTML(type, items, config)}</div>`;
-            } else {
-                 contentContainer.innerHTML = getEmptyStateHTML({
-                    icon: 'database',
-                    title: `Data ${config.title} Kosong`,
-                    desc: `Anda bisa menambahkan data baru melalui tab 'Input Baru'.`
-                 });
-            }
-        } else {
-            contentContainer.innerHTML = createMasterDataFormSkeletonHTML();
-            let itemData = null;
-
-            if (type === 'workers') {
-                await fetchAndCacheData('professions', professionsCol, 'professionName');
-                await fetchAndCacheData('projects', projectsCol, 'projectName');
-            }
-
-            if (currentItemIdForRender) {
-                await fetchAndCacheData(config.stateKey, COLLECTIONS[type], config.nameField);
-                itemData = (appState[config.stateKey] || []).find(i => i.id === currentItemIdForRender);
-            }
-            contentContainer.innerHTML = await getMasterDataFormHTML(type, itemData);
-
-            initCustomSelects(contentContainer);
-
-
-            contentContainer.querySelectorAll('input[inputmode="numeric"]').forEach(input => {
-                input.addEventListener('input', formatNumberInput);
-            });
-
-            const form = contentContainer.querySelector('#master-data-form');
-            if (form) {
-                isFormDirty = false;
-                const dirtyListener = () => { isFormDirty = true; };
-                form.addEventListener('input', dirtyListener);
-                form.addEventListener('change', dirtyListener);
-            }
-
-            if(type === 'staff') {
-                attachStaffFormListeners(contentContainer);
-            }
-
-            emit('ui.forms.init', contentContainer);
-
-            // [PERBAIKAN] Pasang listener untuk update dropdown
-            if (detailPane.__controller && detailPane.__controller.signal) {
-                on('masterData.updated', (updateData) => {
-                    if (!updateData || !updateData.type) return;
-                    // Panggil helper update dropdown yang baru
-                    console.log(`[Master Panel] Master data '${updateData.type}' diperbarui. Memperbarui dropdown...`);
-                    updateCustomSelectOptions(contentContainer, updateData.type);
-                }, { signal: detailPane.__controller.signal });
-            }
-        }
+    appState.masterDataOpenRequest = {
+        type: type,
+        itemId: itemId,
+        activeTab: itemId ? 'form' : activeTab,
     };
 
-    contentContainer.addEventListener('click', e => {
-        const target = e.target.closest('[data-action]');
-        if(!target) return;
-        const action = target.dataset.action;
+    const currentModal = document.querySelector('.modal-bg.show');
+    if (currentModal) {
+        emit('ui.modal.closeImmediate', currentModal);
+    }
 
-        if(action === 'add-worker-wage' || action === 'edit-worker-wage') {
-            const form = target.closest('form');
-            if (!form) return;
-            const list = form.querySelector('#worker-wages-summary-list');
-            if (!list) return;
-
-            const existingWages = {};
-            list.querySelectorAll('.worker-wage-summary-item').forEach(it => {
-                const pid = it.dataset.projectId;
-                try { existingWages[pid] = JSON.parse(it.dataset.wages || '{}'); } catch { existingWages[pid] = {}; }
-            });
-
-            const editingItem = action === 'edit-worker-wage' ? target.closest('.worker-wage-summary-item') : null;
-            const editProjectId = editingItem ? editingItem.dataset.projectId : null;
-
-            const onSave = ({ projectId, roles }) => {
-                const project = appState.projects.find(p => p.id === projectId);
-                const rolesHTML = Object.entries(roles).map(([name, wage]) => `<span class="badge">${name}: ${new Intl.NumberFormat('id-ID').format(wage)}</span>`).join(' ');
-                const markup = `
-                    <div class="worker-wage-summary-item" data-project-id="${projectId}" data-wages='${JSON.stringify(roles)}'>
-                      <div class="dense-list-item">
-                        <div class="item-main-content">
-                            <strong class="item-title">${project?.projectName || 'Proyek'}</strong>
-                            <div class="item-sub-content role-summary">${rolesHTML}</div>
-                        </div>
-                        <div class="item-actions">
-                          <button type="button" class="btn-icon" title="Edit" data-action="edit-worker-wage">${createIcon('pencil')}</button>
-                          <button type="button" class="btn-icon btn-icon-danger" title="Hapus" data-action="remove-worker-wage">${createIcon('trash-2')}</button>
-                        </div>
-                      </div>
-                    </div>`;
-
-                const existingEl = list.querySelector(`.worker-wage-summary-item[data-project-id="${projectId}"]`);
-                if (existingEl) existingEl.outerHTML = markup;
-                else list.insertAdjacentHTML('beforeend', markup);
-
-                const empty = list.querySelector('.empty-state-small');
-                if (empty) empty.remove();
-                isFormDirty = true;
-            };
-
-            openWorkerWageDetailModal({ projectId: editProjectId, existingWages, onSave });
-        }
-        else if (action === 'edit-master-item' || action === 'delete-master-item') {
-             const itemWrapper = target.closest('.wa-card-v2-wrapper');
-             if (itemWrapper) {
-                 const idFromWrapper = itemWrapper.dataset.itemId;
-                 const typeFromWrapper = itemWrapper.dataset.type;
-                 if (idFromWrapper && typeFromWrapper) {
-                     if (action === 'edit-master-item') {
-                         handleEditMasterItem(idFromWrapper, typeFromWrapper);
-                     } else {
-                         handleDeleteMasterItem(idFromWrapper, typeFromWrapper);
-                     }
-                 }
-             }
-        }
-    });
-
-    tabsContainer.addEventListener('click', (e) => {
-        const tabButton = e.target.closest('.sub-nav-item');
-        if (tabButton && !tabButton.classList.contains('active')) {
-            const newTabId = tabButton.dataset.tab;
-            const currentTabId = tabsContainer.querySelector('.active')?.dataset.tab;
-
-            const proceed = () => {
-                tabsContainer.querySelector('.active')?.classList.remove('active');
-                tabButton.classList.add('active');
-                const formTab = tabsContainer.querySelector('[data-tab="form"]');
-                if (formTab) formTab.textContent = 'Input Baru';
-
-                if (newTabId === 'list') {
-                     currentItemId = null;
-                     // --- PERBAIKAN 2: Baris yang menyebabkan bug dihapus ---
-                     // appState.detailPaneHistory = []; 
-                     // --- AKHIR PERBAIKAN 2 ---
-                }
-
-                renderTabContent(newTabId, currentItemId);
-            };
-
-            if (currentTabId === 'form' && isFormDirty) {
-                emit('ui.modal.create', 'confirmUserAction', {
-                    title: 'Batalkan Perubahan?',
-                    message: 'Perubahan yang belum disimpan akan hilang. Anda yakin ingin kembali ke daftar?',
-                    onConfirm: proceed,
-                });
-            } else {
-                proceed();
-            }
-        }
-    });
-
-    await renderTabContent(activeTab, currentItemId);
-
-     const originalCloseHandler = detailPane.dataset.closeHandlerAttached;
-     if (originalCloseHandler) {
-
-         off('detailPane.closing', originalCloseHandler);
-     }
-     const newCloseHandler = () => {
-        if (formUpdateListener) {
-            off('masterData.updated', formUpdateListener);
-            formUpdateListener = null;
-        }
-     };
-     detailPane.dataset.closeHandlerAttached = newCloseHandler;
-     on('detailPane.closing', newCloseHandler);
+    // [PERBAIKAN] Tambahkan pengecekan dan penutupan untuk Detail Pane
+    // Kita panggil 'closeAllModals' agar mencakup panel mobile dan desktop
+    const detailPane = document.getElementById('detail-pane');
+    const isMobileDetailOpen = document.body.classList.contains('detail-view-active');
+    if (detailPane && (detailPane.classList.contains('detail-pane-open') || isMobileDetailOpen)) {
+        emit('ui.modal.closeAll');
+    }
+    // [AKHIR PERBAIKAN]
+    
+    setTimeout(() => {
+        emit('ui.navigate', 'master_data');
+    }, 50);
 }
-
 
 
 export async function handleAddMasterItem(form) {
 
     if (!validateForm(form)) {
-
         toast('error', 'Harap periksa kembali isian Anda, semua field wajib diisi.');
         return false;
     }
@@ -348,7 +140,6 @@ export async function handleAddMasterItem(form) {
     const config = masterDataConfig[type];
     const itemName = form.elements.itemName.value.trim();
     if (!config || !itemName) {
-
         return false;
     }
 
@@ -428,16 +219,32 @@ export async function handleAddMasterItem(form) {
             if (success) {
                 await localDB[config.dbTable].put({ ...dataToAdd, createdAt: new Date(), updatedAt: new Date(), syncState: 'synced' });
                 _logActivity(`Menambah Master Data: ${config.title}`, { name: itemName });
+                
                 emit('masterData.updated', { type });
-                handleManageMasterData(type, { activeTab: 'list', justSaved: true });
+                
+                if (appState.activePage === 'master_data') {
+                    const tabsContainer = document.querySelector('#master-data-tabs');
+                    const listTab = tabsContainer?.querySelector('[data-tab="list"]');
+                    if (listTab) listTab.click();
+                } else {
+                    emit('ui.navigate', 'pengaturan');
+                }
+
                 toast('success', `${config.title} baru berhasil ditambahkan.`);
             } else {
-                // Offline fallback: store locally and queue for sync
                 const localDoc = { ...dataToAdd, createdAt: new Date(), updatedAt: new Date(), syncState: 'pending_create' };
                 await localDB[config.dbTable].put(localDoc);
                 try { await queueOutbox({ table: config.dbTable, docId: dataToAdd.id, op: 'upsert', payload: localDoc, priority: 6 }); } catch(_) {}
+                
                 emit('masterData.updated', { type });
-                handleManageMasterData(type, { activeTab: 'list', justSaved: true });
+                if (appState.activePage === 'master_data') {
+                    const tabsContainer = document.querySelector('#master-data-tabs');
+                    const listTab = tabsContainer?.querySelector('[data-tab="list"]');
+                    if (listTab) listTab.click();
+                } else {
+                    emit('ui.navigate', 'pengaturan');
+                }
+
                 toast('info', `${config.title} disimpan offline dan akan disinkronkan.`);
             }
         }
@@ -488,7 +295,6 @@ export async function handleDeleteMasterItem(id, type) {
                             await _safeFirestoreWrite(() => updateDoc(doc(COLLECTIONS[type], id), { isDeleted: 0, updatedAt: serverTimestamp() }), '', 'Gagal mengurungkan.');
                             if(undoToast.close) undoToast.close();
                             emit('masterData.updated', { type });
-                            handleManageMasterData(type, { activeTab: 'list' });
                             toast('success', 'Aksi dibatalkan.');
                         } catch (e) {
                             if(undoToast.close) undoToast.close();
@@ -509,12 +315,10 @@ export async function handleDeleteMasterItem(id, type) {
                     }
                 }, 500);
             } else {
-                // Offline fallback: soft-delete locally and queue
                 const originalItem = await localDB[config.dbTable].get(id);
                 await localDB[config.dbTable].update(id, { isDeleted: 1, syncState: 'pending_update', updatedAt: new Date() });
                 try { await queueOutbox({ table: config.dbTable, docId: id, op: 'upsert', payload: { id, isDeleted: 1, updatedAt: new Date() }, priority: 5 }); } catch(_) {}
                 emit('masterData.updated', { type });
-                handleManageMasterData(type, { activeTab: 'list' });
                 toast('info', `${config.title} ditandai terhapus (offline). Akan disinkronkan.`);
             }
         }
@@ -523,26 +327,24 @@ export async function handleDeleteMasterItem(id, type) {
 
 
 export async function handleEditMasterItem(id, type) {
-    handleManageMasterData(type, { itemId: id, activeTab: 'form' });
+    appState.masterDataOpenRequest = { type, itemId: id, activeTab: 'form' };
+    emit('ui.navigate', 'master_data');
 }
 
 export async function handleUpdateMasterItem(form) {
 
     if (!validateForm(form)) {
-
         toast('error', 'Harap periksa kembali isian Anda, semua field wajib diisi.');
         return false;
     }
     const { id, type } = form.dataset;
     const config = masterDataConfig[type];
     if (!config) {
-
         return false;
     }
 
     const newName = form.elements.itemName.value.trim();
     if (!newName) {
-
         return false;
     }
 
@@ -622,15 +424,30 @@ export async function handleUpdateMasterItem(form) {
                 await fetchAndCacheData(config.stateKey, collectionRef, config.nameField);
                 _logActivity(`Memperbarui Master: ${config.title}`, { docId: id });
                 emit('masterData.updated', { type });
-                handleManageMasterData(type, { activeTab: 'list', justSaved: true });
+                
+                if (appState.activePage === 'master_data') {
+                    const tabsContainer = document.querySelector('#master-data-tabs');
+                    const listTab = tabsContainer?.querySelector('[data-tab="list"]');
+                    if (listTab) listTab.click();
+                } else {
+                    emit('ui.navigate', 'pengaturan');
+                }
+
                 toast('success', `Data ${config.title} berhasil diperbarui.`);
             } else {
-                // Offline fallback: update locally and queue
                 const localUpdate = { ...dataToUpdate, updatedAt: new Date(), syncState: 'pending_update' };
                 await localDB[config.dbTable].update(id, localUpdate);
                 try { await queueOutbox({ table: config.dbTable, docId: id, op: 'upsert', payload: { id, ...localUpdate }, priority: 6 }); } catch(_) {}
                 emit('masterData.updated', { type });
-                handleManageMasterData(type, { activeTab: 'list', justSaved: true });
+
+                if (appState.activePage === 'master_data') {
+                    const tabsContainer = document.querySelector('#master-data-tabs');
+                    const listTab = tabsContainer?.querySelector('[data-tab="list"]');
+                    if (listTab) listTab.click();
+                } else {
+                    emit('ui.navigate', 'pengaturan');
+                }
+
                 toast('info', `${config.title} diperbarui offline. Akan disinkronkan.`);
             }
         }

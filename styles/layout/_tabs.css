@@ -183,3 +183,73 @@
   background-color: rgba(255, 255, 255, 0.2);
   color: white;
 }
+.sub-nav-tabs-container {
+  display: flex;
+  flex-wrap: wrap; /* Izinkan wrapping di layar kecil */
+  gap: 4px; /* Jarak antar tab */
+  padding: 8px 16px; /* Padding kontainer */
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(
+    --background-color
+  ); /* Pastikan punya background solid */
+  margin: -16px -16px 16px -16px; /* Menyerap padding konten utama */
+  position: sticky;
+  top: var(
+    --header-height
+  ); /* Menempel di bawah header saat scroll (desktop) */
+  z-index: 100; /* Di atas konten tab, di bawah header utama */
+}
+
+.sub-nav-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px; /* Jarak antara ikon dan teks */
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary-color);
+  background-color: transparent;
+  border: none;
+  border-bottom: 3px solid transparent; /* Garis bawah non-aktif */
+  cursor: pointer;
+  border-radius: 6px 6px 0 0; /* Sedikit lengkungan di atas */
+  transition: all 0.2s ease-in-out;
+  text-align: center;
+  flex-grow: 0; /* Jangan memanjang secara default */
+  flex-shrink: 0; /* Jangan menyusut secara default */
+}
+
+.sub-nav-tab-item:hover {
+  background-color: var(--background-hover-color);
+  color: var(--text-primary-color);
+}
+
+.sub-nav-tab-item.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color); /* Garis bawah aktif */
+  font-weight: 600;
+  background-color: var(
+    --background-light-color
+  ); /* Latar belakang aktif yang subtil */
+}
+
+/* Penyesuaian untuk layar kecil */
+@media (max-width: 768px) {
+  .sub-nav-tabs-container {
+    padding: 8px;
+    margin: -8px -8px 8px -8px; /* Margin lebih kecil di mobile */
+    top: var(--header-height-mobile); /* Menempel di bawah header mobile */
+    gap: 8px; /* Jarak lebih besar untuk tap */
+  }
+
+  .sub-nav-tab-item {
+    flex-grow: 1; /* Biarkan tab mengisi ruang jika wrap (tampilan lebih baik) */
+    padding: 10px 8px;
+    font-size: 0.85rem;
+    justify-content: center; /* Pusatkan ikon dan teks */
+  }
+
+  .sub-nav-tab-item span {
+    display: block; /* Tampilkan teks di bawah ikon jika perlu */
+  }
+}

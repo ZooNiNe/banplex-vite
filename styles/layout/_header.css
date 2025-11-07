@@ -34,11 +34,11 @@
 /* Perbaikan #4: Improve tampilan page label agar lebih menonjol */
 .page-label .page-name {
   display: inline-block;
-  font-size: 1.1rem;
+  font-size: .9rem;
   font-weight: 700;
   color: var(--text);
   margin: 0;
-  line-height: 1.1;
+  line-height: 1;
   padding: 0; /* Blend in with toolbar */
   border: none; /* Remove chip/badge look */
   background: transparent; /* Subtle, text-only */

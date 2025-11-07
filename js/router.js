@@ -47,26 +47,22 @@ function handlePopstateEvent(e) {
     const state = e.state || {};
     const targetPage = state.page || 'dashboard';
 
-    // 3. Logika LIFO (Last-In, First-Out) untuk menutup overlay
-    // Kita periksa dari yang paling atas (panel mobile) ke yang paling bawah (modal).
+// [router.js] - DENGAN BLOK BARU INI:
 
-    // Prioritas 1: Menutup Mobile Detail Pane
-    if (isMobileDetailOpen) {
-        console.log('[Popstate] Menutup mobile detail pane...');
-        // Cek riwayat panel bertumpuk
-        if (appState.detailPaneHistory.length > 0) {
-            console.log('[Popstate] Kembali ke panel sebelumnya.');
-            const prevState = appState.detailPaneHistory.pop();
-            // Render ulang panel sebelumnya (true = isGoingBack)
-            emit('ui.modal.showMobileDetail', prevState, true);
-        } else {
-            // Ini adalah panel terakhir, tutup sepenuhnya
-            hideMobileDetailPageImmediate();
-        }
-        // Kita telah menangani event "back" ini. Selesai.
-        return;
-    }
-
+    // Prioritas 1: Menutup Mobile Detail Pane
+    if (isMobileDetailOpen) {
+        console.log('[Popstate] Menutup mobile detail pane...');
+        // Cek riwayat panel bertumpuk
+        if (appState.detailPaneHistory.length > 0) {
+            console.log('[Popstate] Kembali ke panel sebelumnya.');
+            const prevState = appState.detailPaneHistory.pop();
+            // Render ulang panel sebelumnya (true = isGoingBack)
+            emit('ui.modal.showMobileDetail', prevState, true);
+            return; 
+        } else {
+            hideMobileDetailPageImmediate();
+        }
+    }
     // Prioritas 2: Menutup Desktop Detail Pane
     if (isDesktopDetailOpen) {
         console.log('[Popstate] Menutup desktop detail pane...');
@@ -76,12 +72,11 @@ function handlePopstateEvent(e) {
             const prevState = appState.detailPaneHistory.pop();
             // Render ulang panel sebelumnya (true = isGoingBack)
             emit('ui.modal.showDetail', prevState, true);
+            return;
         } else {
             // Ini adalah panel terakhir, tutup sepenuhnya
             closeDetailPaneImmediate();
         }
-        // Kita telah menangani event "back" ini. Selesai.
-        return;
     }
 
     // Prioritas 3: Menutup Modal (non-utility)

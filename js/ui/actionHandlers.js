@@ -483,10 +483,10 @@ export const clickActions = {
             if (btn) {
                 btn.classList.toggle('active', next);
                 btn.setAttribute('aria-pressed', next ? 'true' : 'false');
-                btn.title = next ? 'Mode Akuntansi' : 'Mode Laporan';
+                btn.title = next ? 'Mode Pro' : 'Mode Basic';
                 btn.innerHTML = `
                     <span class="toggle-dot" aria-hidden="true"></span>
-                    <span class="toggle-label">${next ? 'Akuntansi' : 'Laporan'}</span>
+                    <span class="toggle-label">${next ? 'Pro' : 'Basic'}</span>
                 `;
             }
             if (appState.activePage === 'laporan') {

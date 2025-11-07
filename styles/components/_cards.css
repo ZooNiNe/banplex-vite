@@ -141,7 +141,6 @@
   align-items: center;
   gap: .5rem;
   padding: 0.85rem;
-  padding-right: .25rem;
   cursor: default;
   position: relative;
   z-index: 2;

@@ -52,13 +52,13 @@ export function initializeGlobalClickListeners() {
         const actionTarget = resolvedContext?.target;
 
         const isIgnoredButton = target.closest('.custom-select-trigger');
-        const isInDetailPaneFormSubmit = target.closest('#detail-pane form button[type="submit"], #detail-pane .form-footer-actions button[type="submit"]');
-
-        if (isIgnoredButton || isInDetailPaneFormSubmit) {
-
-            return;
-        }
-
+                const isInDetailPaneFormSubmit = target.closest('#detail-pane form button[type="submit"], #detail-pane .form-footer-actions button[type="submit"]');
+        
+                const isCommentButton = target.closest('.composer-capsule,.composer-wrapper,[data-action="post-comment"], [data-action="reply-comment"], .comment-menu');
+        
+                if (isIgnoredButton || isInDetailPaneFormSubmit || isCommentButton) {
+                    return;
+                }
 
         const openMenu = document.querySelector('.actions-menu.show');
         if (openMenu && !openMenu.contains(target) && actionTarget !== openMenu.originElement) {

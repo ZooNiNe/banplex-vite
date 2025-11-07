@@ -116,9 +116,6 @@
   overscroll-behavior: contain; /* <--- TAMBAHKAN INI */
 }
 
- .dark-theme .modal-footer {
-   background-color: var(--panel);
- }
 
 /* --- Welcome Onboarding Modal --- */
 .modal-bg.is-welcome-modal .modal-content {
@@ -243,7 +240,7 @@
 }
 
 .modal-bg.is-bottom-sheet .modal-body {
-  padding: 0.5rem 1.25rem calc(0rem + env(safe-area-inset-bottom, 0px)) 1.25rem;
+  padding: 0.5rem 1.25rem calc(1rem + env(safe-area-inset-bottom, 0px)) 1.25rem;
   overflow-y: auto;
   flex-grow: 1;
   min-height: 0;
@@ -641,4 +638,53 @@ background-color: var(--panel);
 #actionsPopup-modal > div > div.modal-footer > div > footer > div > div > textarea{
   border-color: none;
   box-shadow: none;
+}
+
+
+/*
+--- STYLES UNTUK LOADING MODAL ---
+*/
+.modal-bg.loading-modal {
+  /* Latar belakang lebih transparan untuk loading */
+  background-color: rgba(var(--color-shadow-rgb), 0.3);
+  backdrop-filter: blur(2px);
+  z-index: 9998; /* Di atas modal lain */
+}
+
+.loading-modal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 32px;
+  gap: 16px;
+  background-color: var(--bg-end);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  max-width: 240px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 54px;
+  height: 54px;
+  border: 6px solid var(--primary-light);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  /* Gunakan animasi putar yg sama dgn PTR */
+  animation: ptr-spin 1s linear infinite;
+}
+
+.loading-message {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0;
+}
+
+/* Pastikan animasi ptr-spin ada (jika belum ada di file ini) */
+@keyframes ptr-spin {
+  to {
+      transform: rotate(360deg);
+  }
 }

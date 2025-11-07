@@ -19,7 +19,6 @@ export function initializeEventListeners() {
     initializeEventBusListeners();
     initializeSyncIndicatorListeners();
 
-    // Add event listener for initializing forms globally or in specific contexts
     on('ui.forms.init', (container) => {
         if (!container) return;
         initCustomSelects(container);

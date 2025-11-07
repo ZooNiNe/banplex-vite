@@ -1,0 +1,57 @@
+/*
+ * File: styles/components/_pull-to-refresh.css
+ * Desain ulang spinner PTR
+ */
+
+ .ptr-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 70px; /* Sesuaikan dengan pullThreshold di JS */
+    display: flex;
+    justify-content: center;
+    align-items: flex-end; /* Spinner di bagian bawah container */
+    padding-bottom: 15px;
+    
+    /* Dikelola oleh JS: */
+    transform: translateY(-100%);
+    opacity: 0;
+    
+    /* Penting agar tidak menghalangi klik */
+    pointer-events: none;
+    z-index: 10;
+    overflow: hidden;
+}
+
+/* Spinner baru */
+.ptr-spinner {
+    width: 28px;
+    height: 28px;
+    border: 4px solid rgba(var(--color-primary-rgb), 0.2);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    
+    /* Mulai dari kecil (dikelola oleh JS 'handleTouchMove') */
+    transform: scale(0.2); 
+    transition: transform 0.1s ease-out;
+}
+
+/* Saat 'refreshing' (class ditambahkan oleh JS) */
+.ptr-indicator.refreshing .ptr-spinner {
+    /* Ukuran penuh dan berputar */
+    transform: scale(1);
+    animation: ptr-spin 1s linear infinite;
+}
+
+/* Hapus ikon SVG lama jika masih ada */
+.ptr-icon {
+    display: none;
+}
+
+/* Animasi putar */
+@keyframes ptr-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

@@ -29,6 +29,7 @@ import {
     handleOpenProjectRoleModal
 } from "../../services/data/attendanceService.js";
 import { clickActions } from "../actionHandlers.js";
+import { handleNavigation } from "../mainUI.js";
 
 function createIcon(iconName, size = 20, classes = '') {
     const icons = {
@@ -55,6 +56,13 @@ function handleDownloadConfirmation(downloader, data, actionType, sourceButton) 
 
 
 export function initializeEventBusListeners() {
+    on('ui.navigate', (targetPage, options = {}) => {
+        try {
+            handleNavigation(targetPage, options);
+        } catch (e) {
+            console.error(`[EventBus] Gagal menangani navigasi ke ${targetPage}:`, e);
+        }
+    });
     on('data.deleteMultipleItems', (items) => handleDeleteMultipleItems(items));
 
     on('ui.animate.removeItem', (domId) => {

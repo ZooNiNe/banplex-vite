@@ -34,7 +34,7 @@
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: .75rem .75rem; /* Padding lebih nyaman */
+  padding: .5rem .75rem; /* Padding lebih nyaman */
   background: none;
   border: none;
   width: 100%;

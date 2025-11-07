@@ -99,6 +99,10 @@ async function renderPageContent() {
                  initFunctionName = 'initRecycleBinPage';
                  pageModule = await import('./recycleBin.js');
                  break;
+                 case 'master_data':
+                    initFunctionName = 'initMasterDataPage';
+                    pageModule = await import('./master_data.js');
+                    break;    
             default:
                 emit('ui.transitionContent', container, getEmptyStateHTML({ icon: 'error', title: 'Halaman Tidak Ditemukan', desc: 'Halaman yang diminta tidak valid.', illustration: 'lost' }));
                 if (activePage !== 'absensi') { restorePageFab(); }

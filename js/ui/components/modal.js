@@ -358,7 +358,6 @@ export function closeDetailPaneImmediate() {
     delete detailPane.dataset.isSuccessPanel;
     resetFormDirty();
     detailPane.innerHTML = ''; // Hapus konten
-    checkAndRestoreBottomNav();
 }
 
 export function closeDetailPane() {
@@ -535,7 +534,6 @@ export function hideMobileDetailPageImmediate() {
     delete detailPane.dataset.isSuccessPanel;
     resetFormDirty();
     detailPane.innerHTML = ''; // Hapus konten
-    checkAndRestoreBottomNav();
 }
 
 export function closeAllModals() {
@@ -653,5 +651,56 @@ export function handleDetailPaneBack() {
             },
             onCancel: () => {}
         });
+    }
+}
+
+// Tambahkan di akhir file js/ui/components/modal.js
+
+/**
+ * Menampilkan modal loading sederhana.
+ * @param {string} [message='Mohon tunggu...'] - Pesan yang ditampilkan.
+ */
+export function showLoadingModal(message = 'Mohon tunggu...') {
+    // Hapus dulu jika ada loading modal sebelumnya
+    hideLoadingModal();
+
+    const modalId = 'global-loading-modal';
+    
+    const modalHTML = `
+    <div id="${modalId}" class="modal-bg is-open loading-modal" data-modal-type="loading">
+        <div class="modal-content loading-modal-content">
+            <div class="loading-spinner"></div>
+            <p class="loading-message">${message}</p>
+        </div>
+    </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Paksa reflow untuk transisi 'show'
+    const modalEl = document.getElementById(modalId);
+    if (modalEl) {
+        requestAnimationFrame(() => {
+            modalEl.classList.add('show');
+        });
+    }
+}
+
+/**
+ * Menyembunyikan modal loading global.
+ */
+export function hideLoadingModal() {
+    const modalEl = document.getElementById('global-loading-modal');
+    if (modalEl) {
+        modalEl.classList.remove('show');
+        // Hapus setelah transisi selesai
+        modalEl.addEventListener('transitionend', () => {
+            if (modalEl.parentNode) modalEl.remove();
+        }, { once: true });
+        
+        // Fallback jika event transisi tidak ter-trigger
+        setTimeout(() => {
+            if (modalEl && modalEl.parentNode) modalEl.remove();
+        }, 300);
     }
 }

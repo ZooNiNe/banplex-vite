@@ -7,11 +7,9 @@ import { emit, on, off } from '../../state/eventBus.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
 import { fetchAndCacheData } from '../../services/data/fetch.js';
 import { projectsCol, suppliersCol, opCatsCol, otherCatsCol, materialsCol } from '../../config/firebase.js';
+import { initPullToRefresh, destroyPullToRefresh } from "../components/pullToRefresh.js";
+import { showLoadingModal, hideLoadingModal } from "../components/modal.js";
 
-/**
- * [PERBAIKAN] Helper baru untuk memperbarui <select> kustom tanpa
- * me-render ulang seluruh form.
- */
 function updateFormDropdowns(form, activeTab) {
     console.log(`[Pengeluaran] Memperbarui dropdown untuk form tab: ${activeTab}`);
     
@@ -150,6 +148,7 @@ async function renderPengeluaranContent() {
 }
 
 function initPengeluaranPage() {
+    destroyPullToRefresh();
     const container = $('.page-container');
 
     const tabsData = [
@@ -190,7 +189,24 @@ function initPengeluaranPage() {
             }
         });
     }
+    initPullToRefresh({
+        triggerElement: '.panel-header', // Area statis di atas
+        scrollElement: '#sub-page-content',  // Konten yang di-scroll
+        indicatorContainer: '#ptr-indicator-container', // Target dari index.html
+        
+        onRefresh: async () => {
+            showLoadingModal('Memperbarui pengeluaran...');
+            try {
+                await renderPengeluaranContent();
 
+            } catch (err) {
+                console.error("PTR Error (Pengeluaran):", err);
+                emit('ui.toast', { message: 'Gagal memperbarui pengeluaran', type: 'error' });
+            } finally {
+                hideLoadingModal();
+            }
+        }
+    });
     renderPengeluaranContent();
 
     // Listener ini sekarang aman karena renderPengeluaranContent tidak merusak form
