@@ -10,7 +10,7 @@ import { masterDataConfig } from "../config/constants.js";
 import { handleManageUsers, handleUserAction } from "../services/data/userService.js";
 import { handleDeleteMasterItem, handleManageMasterData, openMasterDataGrid } from "../services/data/masterDataService.js";
 import { handleCheckIn, handleCheckOut, handleDeleteSingleAttendance, handleOpenAttendanceSettings, openManualAbsenceStatusPanel, handleSaveAllPendingAttendance } from "../services/data/attendanceService.js";
-import { handlePaySingleWorkerFromRecap, handleRemoveWorkerFromRecap, handleDeleteSalaryBill, openSalaryRecapPanel, generateSalaryRecap } from "../services/data/jurnalService.js";
+import { handleDeleteSalaryBill } from "../services/data/jurnalService.js";
 import { handleFixStuckAttendanceModal } from "../services/modals/jurnal/fixStuckAttendanceModal.js";
 import { _handleRestoreItems, _handleDeletePermanentItems, handleDeleteItem, _handleEmptyRecycleBin } from "../services/data/recycleBinService.js";
 import { handleServerCleanUp, resolveConflict, handleRecalculateUsageCount, handleRestoreOrphanLoans, openToolsGrid, handleDevResetAllData } from "../services/data/adminService.js";
@@ -152,67 +152,7 @@ export const clickActions = {
     'check-out': (ctx) => { handleCheckOut(ctx.id); },
     'edit-attendance': (ctx) => { emit('ui.modal.editAttendance', ctx.id || ctx.recordId || ctx.itemId); },
     'delete-attendance': (ctx) => { handleDeleteSingleAttendance(ctx.id || ctx.recordId || ctx.itemId); },
-    'pay-single-worker': (ctx) => {
-        const row = ctx.target.closest('tr');
-        const { workerId, workerName, totalPay, recordIds } = row.dataset;
-        const recordsArray = recordIds.split(',');
-        
-        const startDate = new Date(document.getElementById('recap-start-date').value);
-        const endDate = new Date(document.getElementById('recap-end-date').value);
-    
-        const singleWorkerData = {
-            workerId,
-            workerName,
-            totalPay: parseFloat(totalPay),
-            recordIds: recordsArray
-        };
-    
-        emit('ui.modal.create', 'confirmUserAction', {
-            message: `Buat tagihan individual untuk <strong>${workerName}</strong> sebesar <strong>${fmtIDR(singleWorkerData.totalPay)}</strong>?`,
-            onConfirm: async () => {
-                await handleGenerateBulkSalaryBill({ 
-                    all: false, 
-                    selectedWorkers: [singleWorkerData],
-                    startDate,
-                    endDate
-                });
-                
-                row.style.transition = 'opacity 0.3s, transform 0.3s';
-                row.style.opacity = '0';
-                row.style.transform = 'translateX(-20px)';
-                setTimeout(() => row.remove(), 300);
-            }
-        });
-    },
     'edit-recap-amount': (ctx) => { emit('ui.modal.editRecapAmount', ctx.target); },
-    'generate-all-salary-bill': () => {
-        const container = document.getElementById('rekap-gaji-results');
-        if (!container) return;
-        const rows = Array.from(container.querySelectorAll('tr[data-worker-id]'));
-        const selectedWorkers = rows.map(row => ({
-            workerId: row.dataset.workerId,
-            workerName: row.dataset.workerName,
-            totalPay: parseFloat(row.dataset.totalPay),
-            recordIds: row.dataset.recordIds.split(',')
-        }));
-        const startDate = new Date(document.getElementById('recap-start-date').value);
-        const endDate = new Date(document.getElementById('recap-end-date').value);
-        handleGenerateBulkSalaryBill({ all: true, selectedWorkers, startDate, endDate });
-    },
-    'generate-selected-salary-bill': () => {
-        const container = document.getElementById('rekap-gaji-results');
-        if (!container) return;
-        const rows = Array.from(container.querySelectorAll('tr[data-selected="true"]'));
-        const selectedWorkers = rows.map(row => ({
-            workerId: row.dataset.workerId,
-            workerName: row.dataset.workerName,
-            totalPay: parseFloat(row.dataset.totalPay),
-            recordIds: row.dataset.recordIds.split(',')
-        }));
-        const startDate = new Date(document.getElementById('recap-start-date').value);
-        const endDate = new Date(document.getElementById('recap-end-date').value);
-        handleGenerateBulkSalaryBill({ all: false, selectedWorkers, startDate, endDate });
-    },
     'set-payment-full': () => { emit('ui.form.setPaymentAmount', 'full'); },
     'set-payment-half': () => { emit('ui.form.setPaymentAmount', 'half'); },
     'fix-stuck-attendance': () => { handleFixStuckAttendanceModal(); },
@@ -498,29 +438,11 @@ export const clickActions = {
     'refresh-dashboard-card': (ctx) => {
         emit('ui.dashboard.refreshCardData', ctx.cardType);
     },
-    'open-salary-recap-panel': () => {
-        openSalaryRecapPanel();
-    },
     'open-salary-payment-panel': (ctx) => {
         emit('ui.jurnal.openSalaryPaymentPanel', ctx.itemId);
     },
-    'generate-salary-recap': () => {
-        const container = document.getElementById('rekap-gaji-form');
-        if (!container) return;
-        const startDate = container.querySelector('#recap-start-date').value;
-        const endDate = container.querySelector('#recap-end-date').value;
-        if (!startDate || !endDate) {
-            toast('error', 'Silakan pilih rentang tanggal.');
-            return;
-        }
-        generateSalaryRecap(new Date(startDate), new Date(endDate));
-    },
     'change-worker-role': (ctx) => {
         emit('ui.modal.openChangeRole', ctx);
-    },
-    'recalculate-wages': async () => {
-        const { handleRecalculateWages } = await import('../services/data/jurnalService.js');
-        handleRecalculateWages();
     },
     'dev-reset-all-data': () => { 
         handleDevResetAllData(); 

@@ -244,6 +244,15 @@ export function initializeEventBusListeners() {
               _handleDeletePermanentItems(itemsToDelete);
           } else toast('error', 'Gagal mendapatkan detail item dari cache untuk dihapus.');
      });
+     on('ui.action.open-generate-worker-bill-confirm', async (dataset) => {
+        try {
+            const { openGenerateBillConfirmModal } = await import('../../services/data/jurnalService.js');
+            openGenerateBillConfirmModal(dataset);
+        } catch(e) {
+            console.error("Gagal memuat/menjalankan openGenerateBillConfirmModal:", e);
+            toast('error', 'Gagal memproses tagihan pekerja.');
+        }
+    });
     on('ui.action.open-selection-summary', (dataset) => handleOpenSelectionSummaryModal());
     on('ui.action.forward-to-comments', (dataset) => emit('ui.selection.handleAction', 'forward-to-comments', dataset));
     on('ui.action.view-jurnal-harian', (dataset) => emit('ui.modal.viewJurnalHarian', dataset.date));
@@ -383,10 +392,6 @@ export function initializeEventBusListeners() {
         handleCetakKwitansiKolektif(dataset);
     });
      on('ui.action.pay-individual-salary', (dataset) => emit('ui.modal.payIndividualSalary', dataset));
-     on('ui.action.remove-worker-from-recap', async (dataset) => {
-          const { handleRemoveWorkerFromRecap } = await import('../../services/data/jurnalService.js');
-          handleRemoveWorkerFromRecap(dataset.billId, dataset.workerId);
-     });
      on('ui.action.open-simulasi-actions', async (dataset) => {
         const { _openSimulasiItemActionsModal } = await import('../modals/simulasi/actionsModal.js');
         _openSimulasiItemActionsModal(dataset);

@@ -18,11 +18,11 @@ function createIcon(iconName, size = 20, classes = '') {
 
 function getModalLayout(type, data = {}) {
     const contentGenerators = {
-        'confirmDelete': () => _getSimpleDialogHTML('Konfirmasi Hapus', data.message || 'Anda yakin ingin menghapus data ini?', `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-danger">Hapus</button>`),
-        'confirmPayment': () => _getSimpleDialogHTML('Konfirmasi Pembayaran', data.message || 'Anda yakin ingin melanjutkan pembayaran?', `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Bayar</button>`),
-        'confirmEdit': () => _getSimpleDialogHTML('Konfirmasi Perubahan', data.message || 'Anda yakin ingin menyimpan perubahan?', `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Simpan</button>`),
-        'confirmPayBill': () => _getSimpleDialogHTML('Konfirmasi Pembayaran', data.message || 'Anda yakin ingin melanjutkan pembayaran ini?', `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Bayar</button>`),
-        'confirmGenerateBill': () => _getSimpleDialogHTML('Konfirmasi Buat Tagihan', data.message || 'Anda akan membuat tagihan gaji. Lanjutkan?', `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Buat Tagihan</button>`),
+        'confirmDelete': () => _getSimpleDialogHTML('Konfirmasi Hapus', `<p class="confirm-modal-text">${data.message || 'Anda yakin ingin menghapus data ini?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-danger">Hapus</button>`),
+        'confirmPayment': () => _getSimpleDialogHTML('Konfirmasi Pembayaran', `<p class="confirm-modal-text">${data.message || 'Anda yakin ingin melanjutkan pembayaran?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Bayar</button>`),
+        'confirmEdit': () => _getSimpleDialogHTML('Konfirmasi Perubahan', `<p class="confirm-modal-text">${data.message || 'Anda yakin ingin menyimpan perubahan?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Simpan</button>`),
+        'confirmPayBill': () => _getSimpleDialogHTML('Konfirmasi Pembayaran', `<p class="confirm-modal-text">${data.message || 'Anda yakin ingin melanjutkan pembayaran ini?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Bayar</button>`),
+        'confirmGenerateBill': () => _getSimpleDialogHTML('Konfirmasi Buat Tagihan', `<p class="confirm-modal-text">${data.message || 'Anda akan membuat tagihan gaji. Lanjutkan?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Buat Tagihan</button>`),
 
         'confirmUserAction': () => {
             const hasStatusOverride = data.contextType === 'expense-submit';
@@ -56,16 +56,17 @@ function getModalLayout(type, data = {}) {
                         </div>`;
                  }
             }
-
-            const content = `${data.message || 'Apakah Anda yakin?'}${extraContent}`;
+            
+            // PERBAIKAN: Bungkus data.message dengan <p>
+            const content = `<p class="confirm-modal-text">${data.message || 'Apakah Anda yakin?'}</p>${extraContent}`;
             const footer = `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary" data-default-status="${defaultStatus}">Ya, Lanjutkan</button>`;
             return _getSimpleDialogHTML(data.title || 'Konfirmasi Aksi', content, footer);
         },
-        'confirmDeleteAttachment': () => _getSimpleDialogHTML('Hapus Lampiran', data.message || 'Anda yakin ingin menghapus lampiran ini?', `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-danger">Ya, Hapus</button>`),
-        'confirmDeleteRecap': () => _getSimpleDialogHTML('Hapus Rekap Gaji', data.message || 'Menghapus rekap ini akan menghapus data absensi terkait. Aksi ini tidak dapat dibatalkan. Lanjutkan?', `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-danger">Ya, Hapus</button>`),
-        'login': () => _getSimpleDialogHTML('Login', '<p>Gunakan akun Google Anda.</p>', `<button type="button" id="google-login-btn" class="btn btn-primary">${createIcon('log-in')} Masuk dengan Google</button>`),
-        'confirmLogout': () => _getSimpleDialogHTML('Keluar', '<p>Anda yakin ingin keluar?</p>', `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-logout-btn" class="btn btn-danger">${createIcon('log-out')} Keluar</button>`),
-        'confirmExpense': () => _getSimpleDialogHTML('Konfirmasi Status Pengeluaran', '<p>Apakah pengeluaran ini sudah dibayar atau akan dijadikan tagihan?</p>', `<button type="button" class="btn btn-secondary" id="confirm-bill-btn">Jadikan Tagihan</button><button type="button" id="confirm-paid-btn" class="btn btn-success">Sudah, Lunas</button>`),
+        'confirmDeleteAttachment': () => _getSimpleDialogHTML('Hapus Lampiran', `<p class="confirm-modal-text">${data.message || 'Anda yakin ingin menghapus lampiran ini?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-danger">Ya, Hapus</button>`),
+        'confirmDeleteRecap': () => _getSimpleDialogHTML('Hapus Rekap Gaji', `<p class="confirm-modal-text">${data.message || 'Menghapus rekap ini akan menghapus data absensi terkait. Aksi ini tidak dapat dibatalkan. Lanjutkan?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-danger">Ya, Hapus</button>`),
+        'login': () => _getSimpleDialogHTML('Login', '<p class="confirm-modal-text">Gunakan akun Google Anda.</p>', `<button type="button" id="google-login-btn" class="btn btn-primary">${createIcon('log-in')} Masuk dengan Google</button>`),
+        'confirmLogout': () => _getSimpleDialogHTML('Keluar', '<p class="confirm-modal-text">Anda yakin ingin keluar?</p>', `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-logout-btn" class="btn btn-danger">${createIcon('log-out')} Keluar</button>`),
+        'confirmExpense': () => _getSimpleDialogHTML('Konfirmasi Status Pengeluaran', '<p class="confirm-modal-text">Apakah pengeluaran ini sudah dibayar atau akan dijadikan tagihan?</p>', `<button type="button" class="btn btn-secondary" id="confirm-bill-btn">Jadikan Tagihan</button><button type="button" id="confirm-paid-btn" class="btn btn-success">Sudah, Lunas</button>`),
         'actionsPopup': () => ({
             layoutClass: data.layoutClass || 'is-actions-menu',
             contentHTML: _getBottomSheetContent(data.title, data.content, data.footer)
@@ -73,7 +74,7 @@ function getModalLayout(type, data = {}) {
         'reportGenerator': () => _getModalWithHeader(data.title || 'Buat Laporan', data.content, data.footer),
         'uploadSource': () => {
             const body = `
-                <p>Pilih sumber untuk mengambil gambar lampiran:</p>
+                <p class="confirm-modal-text">Pilih sumber untuk mengambil gambar lampiran:</p>
                 <div class="upload-source-actions">
                     <button type="button" class="btn btn-secondary" data-source="camera">${createIcon('camera')} Kamera</button>
                     <button type="button" class="btn btn-secondary" data-source="gallery">${createIcon('image')} Galeri</button>

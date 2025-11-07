@@ -46,7 +46,7 @@ export async function handleOpenBillDetail(context) {
     const { itemId, expenseId } = context || {};
     const billId = itemId;
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
-    const loaderContent = _getSkeletonLoaderHTML('laporan');
+    const loaderContent = `<div class="skeleton-wrapper" style="padding: 1.5rem; display: flex; flex-direction: column; height: 100%;">${_getSkeletonLoaderHTML('detail-tagihan')}</div>`;
     const titleText = 'Memuat Detail Tagihan...';
     let targetEl = null;
 
@@ -116,7 +116,28 @@ export async function handleOpenBillDetail(context) {
 
             }
             content = _createSalaryBillDetailContentHTML(bill, payments);
-            title = `Detail Tagihan Gaji`;
+            
+            try {
+                const formatRingkas = (d) => {
+                    if (!d) return '??/??';
+                    const date = getJSDate(d);
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    return `${day}/${month}`;
+                };
+                
+                if (bill.startDate && bill.endDate) {
+                    const start = formatRingkas(bill.startDate);
+                    const end = formatRingkas(bill.endDate);
+                    title = `Gaji (${start} - ${end})`;
+                } else {
+                    const workerName = bill.workerDetails && bill.workerDetails.length === 1 ? bill.workerDetails[0].name : (bill.workerDetails ? `${bill.workerDetails.length} Pekerja` : 'Pekerja');
+                    title = `Detail Gaji: ${workerName}`;
+                }
+            } catch (e) {
+                title = `Detail Tagihan Gaji`; // Fallback akhir
+            }
+
         } else {
             content = await _createBillDetailContentHTML(bill, expenseData);
             title = `Detail: ${expenseData?.description || bill?.description || 'Item'}`;
@@ -145,7 +166,7 @@ export async function handleOpenPemasukanDetail(context) {
     }
 
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
-    const loaderContent = _getSkeletonLoaderHTML('laporan');
+    const loaderContent = `<div class="skeleton-wrapper" style="padding: 1.5rem; display: flex; flex-direction: column; height: 100%;">${_getSkeletonLoaderHTML('detail-pemasukan')}</div>`;
     let initialTitle = (type === 'termin') ? 'Detail Termin Proyek' : 'Detail Pinjaman';
     let targetEl = null;
 
@@ -463,7 +484,7 @@ export function showSuccessPreviewPanel(itemData, type) {
 
     const navTargetPage = (isPengeluaran || type === 'bill') ? 'tagihan' : 'pemasukan';
     const navTargetFull = `${navTargetPage}`;
-    
+
     let firstButtonHTML = '';
     const originalFormPage = isPemasukan ? 'pemasukan_form' : 'pengeluaran';
 

@@ -132,6 +132,7 @@ export function initializeGlobalClickListeners() {
             'open-selection-summary', 'forward-to-comments',
             'open-item-actions-modal',
             'view-jurnal-harian', 'view-worker-recap',
+            'open-generate-worker-bill-confirm',
             'view-log-detail',
             'manage-master',
             'open-pemasukan-form',

@@ -25,10 +25,9 @@ async function handleViewJurnalHarianModal(dateStr) {
 
   const pane = showDetailPane({
     title: `Jurnal: ${formattedDate}`,
-    content: `<div class="card card-pad">${_getSkeletonLoaderHTML('jurnal')}</div>`,
+    content: `<div class="skeleton-wrapper" style="padding: 1.5rem; display: flex; flex-direction: column; height: 100%;">${_getSkeletonLoaderHTML('detail-jurnal-harian')}</div>`,
     footer: ''
   });
-
   if (!pane) return;
 
   try {
@@ -52,7 +51,14 @@ async function handleViewJurnalHarianModal(dateStr) {
     }
 
     const productiveRecords = recordsOnDate.filter(r => r.attendanceStatus !== 'absent');
-    const unpaidRecordsOnDate = productiveRecords.filter(r => !r.isPaid && r.totalPay > 0);
+    
+    // Logika ini (unpaidRecordsOnDate, hasUnpaid, totalUnpaid) tampaknya tidak digunakan
+    // setelah footer dihapus, tetapi kita biarkan jika diperlukan di masa depan.
+    const unpaidRecordsOnDate = productiveRecords.filter(r => {
+        if (!r.isPaid) return true; // Belum direkap pasti belum lunas
+        const bill = r.billId ? appState.bills.find(b => b.id === r.billId) : null;
+        return !bill || bill.status !== 'paid'; // Direkap tapi tagihan belum lunas
+    });
     const hasUnpaid = unpaidRecordsOnDate.length > 0;
     const totalUnpaid = unpaidRecordsOnDate.reduce((sum, r) => sum + (r.totalPay || 0), 0);
     
@@ -93,8 +99,11 @@ async function handleViewJurnalHarianModal(dateStr) {
               if (rec.attendanceStatus === 'full_day') { statusText = 'Hadir'; statusColor = 'hadir'; }
               else if (rec.attendanceStatus === 'half_day') { statusText = '1/2 Hari'; statusColor = 'setengah'; }
 
-              const paymentStatus = rec.isPaid ? 'Lunas' : 'Belum Lunas';
-              const paymentColorClass = rec.isPaid ? 'positive' : 'warn';
+              const bill = rec.billId ? appState.bills.find(b => b.id === rec.billId) : null;
+              const isBillPaid = bill && bill.status === 'paid'; // Ini adalah status lunas yang sebenarnya
+
+              const paymentStatus = isBillPaid ? 'Lunas' : 'Belum Lunas';
+              const paymentColorClass = isBillPaid ? 'positive' : 'warn';
 
               return createUnifiedCard({
                   id: `att-${rec.id}`,
@@ -102,11 +111,11 @@ async function handleViewJurnalHarianModal(dateStr) {
                   headerMeta: `<span class="status-badge status-${statusColor}">${statusText}</span>`,
                   mainContentHTML: `<div class="wa-card-v2__description">${rec.jobRole || 'Peran?'}</div>`,
                   amount: fmtIDR(rec.totalPay || 0),
-                  amountLabel: paymentStatus,
-                  amountColorClass: paymentColorClass,
+                  amountLabel: paymentStatus, // <-- Menggunakan variabel baru
+                  amountColorClass: paymentColorClass, // <-- Menggunakan variabel baru
                   dataset: { itemId: rec.id },
                   moreAction: false,
-                  customClasses: rec.isPaid ? 'is-paid' : 'is-unpaid'
+                  customClasses: isBillPaid ? 'is-paid' : 'is-unpaid' // <-- Menggunakan variabel baru
               });
           }).join('');
 
@@ -131,22 +140,6 @@ async function handleViewJurnalHarianModal(dateStr) {
               ${finalProjectHTML}
           </div>
       `;
-
-      const footer = hasUnpaid && !isViewer() ? `
-          <div class="form-footer-actions">
-              <button type="button" class="btn btn-primary" id="buat-tagihan-harian-btn" data-date="${dateStr}">
-                  ${createIcon('save')} Jadikan Tagihan (${fmtIDR(totalUnpaid)})
-              </button>
-          </div>
-      ` : '';
-      
-      if (footer) {
-          pane.insertAdjacentHTML('beforeend', `<div class="detail-pane-footer">${footer}</div>`);
-          pane.querySelector('#buat-tagihan-harian-btn')?.addEventListener('click', (e) => {
-              const date = e.currentTarget.dataset.date;
-              emit('jurnal.generateDailyBill', { date, records: unpaidRecordsOnDate });
-          });
-      }
 
     } catch (error) {
         console.error("Gagal memuat detail jurnal harian:", error);

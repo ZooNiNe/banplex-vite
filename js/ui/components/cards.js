@@ -1,6 +1,5 @@
 import { appState } from "../../state/appState.js";
 import { fmtIDR, formatDate } from "../../utils/formatters.js";
-// PERUBAHAN: Impor getJSDate dan getUnreadCommentCount
 import { getJSDate, getUnreadCommentCount } from "../../utils/helpers.js";
 import { emit } from "../../state/eventBus.js";
 
@@ -449,7 +448,6 @@ export function _createDetailContentHTML(item, type) {
 export function _getBillsListHTML(items) {
     if (!Array.isArray(items)) return '';
 
-    // PERUBAHAN: Ambil daftar komentar satu kali
     const allComments = appState.comments || [];
 
     return items.map(item => {
@@ -471,18 +469,52 @@ export function _getBillsListHTML(items) {
             }
         }
         else if (item.type === 'gaji' && isBill) {
-            const workerName = item.workerDetails && item.workerDetails.length === 1 ? item.workerDetails[0].name : (item.workerDetails ? `${item.workerDetails.length} Pekerja` : '');
+            const workerName = item.workerDetails && item.workerDetails.length === 1 
+                ? item.workerDetails[0].name 
+                : (item.workerDetails ? `${item.workerDetails.length} Pekerja` : '');
+            
             if (workerName) {
                  localMetaBadges.push({ icon: 'hard_hat', text: workerName });
+            } else if (item.workerId) {
+                const worker = appState.workers.find(w => w.id === item.workerId);
+                if (worker) {
+                    localMetaBadges.push({ icon: 'hard_hat', text: worker.workerName });
+                }
+            }
+        } else if (expenseData) {
+            const sup = appState.suppliers?.find(s => s.id === expenseData.supplierId);
+            if (sup) {
+                localMetaBadges.push({ icon: 'storefront', text: sup.supplierName });
             }
         }
+        let title = item.description;
         
-        // PERUBAHAN: Logika hitung komentar
+        if (item.type === 'gaji' && isBill) {
+            try {
+                const formatRingkas = (d) => {
+                    if (!d) return '??/??';
+                    const date = getJSDate(d);
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    return `${day}/${month}`;
+                };
+                
+                if (item.startDate && item.endDate) {
+                    const start = formatRingkas(item.startDate);
+                    const end = formatRingkas(item.endDate);
+                    title = `Gaji (${start} - ${end})`; 
+                } else if (item.description) {
+                    title = item.description.replace('Tagihan Gaji - ', 'Gaji: ');
+                } else {
+                    title = 'Tagihan Gaji';
+                }
+            } catch (e) {
+                title = item.description ? item.description.replace('Tagihan Gaji - ', 'Gaji: ') : 'Tagihan Gaji';
+            }
+        }
         const parentId = (isBill && item.type === 'gaji') ? item.id : (expenseData?.id || (isBill ? item.expenseId : null));
         const parentType = (isBill && item.type === 'gaji') ? 'bill' : 'expense';
         const unreadCount = (parentId && parentType) ? getUnreadCommentCount(parentId, allComments.filter(c => c.parentType === parentType && c.parentId === parentId)) : 0;
-        // ---
-
         const isPaid = item.status === 'paid';
         const displayAmount = isDeliveryOrder ? '-' : (isPaid ? (item.amount || 0) : Math.max(0, (item.amount || 0) - (item.paidAmount || 0)));
         const amountLabelText = isDeliveryOrder ? 'Surat Jalan' : (isPaid ? 'Lunas' : (isBill && item.paidAmount > 0 ? 'Sisa Tagihan' : ''));
@@ -499,10 +531,10 @@ export function _getBillsListHTML(items) {
             'expense-id': expenseData?.id || '',
             amount: item.amount,
             tooltip: tooltipText.replace(/"/g, '&quot;'),
-            title: item.description,
-            description: item.description,
-            'parent-id': parentId || '',     // PERUBAHAN: Tambahkan parent-id
-            'parent-type': parentType || '' // PERUBAHAN: Tambahkan parent-type
+            title: title,
+            description: title,
+            'parent-id': parentId || '',
+            'parent-type': parentType || ''
         };
 
         const selectionActive = appState.selectionMode.active && appState.selectionMode.pageContext === 'tagihan';
@@ -512,7 +544,7 @@ export function _getBillsListHTML(items) {
 
         return createUnifiedCard({
             id: uniqueDomId,
-            title: item.description,
+            title: title,
             headerMeta: formatDate(item.dueDate || item.date),
             metaBadges: localMetaBadges,
             amount: displayAmount === '-' ? '-' : fmtIDR(displayAmount),
@@ -523,15 +555,13 @@ export function _getBillsListHTML(items) {
             actions: [],
             selectionEnabled: selectionActive,
             isSelected: isSelected,
-            unreadCount: unreadCount // PERUBAHAN: Kirim unreadCount
+            unreadCount: unreadCount
         });
     }).join('');
 }
 
 export function _getSinglePemasukanHTML(item, type) {
     if (!item) return '';
-
-    // PERUBAHAN: Ambil daftar komentar satu kali
     const allComments = appState.comments || [];
     const isTermin = type === 'termin';
     let localMetaBadges = [];
@@ -554,19 +584,16 @@ export function _getSinglePemasukanHTML(item, type) {
         }
     }
     
-    // PERUBAHAN: Logika hitung komentar
     const parentId = item.id;
-    const parentType = isTermin ? 'income' : 'loan'; // 'income' atau 'loan'
-    // Hanya 'loan' yang saat ini didukung di itemActions
+    const parentType = isTermin ? 'income' : 'loan';
     const isValidCommentType = parentType === 'loan';
     const unreadCount = (isValidCommentType && parentId && parentType) ? getUnreadCommentCount(parentId, allComments.filter(c => c.parentType === parentType && c.parentId === parentId)) : 0;
-    // ---
 
     const domId = `${type}-${item.id}`;
     const itemIdForDataset = item.id;
 
-     const selectionActive = appState.selectionMode.active && appState.selectionMode.pageContext === 'pemasukan';
-     const isSelected = selectionActive && appState.selectionMode.selectedIds.has(itemIdForDataset);
+    const selectionActive = appState.selectionMode.active && appState.selectionMode.pageContext === 'pemasukan';
+    const isSelected = selectionActive && appState.selectionMode.selectedIds.has(itemIdForDataset);
 
     const showMoreIcon = true;
     const dataset = {
@@ -621,8 +648,15 @@ export function _getJurnalPerPekerjaListHTML(items) {
     return items.map(item => {
         const itemId = item.workerId;
         const title = item.workerName;
-        const dataset = { itemId: item.workerId, workerId: item.workerId, title: title, description: title };
-        const showMoreIcon = true;
+        const dataset = { 
+            itemId: item.workerId, 
+            workerId: item.workerId, 
+            title: title, 
+            description: title,
+            totalUnpaid: item.totalUnpaid
+        };
+
+        const showMoreIcon = true; // Aktifkan tombol 'more'
         const profession = appState.professions?.find(p => p.id === item.professionId);
         const metaBadges = profession ? [{ icon: 'hammer', text: profession.professionName }] : [];
 
@@ -632,15 +666,15 @@ export function _getJurnalPerPekerjaListHTML(items) {
             headerMeta: `${item.totalDays || 0} Hari Kerja`,
             metaBadges: metaBadges,
             amount: fmtIDR(item.totalUnpaid),
-            amountLabel: 'Total Belum Dibayar',
+            amountLabel: 'Total Belum Direkap',
             amountColorClass: item.totalUnpaid > 0 ? 'warn' : 'positive',
             dataset: { ...dataset },
-            moreAction: showMoreIcon,
-            actions: []
+            moreAction: showMoreIcon, // 'true' akan menampilkan tombol
+            actions: [],
+            pageContext: 'jurnal'
         });
     }).join('');
 }
-
 
 export function _getRekapGajiListHTML(items) {
     return items.map(item => {

@@ -9,12 +9,12 @@ import { toast } from "../ui/components/toast.js";
 export const localDB = new Dexie('BanPlexDevLocalDB');
 
 export async function setupLocalDatabase() {
-    localDB.version(19).stores({
+    localDB.version(20).stores({
         expenses: '&id, projectId, date, type, status, isDeleted, attachmentNeedsSync, syncState, category',
         bills: '&id, expenseId, status, dueDate, type, isDeleted, syncState',
         incomes: '&id, projectId, date, isDeleted, syncState',
         funding_sources: '&id, creditorId, status, isDeleted, syncState',
-        attendance_records: '&id, [workerId+isDeleted], workerId, date, isPaid, isDeleted, syncState',
+        attendance_records: '&id, [workerId+isDeleted], workerId, date, isPaid, isDeleted, syncState, [workerId+isPaid+isDeleted]',
         stock_transactions: '&id, materialId, date, type, isDeleted, syncState',
         comments: '&id, parentId, parentType, createdAt, isDeleted, syncState, [parentId+parentType]',
         files: 'id',

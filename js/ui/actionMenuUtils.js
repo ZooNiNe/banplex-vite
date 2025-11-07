@@ -6,6 +6,7 @@ import { isViewer, getLocalDayBounds, parseLocalDate } from "../utils/helpers.js
 import { getRecycleBinHeaderOverflowActions } from "./pages/recycleBin.js";
 import { attachMenuActionListeners, attachBottomSheetActionListeners } from "./eventListeners/dynamicElementListeners.js";
 import { createModal } from "./components/modal.js";
+import { fmtIDR } from "../utils/formatters.js";
 
 function createIcon(iconName, size = 20, classes = '') {
     const icons = {
@@ -233,13 +234,25 @@ export function getItemActions(context) {
             }
         } else if (jurnalTab === 'per_pekerja') {
             baseActions.push({ label: 'Lihat Detail Pekerja', action: 'view-worker-recap', icon: 'visibility', workerId: context.workerId });
-        } else {
+            
+            const totalUnpaid = parseFloat(context.totalUnpaid || '0');
+            
+            if (totalUnpaid > 0 && !isViewer()) {
+                baseActions.push({ 
+                    label: `Buat Tagihan Gaji`, // Label generik tanpa nominal
+                    action: 'open-generate-worker-bill-confirm', // Aksi BARU untuk membuka modal
+                    icon: 'receipt_long',
+                    workerId: context.workerId
+                });
+            }
+        } else if (jurnalTab === 'riwayat_rekap') { // Nama tab baru
              baseActions.push({ label: 'Lihat Detail Rekap', action: 'open-bill-detail', icon: 'visibility', type: 'bill' });
              const bill = appState.bills.find(b => b.id === itemId);
              if (bill && bill.status !== 'paid' && !isViewer()) {
                  baseActions.push({ label: 'Hapus Rekap', action: 'delete-salary-bill', icon: 'delete', isDanger: true });
              }
         }
+    
     } else if (page === 'recycleBin') {
         baseActions = [
             { icon: 'restore_from_trash', label: 'Pulihkan', action: 'restore-item', table: table },

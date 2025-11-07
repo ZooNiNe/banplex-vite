@@ -3,11 +3,14 @@
 import { createTabsHTML } from "./tabs.js";
 import { appState } from "../../state/appState.js";
 
-// Minimal mobile sidebar toggle placeholder used across skeleton toolbars
-const mobileToggleBtn = `<button class="btn-icon mobile-sidebar-toggle" data-action="toggle-sidebar" data-tooltip="Menu"><div class="skeleton" style="width:22px;height:22px;border-radius:4px;"></div></button>`;
+// --- [HELPER SKELETON GENERIC BARU] ---
+// Placeholder untuk tombol navigasi kembali (digunakan di master_data)
+const navBackBtn = `<button class="btn-icon skeleton" data-tooltip="Kembali" style="width:36px;height:36px;border-radius:8px;"></button>`;
+
+// Placeholder untuk tombol toggle sidebar mobile (digunakan di halaman utama)
+const mobileToggleBtn = `<button class="btn-icon mobile-sidebar-toggle skeleton" data-action="toggle-sidebar" data-tooltip="Menu" style="width:36px;height:36px;border-radius:8px;"></button>`;
 
 // --- [HELPER GENERIC] ---
-// (Fungsi createListSkeletonHTML Anda yang sudah ada, tetap dipertahankan)
 export const createListSkeletonHTML = (count = 5) => {
     const itemTemplate = `
         <div class="wa-card-v2-wrapper skeleton-item">
@@ -28,55 +31,51 @@ export const createListSkeletonHTML = (count = 5) => {
             </div>
         </div>
     `;
-    return Array(count).fill(itemTemplate).join('');
+    return `<div class="wa-card-list-wrapper">${Array(count).fill(itemTemplate).join('')}</div>`;
 };
 
-// (Fungsi-fungsi skeleton Master Data Anda yang sudah ada)
-export function createMasterDataGridSkeletonHTML() {
-    const item = `<div class="master-data-grid-item skeleton" style="height: 150px;"></div>`;
-    return `<div class="master-data-grid">${Array(6).fill(item).join('')}</div>`;
-}
-
+// --- [SKELETON MASTER DATA (REVISI)] ---
 export function createMasterDataListSkeletonHTML() {
-    const item = `<div class="master-data-item skeleton" style="height: 50px;"></div>`;
-    return `<div class="master-data-list">${Array(5).fill(item).join('')}</div>`;
+    // Gunakan helper createListSkeletonHTML yang sudah ada,
+    // karena ini adalah skeleton yang benar untuk wa-card-v2
+    return createListSkeletonHTML(6);
 }
 
 export function createMasterDataFormSkeletonHTML() {
-    const field = `
+    // Dibuat lebih mirip dengan form aslinya
+    const field = (width = '40%') => `
         <div class="form-group">
-            <div class="skeleton" style="height: 12px; width: 40%; margin-bottom: 4px;"></div>
+            <div class="skeleton" style="height: 12px; width: ${width}; margin-bottom: 4px;"></div>
             <div class="skeleton" style="height: 42px;"></div>
         </div>`;
+    
+    const doubleField = `
+        <div class="form-grid-2col" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            ${field('60%')}
+            ${field('60%')}
+        </div>
+    `;
+
     return `
-        <div class="card card-pad skeleton-wrapper" style="gap: 1rem; padding: 0;">
-            ${Array(3).fill(field).join('')}
-            <div class="form-footer-actions" style="padding-top: 1rem; border-top: 1px solid var(--line); display:flex; justify-content: flex-end;">
+        <div class="card card-pad skeleton-wrapper" style="gap: 1.25rem; padding: 1.5rem;">
+            ${field('30%')}
+            ${doubleField}
+            ${field('40%')}
+            ${field('35%')}
+            
+            <div class="form-group">
+                <div class="skeleton" style="height: 12px; width: 30%; margin-bottom: 4px;"></div>
+                <div class="skeleton" style="height: 80px;"></div>
+            </div>
+
+            <div class="form-footer-actions" style="padding-top: 1.5rem; border-top: 1px solid var(--line); display:flex; justify-content: flex-end; margin-top: 1rem;">
                 <div class="skeleton" style="height: 42px; width: 120px; border-radius: 8px;"></div>
             </div>
         </div>
     `;
 }
 
-// --- [HELPER SKELETON SPESIFIK HALAMAN BARU] ---
-
-function createToolbarSkeleton(title = 'Memuat...') {
-    return `
-        <div class="toolbar sticky-toolbar">
-            <div class="toolbar-standard-actions">
-                <div class="page-label">
-                    ${mobileToggleBtn}
-                    <div class="title-group"><h4 class="page-name">${title}</h4></div>
-                </div>
-                <div id="sync-indicator" class="sync-indicator"></div>
-                <div class="header-actions">
-                    <div class="skeleton skeleton-button" style="width: 40px; height: 40px; border-radius: 12px; margin-left: 8px;"></div>
-                    <div class="skeleton skeleton-button" style="width: 40px; height: 40px; border-radius: 12px; margin-left: 8px;"></div>
-                </div>
-            </div>
-        </div>
-    `;
-}
+// --- [HELPER SKELETON GENERIC] ---
 
 function createHeroSkeleton(height = '110px') {
     return `<div class="dashboard-hero-carousel skeleton" style="height: ${height}; margin-bottom: 1.5rem; border-radius: var(--radius-lg);"></div>`;
@@ -99,13 +98,46 @@ function createCategoryNavSkeleton() {
     `;
 }
 
-// --- [FUNGSI SKELETON SPESIFIK HALAMAN] ---
+// --- [FUNGSI SKELETON SPESIFIK HALAMAN (REVISI)] ---
+
+// Helper untuk membuat skeleton toolbar standar
+function _createStandardToolbarSkeleton(title, { hasSearch = false, hasMore = false, hasNavBack = false } = {}) {
+    const headerActions = [];
+    
+    // Halaman Tagihan punya tombol search
+    if (hasSearch) {
+        headerActions.push(`<div class="skeleton skeleton-button" style="width: 40px; height: 40px; border-radius: 12px; margin-left: 8px;"></div>`);
+    }
+    
+    // Halaman Pemasukan, Recycle Bin, Komentar punya tombol more_vert
+    if (hasMore) {
+        headerActions.push(`<div class="skeleton skeleton-button" style="width: 40px; height: 40px; border-radius: 12px; margin-left: 8px;"></div>`);
+    }
+
+    // Halaman Master Data punya tombol kembali
+    const titleBtn = hasNavBack ? navBackBtn : mobileToggleBtn;
+
+    return `
+        <div class="toolbar sticky-toolbar">
+            <div class="toolbar-standard-actions">
+                <div class="page-label">
+                    ${titleBtn}
+                    <div class="title-group"><h4 class="page-name">${title}</h4></div>
+                </div>
+                <div id="sync-indicator" class="sync-indicator"></div>
+                <div class="header-actions">
+                    ${headerActions.join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
 
 export function createTagihanPageSkeletonHTML() {
     return `
         <div class="content-panel">
             <div class="panel-header">
-                ${createToolbarSkeleton('Tagihan')}
+                ${_createStandardToolbarSkeleton('Tagihan', { hasSearch: true })}
                 ${createHeroSkeleton('110px')}
                 ${createTabsSkeleton(3)}
                 ${createCategoryNavSkeleton()}
@@ -122,7 +154,6 @@ export function createTagihanPageSkeletonHTML() {
 
 export function createPengeluaranPageSkeletonHTML() {
     const activeTab = appState.activeSubPage.get('pengeluaran') || 'operasional';
-
     const formSkeleton = `
         <div class="card card-pad skeleton-wrapper" style="gap: 1rem; padding: 1.5rem;">
             <div class="skeleton" style="height: 100px; width: 100%; border-radius: 12px; margin-bottom: 1rem;"></div>
@@ -130,7 +161,6 @@ export function createPengeluaranPageSkeletonHTML() {
                 <div class="form-group"><div class="skeleton" style="height: 12px; width: 60%;"></div><div class="skeleton" style="height: 40px; width: 100%;"></div></div>
                 <div class="form-group"><div class="skeleton" style="height: 12px; width: 60%;"></div><div class="skeleton" style="height: 40px; width: 100%;"></div></div>
             </div>
-
             ${activeTab === 'material' ? `
                 <div class="skeleton" style="height: 20px; width: 120px; margin-top: 1rem;"></div>
                 <div class="skeleton-list-item" style="height: 100px; border-radius: 12px;"></div>
@@ -140,14 +170,11 @@ export function createPengeluaranPageSkeletonHTML() {
                     <div class="form-group"><div class="skeleton" style="height: 12px; width: 60%;"></div><div class="skeleton" style="height: 40px; width: 100%;"></div></div>
                 </div>
             `}
-
             <div class="form-group" style="margin-top: 1.5rem;">
                  <div class="skeleton" style="height: 12px; width: 30%;"></div>
                  <div class="skeleton" style="height: 80px; width: 100%; border-radius: 8px;"></div>
             </div>
-            
             <div class="skeleton" style="height: 120px; width: 100%; border-radius: 12px; margin-top: 1rem;"></div>
-
             <div class="form-footer-actions" style="padding-top: 1rem; border-top: 1px solid var(--line); display:flex; justify-content: flex-end;">
                 <div class="skeleton" style="height: 42px; width: 120px; border-radius: 8px;"></div>
             </div>
@@ -157,7 +184,7 @@ export function createPengeluaranPageSkeletonHTML() {
     return `
         <div class="content-panel">
             <div class="panel-header">
-                ${createToolbarSkeleton('Input Pengeluaran')}
+                ${_createStandardToolbarSkeleton('Input Pengeluaran')}
                 ${createTabsSkeleton(3)}
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content">
@@ -167,39 +194,30 @@ export function createPengeluaranPageSkeletonHTML() {
     `;
 }
 
-// Skeleton form untuk Pemasukan Baru
 export function createPemasukanFormPageSkeletonHTML() {
-    // Kita cek tab aktif untuk 'pemasukan_form'
     const activeTab = appState.activeSubPage.get('pemasukan_form') || 'termin';
-
-    // Struktur skeleton ini meniru 'createPengeluaranPageSkeletonHTML'
     const formSkeleton = `
         <div class="card card-pad skeleton-wrapper" style="gap: 1rem; padding: 1.5rem;">
             <div class="skeleton" style="height: 100px; width: 100%; border-radius: 12px; margin-bottom: 1rem;"></div>
-            
             <div class="form-grid-2col" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group"><div class="skeleton" style="height: 12px; width: 60%;"></div><div class="skeleton" style="height: 40px; width: 100%;"></div></div>
                 <div class="form-group"><div class="skeleton" style="height: 12px; width: 60%;"></div><div class="skeleton" style="height: 40px; width: 100%;"></div></div>
             </div>
-
             <div class="form-grid-2col" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                 <div class="form-group"><div class="skeleton" style="height: 12px; width: 60%;"></div><div class="skeleton" style="height: 40px; width: 100%;"></div></div>
                 ${activeTab === 'pinjaman' ? `
                     <div class="form-group"><div class="skeleton" style="height: 12px; width: 60%;"></div><div class="skeleton" style="height: 40px; width: 100%;"></div></div>
                 ` : '<div class="form-group"></div>'}
             </div>
-
             <div class="form-group" style="margin-top: 1.5rem;">
                  <div class="skeleton" style="height: 12px; width: 30%;"></div>
                  <div class="skeleton" style="height: 80px; width: 100%; border-radius: 8px;"></div>
             </div>
-            
             ${activeTab === 'pinjaman' ? `
                 <div class="skeleton" style="height: 100px; width: 100%; border-radius: 12px; margin-top: 1rem;"></div>
             ` : `
                 <div class="skeleton" style="height: 60px; width: 100%; border-radius: 12px; margin-top: 1rem;"></div>
             `}
-
             <div class="form-footer-actions" style="padding-top: 1rem; border-top: 1px solid var(--line); display:flex; justify-content: flex-end;">
                 <div class="skeleton" style="height: 42px; width: 120px; border-radius: 8px;"></div>
             </div>
@@ -209,7 +227,7 @@ export function createPemasukanFormPageSkeletonHTML() {
     return `
         <div class="content-panel">
             <div class="panel-header">
-                ${createToolbarSkeleton('Input Pemasukan')}
+                ${_createStandardToolbarSkeleton('Input Pemasukan')}
                 ${createTabsSkeleton(2)} 
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content">
@@ -228,7 +246,6 @@ export function createPengaturanPageSkeletonHTML() {
             <div class="skeleton" style="height: 24px; width: 40%; border-radius: 999px;"></div>
         </div>
     `;
-
     const settingsGroupSkeleton = (count = 2) => `
         <div class="settings-section skeleton-wrapper" style="gap: 0.75rem;">
             <div class="skeleton" style="height: 12px; width: 30%; margin-left: 0.5rem;"></div>
@@ -237,12 +254,12 @@ export function createPengaturanPageSkeletonHTML() {
             </div>
         </div>
     `;
-
     const body = profileSkeleton + settingsGroupSkeleton(1) + settingsGroupSkeleton(3) + settingsGroupSkeleton(1);
+    
     return `
         <div class="content-panel settings-panel">
             <div class="panel-header">
-                ${createToolbarSkeleton('Pengaturan')}
+                ${_createStandardToolbarSkeleton('Pengaturan')}
             </div>
             <div id="sub-page-content" class="scrollable-content" style="padding: 1.5rem;">
                 ${body}
@@ -255,7 +272,7 @@ export function createPemasukanPageSkeletonHTML() {
     return `
         <div class="content-panel">
             <div class="panel-header">
-                ${createToolbarSkeleton('Pemasukan')}
+                ${_createStandardToolbarSkeleton('Pemasukan', { hasMore: true })}
                 ${createHeroSkeleton('110px')}
                 ${createTabsSkeleton(2)}
             </div>
@@ -271,7 +288,7 @@ export function createJurnalPageSkeletonHTML() {
     return `
         <div class="content-panel">
             <div class="panel-header">
-                ${createToolbarSkeleton('Jurnal')}
+                ${_createStandardToolbarSkeleton('Jurnal')}
                 ${createHeroSkeleton('110px')}
                 ${createTabsSkeleton(2)}
             </div>
@@ -290,7 +307,7 @@ export function createAbsensiPageSkeletonHTML() {
     return `
         <div class="content-panel page-absensi">
             <div class="panel-header">
-                ${createToolbarSkeleton('Absensi')}
+                ${_createStandardToolbarSkeleton('Absensi')}
                 <div class="attendance-info-bar">
                     ${dateDisplay}
                     ${selectionToolbar}
@@ -322,7 +339,7 @@ export function createLaporanPageSkeletonHTML() {
     return `
         <div class="content-panel">
             <div class="panel-header">
-                ${createToolbarSkeleton('Laporan')}
+                ${_createStandardToolbarSkeleton('Laporan')}
                 ${createHeroSkeleton('110px')}
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content">
@@ -347,7 +364,7 @@ export function createDashboardPageSkeletonHTML() {
         </div>`;
 
     return `
-        ${createToolbarSkeleton('Dashboard')}
+        ${_createStandardToolbarSkeleton('Dashboard')}
         <div id="sub-page-content" class="scrollable-content" style="padding: 1rem;">
             ${createHeroSkeleton('110px')}
             <div class="dashboard-stats-grid" style="margin-bottom: 1.5rem;">
@@ -367,13 +384,11 @@ export function createDashboardPageSkeletonHTML() {
     `;
 }
 
-// --- [FUNGSI SKELETON HALAMAN BARU] ---
-
 function createStokPageSkeletonHTML() {
     return `
         <div class="content-panel">
             <div class="panel-header">
-                ${createToolbarSkeleton('Manajemen Stok')}
+                ${_createStandardToolbarSkeleton('Manajemen Stok')}
                 ${createTabsSkeleton(2)}
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content">
@@ -408,7 +423,7 @@ function createSimulasiPageSkeletonHTML() {
     `;
     return `
         <div class="content-panel">
-            ${createToolbarSkeleton('Simulasi Pembayaran')}
+            ${_createStandardToolbarSkeleton('Simulasi Pembayaran')}
             <div id="sub-page-content" class="scrollable-content" style="padding: 1rem;">
                 ${summaryCard}
                 ${listCard}
@@ -421,7 +436,7 @@ function createLogAktivitasPageSkeletonHTML() {
     return `
         <div class="content-panel">
             <div class="panel-header">
-                ${createToolbarSkeleton('Log Aktivitas')}
+                ${_createStandardToolbarSkeleton('Log Aktivitas')}
                 ${createHeroSkeleton('110px')}
                 ${createTabsSkeleton(2)}
             </div>
@@ -437,7 +452,7 @@ function createRecycleBinPageSkeletonHTML() {
     return `
         <div class="content-panel">
             <div class="panel-header">
-                ${createToolbarSkeleton('Keranjang Sampah')}
+                ${_createStandardToolbarSkeleton('Keranjang Sampah', { hasMore: true })}
                 ${createHeroSkeleton('110px')}
                 ${createCategoryNavSkeleton()}
             </div>
@@ -457,7 +472,6 @@ function createChatPageSkeletonHTML() {
                 </div>
             </div>
         </div>`;
-    
     const composer = `
         <div class="composer-wrapper skeleton-wrapper">
             <footer class="composer">
@@ -470,7 +484,6 @@ function createChatPageSkeletonHTML() {
             </footer>
         </div>
     `;
-
     return `
         <div class="content-panel chat-page-panel">
             <div class="toolbar sticky-toolbar">
@@ -503,16 +516,13 @@ function createChatPageSkeletonHTML() {
     `;
 }
 
-
-// --- PERBAIKAN DI SINI ---
-// Skeleton baru untuk Halaman Master Data
 function createMasterDataPageSkeletonHTML() {
-    const listSkeleton = createListSkeletonHTML(6); // Default list view
+    const listSkeleton = createMasterDataListSkeletonHTML(); 
     
     return `
         <div class="content-panel">
             <div class="panel-header">
-                ${createToolbarSkeleton('Kelola Master Data')}
+                ${_createStandardToolbarSkeleton('Kelola Master Data', { hasNavBack: true })}
                 ${createCategoryNavSkeleton()}
                 ${createTabsSkeleton(2)}
             </div>
@@ -522,12 +532,233 @@ function createMasterDataPageSkeletonHTML() {
         </div>
     `;
 }
-// --- AKHIR PERBAIKAN ---
 
+// --- [FUNGSI SKELETON PANEL DETAIL BARU] ---
+
+/**
+ * Skeleton untuk item daftar di dalam panel detail
+ */
+function _createDetailListItemSkeleton(count = 3) {
+    const item = `
+        <div class="wa-card-v2-wrapper skeleton-item">
+            <div class="wa-card-v2" style="padding: 0.75rem 1rem;">
+                <div class="wa-card-v2__main">
+                    <div class="wa-card-v2__header">
+                        <span class="skeleton skeleton-text" style="width: 60%; height: 16px;"></span>
+                    </div>
+                    <div class="wa-card-v2__body">
+                        <span class="skeleton skeleton-text" style="width: 40%; height: 12px;"></span>
+                    </div>
+                </div>
+                <div class="wa-card-v2__meta" style="text-align: right;">
+                    <span class="skeleton skeleton-text" style="width: 70px; height: 12px; margin-bottom: 4px;"></span>
+                    <span class="skeleton skeleton-text" style="width: 90px; height: 16px;"></span>
+                </div>
+            </div>
+        </div>
+    `;
+    return `<div class="wa-card-list-wrapper">${Array(count).fill(item).join('')}</div>`;
+}
+
+/**
+ * Skeleton untuk ringkasan di atas panel detail
+ */
+function _createDetailSummarySkeleton(itemCount = 2) {
+    const item = `
+        <div class="summary-item">
+            <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+            <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+        </div>
+    `;
+    const gridClass = itemCount === 3 ? 'detail-summary-grid three-col' : 'detail-summary-grid';
+    return `
+        <div class="card card-pad" style="flex-shrink: 0;">
+            <div class="detail-section">
+                <div class="${gridClass}" style="gap: 1rem;">
+                    ${Array(itemCount).fill(item).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Skeleton untuk daftar info (Label: Nilai) di panel detail
+ */
+function _createDetailInfoListSkeleton(rows = 2) {
+    const row = `
+        <div class="detail-info-row" style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--line-soft);">
+            <span class="skeleton skeleton-text" style="width: 30%; height: 14px;"></span>
+            <span class="skeleton skeleton-text" style="width: 50%; height: 14px;"></span>
+        </div>
+    `;
+    return `<div class="detail-info-list" style="margin-top: 1rem;">${Array(rows).fill(row).join('')}</div>`;
+}
+
+function createJurnalHarianDetailSkeletonHTML() {
+    return `
+        ${_createDetailSummarySkeleton(2)}
+        <div class="scrollable-content" style="padding-top: 0; flex-grow: 1; min-height: 0;">
+            <div class="detail-section card card-pad" style="margin-top: 1rem;">
+                <h5 class="detail-section-title skeleton skeleton-text" style="margin-top:0; width: 60%; height: 20px;"></h5>
+                ${_createDetailListItemSkeleton(3)}
+            </div>
+        </div>
+    `;
+}
+
+function createWorkerRecapDetailSkeletonHTML() {
+    // Ringkasan rekap pekerja punya 3 item, 1 full-width
+    const summary = `
+        <div class="card card-pad" style="flex-shrink: 0;">
+            <div class="detail-section">
+                <div class="detail-summary-grid">
+                    <div class="summary-item">
+                        <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+                    </div>
+                    <div class="summary-item" style="grid-column: 1 / -1;">
+                        <span class="skeleton skeleton-text" style="width: 40%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 30%; height: 18px;"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return `
+        ${summary}
+        <div class="scrollable-content" style="padding-top: 0; flex-grow: 1; min-height: 0;">
+            <div class="detail-section card card-pad" style="margin-top: 1rem;">
+                <h5 class="detail-section-title skeleton skeleton-text" style="margin-top:0; width: 60%; height: 20px;"></h5>
+                ${_createDetailListItemSkeleton(4)}
+            </div>
+        </div>
+    `;
+}
+
+// --- PERBAIKAN UNTUK PERMINTAAN INI ---
+
+function createTagihanDetailSkeletonHTML() {
+    // Summary: Total, Dibayar, Sisa
+    const summary = `
+        <div class="card card-pad" style="flex-shrink: 0;">
+            <div class="detail-section">
+                <div class="detail-summary-grid three-col" style="gap: 1rem;">
+                    <div class="summary-item">
+                        <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+                    </div>
+                </div>
+                ${_createDetailInfoListSkeleton(3)}
+            </div>
+        </div>
+    `;
+    
+    return `
+        ${summary}
+        <div class="scrollable-content" style="padding-top: 0; flex-grow: 1; min-height: 0;">
+            <div class="detail-section card card-pad" style="margin-top: 1rem;">
+                <h5 class="detail-section-title skeleton skeleton-text" style="margin-top:0; width: 60%; height: 20px;"></h5>
+                ${_createDetailListItemSkeleton(2)}
+            </div>
+            <div class="detail-section card card-pad" style="margin-top: 1rem;">
+                <h5 class="detail-section-title skeleton skeleton-text" style="margin-top:0; width: 50%; height: 20px;"></h5>
+                ${_createDetailListItemSkeleton(1)}
+            </div>
+        </div>
+    `;
+}
+
+function createPemasukanDetailSkeletonHTML() {
+     // Summary: Total, Dibayar, Sisa
+    const summary = `
+        <div class="card card-pad" style="flex-shrink: 0;">
+            <div class="detail-section">
+                <div class="detail-summary-grid three-col" style="gap: 1rem;">
+                    <div class="summary-item">
+                        <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+                    </div>
+                </div>
+                ${_createDetailInfoListSkeleton(2)}
+            </div>
+        </div>
+    `;
+    
+     return `
+        ${summary}
+        <div class="scrollable-content" style="padding-top: 0; flex-grow: 1; min-height: 0;">
+            <div class="detail-section card card-pad" style="margin-top: 1rem;">
+                <h5 class="detail-section-title skeleton skeleton-text" style="margin-top:0; width: 60%; height: 20px;"></h5>
+                ${_createDetailListItemSkeleton(2)}
+            </div>
+        </div>
+    `;
+}
+
+function createSalaryBillDetailSkeletonHTML() {
+    // Mirip Tagihan, tapi ringkasan lebih simpel
+    const summary = `
+        <div class="card card-pad" style="flex-shrink: 0;">
+            <div class="detail-section">
+                <div class="detail-summary-grid three-col" style="gap: 1rem;">
+                    <div class="summary-item">
+                        <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="skeleton skeleton-text" style="width: 70%; height: 12px; margin-bottom: 4px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 50%; height: 18px;"></span>
+                    </div>
+                </div>
+                ${_createDetailInfoListSkeleton(1)}
+            </div>
+        </div>
+    `;
+    return `
+        ${summary}
+        <div class="scrollable-content" style="padding-top: 0; flex-grow: 1; min-height: 0;">
+            <div class="detail-section card card-pad" style="margin-top: 1rem;">
+                <h5 class="detail-section-title skeleton skeleton-text" style="margin-top:0; width: 60%; height: 20px;"></h5>
+                ${_createDetailListItemSkeleton(4)}
+            </div>
+            <div class="detail-section card card-pad" style="margin-top: 1rem;">
+                <h5 class="detail-section-title skeleton skeleton-text" style="margin-top:0; width: 50%; height: 20px;"></h5>
+                ${_createDetailListItemSkeleton(1)}
+            </div>
+        </div>
+    `;
+}
 
 // --- [FUNGSI ROUTER UTAMA] ---
 export const _getSkeletonLoaderHTML = (type = 'page') => {
     switch (type) {
+        // --- HALAMAN UTAMA ---
         case 'dashboard':
             return createDashboardPageSkeletonHTML();
         case 'tagihan':
@@ -546,8 +777,6 @@ export const _getSkeletonLoaderHTML = (type = 'page') => {
             return createLaporanPageSkeletonHTML();
         case 'pengaturan':
             return createPengaturanPageSkeletonHTML();
-        
-        // --- [SKELETON BARU DITAMBAHKAN] ---
         case 'stok':
             return createStokPageSkeletonHTML();
         case 'simulasi':
@@ -558,28 +787,36 @@ export const _getSkeletonLoaderHTML = (type = 'page') => {
             return createRecycleBinPageSkeletonHTML();
         case 'chat':
             return createChatPageSkeletonHTML();
-        
-        // --- PERBAIKAN DI SINI ---
         case 'master_data':
-            return createMasterDataPageSkeletonHTML(); // Gunakan skeleton baru
-        // --- AKHIR PERBAIKAN ---
-
-        case 'komentar': // Halaman Komentar Desktop
+            return createMasterDataPageSkeletonHTML();
+        case 'komentar':
              return `
                 <div class="content-panel">
-                    ${createToolbarSkeleton('Semua Komentar')}
+                    ${_createStandardToolbarSkeleton('Semua Komentar', { hasMore: true })}
                     <div id="komentar-list-container" class="panel-body scrollable-content">
                         ${createListSkeletonHTML(8)}
                     </div>
                 </div>
             `;
-        // --- [AKHIR SKELETON BARU] ---
             
+        // --- PANEL DETAIL (MODAL) ---
+        case 'detail-jurnal-harian':
+            return createJurnalHarianDetailSkeletonHTML();
+        case 'detail-worker-recap':
+            return createWorkerRecapDetailSkeletonHTML();
+        case 'detail-tagihan':
+            return createTagihanDetailSkeletonHTML();
+        case 'detail-gaji': // (Asumsi nama key)
+            return createSalaryBillDetailSkeletonHTML();
+        case 'detail-pemasukan':
+            return createPemasukanDetailSkeletonHTML();
+
+        // --- FALLBACK ---
         case 'page':
         default:
             return `
                 <div class="content-panel">
-                    ${createToolbarSkeleton()}
+                    ${_createStandardToolbarSkeleton('Memuat...')}
                     <div id="sub-page-content" class="panel-body scrollable-content">
                         ${createListSkeletonHTML(8)}
                     </div>

@@ -25,11 +25,9 @@ async function handleViewWorkerRecapModal(workerId) {
 
     const pane = showDetailPane({
         title: `Rekap: ${worker.workerName}`,
-        content: `<div class="card card-pad">${_getSkeletonLoaderHTML('jurnal')}</div>`,
+        content: `<div class="skeleton-wrapper" style="padding: 1.5rem; display: flex; flex-direction: column; height: 100%;">${_getSkeletonLoaderHTML('detail-worker-recap')}</div>`,
         footer: ''
     });
-
-    // PERBAIKAN 2: Tambahkan console.warning
     console.warn(`[DEV] salaryPaymentPanel: handleViewWorkerRecapModal loaded. Verify summary calculations if bugs are reported.`, { workerId });
 
     if (!pane) return;
@@ -52,9 +50,19 @@ async function handleViewWorkerRecapModal(workerId) {
         }
 
         const totalUpah = records.reduce((sum, rec) => sum + (rec.totalPay || 0), 0);
+        
         const totalUpahBelumLunas = records
-            .filter(rec => !rec.isPaid)
+            .filter(rec => {
+                if (!rec.isPaid) {
+                    return true; // Pasti belum lunas jika belum direkap
+                }
+                const bill = rec.billId ? appState.bills.find(b => b.id === rec.billId) : null;
+                const isBillPaid = bill && bill.status === 'paid';
+                
+                return !isBillPaid; // Hanya tampilkan jika tagihan TIDAK lunas
+            })
             .reduce((sum, rec) => sum + (rec.totalPay || 0), 0);
+
         const totalHari = records.reduce((sum, rec) => {
             if (rec.attendanceStatus === 'full_day') return sum + 1;
             if (rec.attendanceStatus === 'half_day') return sum + 0.5;
@@ -86,8 +94,12 @@ async function handleViewWorkerRecapModal(workerId) {
                 if (rec.attendanceStatus === 'full_day') { statusText = 'Hadir'; statusColor = 'hadir'; }
                 else if (rec.attendanceStatus === 'half_day') { statusText = '1/2 Hari'; statusColor = 'setengah'; }
     
-                const paymentStatus = rec.isPaid ? 'Lunas' : 'Belum Lunas';
-                const paymentColorClass = rec.isPaid ? 'positive' : 'warn';
+                const bill = rec.billId ? appState.bills.find(b => b.id === rec.billId) : null;
+                const isBillPaid = bill && bill.status === 'paid';
+
+                const paymentStatus = isBillPaid ? 'Lunas' : 'Belum Lunas';
+                const paymentColorClass = isBillPaid ? 'positive' : 'warn';
+                
                 const title = getJSDate(rec.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
                 const description = `${project?.projectName || 'Proyek?'} · ${rec.jobRole || 'Peran?'}`;
     
@@ -97,11 +109,11 @@ async function handleViewWorkerRecapModal(workerId) {
                     headerMeta: `<span class="status-badge status-${statusColor}">${statusText}</span>`,
                     mainContentHTML: `<div class="wa-card-v2__description">${description}</div>`,
                     amount: fmtIDR(rec.totalPay || 0),
-                    amountLabel: paymentStatus,
-                    amountColorClass: paymentColorClass,
+                    amountLabel: paymentStatus, // <-- Menggunakan variabel baru
+                    amountColorClass: paymentColorClass, // <-- Menggunakan variabel baru
                     dataset: { itemId: rec.id },
                     moreAction: false, // <-- Tombol more dihapus
-                    customClasses: rec.isPaid ? 'is-paid' : 'is-unpaid'
+                    customClasses: isBillPaid ? 'is-paid' : 'is-unpaid' // <-- Menggunakan variabel baru
                 });
             }).join('');
             

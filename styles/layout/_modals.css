@@ -688,3 +688,17 @@ background-color: var(--panel);
       transform: rotate(360deg);
   }
 }
+
+.modal-body .confirm-modal-text {
+  margin: 0;
+  padding: 0;
+  line-height: 1.6;
+  font-size: 1rem;
+  color: var(--text-dim);
+}
+
+/* Jika ada elemen form setelah teks, beri jarak */
+.modal-body .confirm-modal-text + .form-group {
+  margin-top: 1.5rem;
+}
+

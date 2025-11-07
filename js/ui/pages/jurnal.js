@@ -10,7 +10,6 @@ import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infinit
 import { createListSkeletonHTML } from '../components/skeleton.js';
 import { getJSDate } from '../../utils/helpers.js';
 import { localDB } from '../../services/localDbService.js';
-import { openSalaryRecapPanel } from '../../services/data/jurnalService.js';
 import { openDailyProjectPickerForEdit } from '../../services/data/jurnalService.js';
 import { openDailyAttendanceEditorPanel } from '../../services/data/attendanceService.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
@@ -58,34 +57,55 @@ function groupItemsByMonth(items, dateField = 'date') {
     return grouped;
 }
 
+function groupItemsByProfession(items) {
+    const grouped = {};
+    const professionMap = new Map((appState.professions || []).map(p => [p.id, p.professionName]));
+
+    items.forEach(item => {
+        const professionId = item.professionId || 'unknown';
+        const groupLabel = professionMap.get(professionId) || 'Tanpa Profesi';
+        
+        if (!grouped[groupLabel]) {
+            grouped[groupLabel] = { label: groupLabel, items: [] };
+        }
+        grouped[groupLabel].items.push(item);
+    });
+    return grouped;
+}
+
 function _renderGroupedListItems(groupedData, type) {
     let html = '';
-    const sortedMonthKeys = Object.keys(groupedData).sort().reverse();
+    
+    let sortedGroupKeys;
+    if (type === 'per_pekerja') {
+        sortedGroupKeys = Object.keys(groupedData).sort((a, b) => a.localeCompare(b));
+    } else {
+        sortedGroupKeys = Object.keys(groupedData).sort().reverse();
+    }
 
-    sortedMonthKeys.forEach(key => {
+    sortedGroupKeys.forEach(key => {
         const group = groupedData[key];
-        html += `<div class="month-group-header date-group-header">${group.label}</div>`;
+        html += `<div class="month-group-header date-group-header">${group.label}</div>`; // Nama kelas 'month-group-header' kita biarkan
         
-        let sortedItemsInMonth;
+        let sortedItemsInGroup;
         if (type === 'per_pekerja') {
-            sortedItemsInMonth = group.items.sort((a, b) => (a.workerName || '').localeCompare(b.workerName || ''));
+            sortedItemsInGroup = group.items.sort((a, b) => (a.workerName || '').localeCompare(b.workerName || ''));
         } else {
-            sortedItemsInMonth = group.items.sort((a, b) => getJSDate(b.date || b.createdAt) - getJSDate(a.date || a.createdAt));
+            sortedItemsInGroup = group.items.sort((a, b) => getJSDate(b.date || b.createdAt) - getJSDate(a.date || a.createdAt));
         }
 
         let groupHTML = '';
         if (type === 'harian') {
-            groupHTML = _getJurnalHarianListHTML(sortedItemsInMonth);
-        } else if (type === 'rekap_gaji') {
-            groupHTML = _getRekapGajiListHTML(sortedItemsInMonth);
+            groupHTML = _getJurnalHarianListHTML(sortedItemsInGroup);
+        } else if (type === 'riwayat_rekap') { // Nama tab baru
+            groupHTML = _getRekapGajiListHTML(sortedItemsInGroup);
         } else if (type === 'per_pekerja') {
-            groupHTML = _getJurnalPerPekerjaListHTML(sortedItemsInMonth);
+            groupHTML = _getJurnalPerPekerjaListHTML(sortedItemsInGroup);
         }
         html += `<div class="date-group-body">${groupHTML}</div>`;
     });
     return html;
 }
-
 
 async function renderJurnalContent(append = false) {
     if (!append && pageAbortController) pageAbortController.abort();
@@ -117,7 +137,8 @@ async function renderJurnalContent(append = false) {
             return acc;
         }, {});
         sourceItems = Object.values(groupedByDate).sort((a, b) => getJSDate(b.date) - getJSDate(a.date));
-    } else {
+        
+    } else if (activeTab === 'per_pekerja') {
         const attendance = (appState.attendanceRecords || []).filter(r => !r.isDeleted);
         const workersMap = new Map();
 
@@ -146,6 +167,14 @@ async function renderJurnalContent(append = false) {
         sourceItems = Array.from(workersMap.values())
             .filter(w => w.totalDays > 0)
             .sort((a, b) => b.lastActivity - a.lastActivity);
+            
+    } else if (activeTab === 'riwayat_rekap') {
+        sourceItems = (appState.bills || [])
+            .filter(b => b.type === 'gaji' && !b.isDeleted)
+            .sort((a, b) => getJSDate(b.createdAt) - getJSDate(a.createdAt));
+        sourceItems.forEach(item => {
+            item.date = item.createdAt; 
+        });
     }
 
     if (signal?.aborted) throw new DOMException('Operation aborted', 'AbortError');
@@ -155,11 +184,9 @@ async function renderJurnalContent(append = false) {
         appState.pagination[paginationKey] = { isLoading: false, hasMore: true, page: 0 };
     }
     const paginationState = appState.pagination[paginationKey];
-
     const startIndex = append ? (paginationState.page + 1) * ITEMS_PER_PAGE : 0;
     const endIndex = startIndex + ITEMS_PER_PAGE;
     const itemsToDisplay = sourceItems.slice(startIndex, endIndex);
-
     if (append || startIndex === 0) {
         paginationState.page = Math.floor(startIndex / ITEMS_PER_PAGE);
     }
@@ -167,9 +194,14 @@ async function renderJurnalContent(append = false) {
     paginationState.isLoading = false;
 
     if (!append && sourceItems.length === 0) {
-        const emptyConfig = activeTab === 'harian'
-            ? { icon: 'event_note', title: 'Jurnal Kosong', desc: 'Belum ada absensi harian yang tercatat.' }
-            : { icon: 'request_quote', title: 'Belum Ada Data Pekerja', desc: 'Belum ada absensi pekerja yang tercatat.' };
+        let emptyConfig = {};
+        if (activeTab === 'harian') {
+            emptyConfig = { icon: 'event_note', title: 'Jurnal Kosong', desc: 'Belum ada absensi harian yang tercatat.' };
+        } else if (activeTab === 'per_pekerja') {
+            emptyConfig = { icon: 'request_quote', title: 'Belum Ada Data Pekerja', desc: 'Belum ada absensi pekerja yang tercatat.' };
+        } else {
+            emptyConfig = { icon: 'history', title: 'Riwayat Kosong', desc: 'Belum ada tagihan gaji yang dibuat.' };
+        }
         container.innerHTML = getEmptyStateHTML(emptyConfig);
         return;
     }
@@ -179,7 +211,13 @@ async function renderJurnalContent(append = false) {
         return;
     }
 
-    const groupedData = groupItemsByMonth(itemsToDisplay, activeTab === 'harian' ? 'date' : 'lastActivity');
+    let groupedData;
+    if (activeTab === 'per_pekerja') {
+        groupedData = groupItemsByProfession(itemsToDisplay);
+    } else {
+        const dateField = (activeTab === 'harian') ? 'date' : 'createdAt';
+        groupedData = groupItemsByMonth(itemsToDisplay, dateField);
+    }
     const listHTML = _renderGroupedListItems(groupedData, activeTab);
     
     let listWrapper = container.querySelector('#journal-grouped-wrapper');
@@ -376,7 +414,6 @@ function initJurnalHeroCarousel() {
     buildSlides();
 }
 
-
 function initJurnalPage() {
     if (pageAbortController) pageAbortController.abort();
     if (pageEventListenerController) pageEventListenerController.abort();
@@ -389,21 +426,26 @@ function initJurnalPage() {
 
     appState.pagination.jurnal_harian = { isLoading: false, hasMore: true, page: 0 };
     appState.pagination.jurnal_per_pekerja = { isLoading: false, hasMore: true, page: 0 };
+    appState.pagination.jurnal_riwayat_rekap = { isLoading: false, hasMore: true, page: 0 };
 
     const container = $('.page-container');
+    
     const pageToolbarHTML = createPageToolbarHTML({ 
-        title: 'Jurnal',
-        actions: [
-             { icon: 'settings', label: 'Rekap Gaji', action: 'open-salary-recap-panel' }
-        ]
+        title: 'Jurnal'
     });
 
     const tabsData = [
         { id: 'harian', label: 'Harian' },
-        { id: 'per_pekerja', label: 'Per Pekerja' },
+        { id: 'per_pekerja', label: 'Pekerja' },
+        { id: 'riwayat_rekap', label: 'Riwayat' },
     ];
     const initialActiveTab = appState.activeSubPage.get('jurnal') || 'harian';
-    const tabsHTML = createTabsHTML({ id: 'jurnal-tabs', tabs: tabsData, activeTab: initialActiveTab, customClasses: 'tabs-underline two-tabs' });
+    const tabsHTML = createTabsHTML({ 
+        id: 'jurnal-tabs', 
+        tabs: tabsData, 
+        activeTab: initialActiveTab, 
+        customClasses: 'tabs-underline three-tabs' // <-- Diubah menjadi three-tabs
+    });
 
     const heroHTML = `
         <div id="jurnal-hero-carousel" class="dashboard-hero-carousel hero-journal" style="position:relative;">
@@ -419,7 +461,6 @@ function initJurnalPage() {
             <div id="sub-page-content" class="panel-body scrollable-content"></div>
         </div>
     `;
-
     const tabsContainer = container.querySelector('#jurnal-tabs');
     if (tabsContainer) {
         tabsContainer.addEventListener('click', (e) => {
@@ -453,7 +494,6 @@ function initJurnalPage() {
     on('ui.jurnal.openDailyProjectPicker', ({ date }) => openDailyProjectPickerForEdit(date), { signal: listenerSignal });
     on('ui.jurnal.openDailyEditorPanel', ({ dateStr, projectId }) => openDailyAttendanceEditorPanel(dateStr, projectId), { signal: listenerSignal });
     on('ui.jurnal.renderContent', renderJurnalContent, { signal: listenerSignal });
-    on('jurnal.generateDailyBill', handleGenerateDailyBill, { signal: listenerSignal });
     on('request-more-data', loadMoreJurnal, { signal: listenerSignal });
     
     const cleanupJurnal = () => {

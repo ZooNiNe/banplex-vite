@@ -291,6 +291,7 @@ export async function handleUpdateAttendance(form) {
     }
 }
 
+
 function _showPostSaveAttendanceDialog(summary) {
     const { totalPay, workerCount, dateStr, productiveEntries } = summary;
     
@@ -300,8 +301,7 @@ function _showPostSaveAttendanceDialog(summary) {
     }
 
     const formattedDate = parseLocalDate(dateStr).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    const billButtonDisabled = totalPay === 0 ? 'disabled' : '';
-
+    
     const modalContent = `
         <div class="success-preview-card" id="success-preview-card" style="padding: 0; background: transparent; border: none; box-shadow: none;">
             
@@ -311,7 +311,10 @@ function _showPostSaveAttendanceDialog(summary) {
             </div>
 
             <h4 class="success-preview-title" style="margin-top: 1rem; font-size: 1.2rem;">Absensi Harian Telah Disimpan!</h4>
-            <p class="success-preview-description" style="font-size: 0.9rem;">Apa yang ingin Anda lakukan selanjutnya?</p>
+            
+            <p class="success-preview-description" style="font-size: 0.9rem; text-align: left; max-width: 400px; margin: 0 auto 1.5rem auto;">
+                Data absensi telah disimpan. Untuk melihat rekapitulasi upah per pekerja dan membuat tagihan gaji, silakan buka halaman <b>Jurnal</b> dan pilih tab <b>Per Pekerja</b>.
+            </p>
 
             <dl class="detail-list" style="margin-top: 1rem; background-color: var(--surface-muted); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.25rem 1rem;">
                 <div><dt>Tanggal</dt><dd>${formattedDate}</dd></div>
@@ -322,9 +325,8 @@ function _showPostSaveAttendanceDialog(summary) {
     `;
 
     const footer = `
-        <button type="button" class="btn btn-secondary" data-action="close-modal-and-navigate" data-nav="jurnal">Lihat di Jurnal</button>
-        <button type="button" class="btn btn-primary" id="buat-tagihan-harian-btn" data-date="${dateStr}" ${billButtonDisabled}>
-            ${createIcon('receipt-text')} Jadikan Tagihan Gaji
+        <button type="button" class="btn btn-primary" data-action="close-modal-and-navigate" data-nav="jurnal">
+            Lihat di Jurnal
         </button>
     `;
 
@@ -336,7 +338,6 @@ function _showPostSaveAttendanceDialog(summary) {
     });
 
     const navigateBtn = modal.querySelector('[data-action="close-modal-and-navigate"]');
-    const createBillBtn = modal.querySelector('#buat-tagihan-harian-btn');
 
     if (navigateBtn) {
         navigateBtn.addEventListener('click', () => {
@@ -345,16 +346,6 @@ function _showPostSaveAttendanceDialog(summary) {
         });
     }
 
-    if (createBillBtn && !billButtonDisabled) {
-        createBillBtn.addEventListener('click', () => {
-            emit('jurnal.generateDailyBill', { 
-                date: dateStr,
-                records: productiveEntries // Kirim data absensi yang baru disimpan
-            });
-            closeModal(modal); // Tutup modal setelah aksi
-        });
-    }
-    
 }
 
 async function _confirmAndSaveAttendance(attendanceData) {
