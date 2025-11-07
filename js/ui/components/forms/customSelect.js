@@ -12,7 +12,8 @@ function createIcon(iconName, size = 18, classes = '') {
     return icons[iconName] || '';
 }
 
-export function createMasterDataSelect(id, label, options, selectedValue = '', masterType = null, required = false) {
+// --- PERBAIKAN (BUG 3): Tambahkan parameter `showSearch` di akhir ---
+export function createMasterDataSelect(id, label, options, selectedValue = '', masterType = null, required = false, showSearch = true) {
     // ... (kode createMasterDataSelect yang ada)
     const validOptions = Array.isArray(options) ? options : [];
     const safeSelectedValue = selectedValue || '';
@@ -22,6 +23,11 @@ export function createMasterDataSelect(id, label, options, selectedValue = '', m
     const showMasterButton = masterType && !isViewer();
     const requiredAttr = required ? 'required' : '';
     const masterButtonHTML = showMasterButton ? `<button type="button" class="btn-icon master-data-trigger" data-action="manage-master" data-type="${masterType}">${createIcon('database')}</button>` : '';
+
+    // --- PERBAIKAN (BUG 3): Tampilkan search box secara kondisional ---
+    const searchBoxHTML = showSearch
+        ? `<div class="custom-select-search-wrapper"><input type="search" class="custom-select-search" placeholder="Cari..." autocomplete="off"></div>`
+        : '';
 
     return `
         <div class="form-group">
@@ -34,8 +40,7 @@ export function createMasterDataSelect(id, label, options, selectedValue = '', m
                         ${createIcon('arrow_drop_down')}
                     </button>
                     <div class="custom-select-options">
-                        <div class="custom-select-search-wrapper"><input type="search" class="custom-select-search" placeholder="Cari..." autocomplete="off"></div>
-                        <div class="custom-select-options-list">
+                        ${searchBoxHTML} <div class="custom-select-options-list">
                         ${validOptions.map(opt => `<div class="custom-select-option ${opt.value === finalSelectedValue ? 'selected' : ''}" data-value="${opt.value}" ${opt.disabled ? 'disabled' : ''}>${opt.text}</div>`).join('')}
                         </div>
                     </div>
@@ -99,7 +104,7 @@ export function initCustomSelects(context = document) {
 
 
             if (!isActive) { 
-                if (searchInput) {
+                if (searchInput) { // --- PERBAIKAN (BUG 3): Sudah aman karena ada `if (searchInput)`
                     searchInput.value = '';
                     optionsList.querySelectorAll('.custom-select-option').forEach(opt => opt.style.display = '');
                                         
@@ -137,20 +142,26 @@ export function initCustomSelects(context = document) {
 
         optionsList.removeEventListener('click', optionsList._clickHandler);
         optionsList._clickHandler = (e) => {
+            // --- PERBAIKAN (BUG 1): Hentikan event agar tidak 'click-through' ---
+            e.stopPropagation();
             const option = e.target.closest('.custom-select-option:not([disabled])');
             if (option) applySelection(option);
         };
         optionsList.addEventListener('click', optionsList._clickHandler);
 
+        // --- PERBAIKAN (BUG 2): Hapus listener 'pointerdown' ---
+        // Listener ini menyebabkan pemilihan instan di perangkat sentuh dan memblokir scroll.
+        // Event 'click' sudah cukup untuk menangani pemilihan.
         optionsList.removeEventListener('pointerdown', optionsList._pointerHandler);
-        optionsList._pointerHandler = (e) => {
-            const option = e.target.closest('.custom-select-option:not([disabled])');
-            if (!option) return;
-            e.preventDefault();
-            e.stopPropagation();
-            applySelection(option);
-        };
-        optionsList.addEventListener('pointerdown', optionsList._pointerHandler, { passive: false });
+        // optionsList._pointerHandler = (e) => {
+        //     const option = e.target.closest('.custom-select-option:not([disabled])');
+        //     if (!option) return;
+        //     e.preventDefault();
+        //     e.stopPropagation();
+        //     applySelection(option);
+        // };
+        // optionsList.addEventListener('pointerdown', optionsList._pointerHandler, { passive: false });
+        // --- AKHIR PERBAIKAN (BUG 2) ---
 
         if (searchInput) {
 
@@ -173,7 +184,7 @@ export function initCustomSelects(context = document) {
 }
 
 export function updateCustomSelectOptions(containerElement, masterType) {
-    // Konfigurasi untuk memetakan masterType ke data di appState
+    // ... (Tidak ada perubahan di fungsi ini) ...
     const config = {
         'projects': { stateKey: 'projects', nameField: 'projectName' },
         'suppliers': { stateKey: 'suppliers', nameField: 'supplierName' },

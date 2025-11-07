@@ -1,5 +1,3 @@
-// js/ui/pages/pemasukan_form.js
-
 import { appState } from '../../state/appState.js';
 import { $ } from '../../utils/dom.js';
 import { createPageToolbarHTML } from '../components/toolbar.js';
@@ -10,14 +8,11 @@ import { liveQueryMulti } from '../../state/liveQuery.js';
 import { fetchAndCacheData } from '../../services/data/fetch.js';
 import { projectsCol, fundingCreditorsCol } from '../../config/firebase.js';
 import { fmtIDR, parseFormattedNumber } from '../../utils/formatters.js';
+import { attachFormDraftPersistence } from '../../utils/formPersistence.js';
 
 let pageEventListenerController = null;
 let unsubscribeLiveQuery = null;
 
-/**
- * Membersihkan field yang tidak valid
- * (DIPINDAHKAN DARI uiInteractionService.js)
- */
 function clearInvalid(field) {
     if (!field) return;
     const group = field.closest('.form-group');
@@ -34,10 +29,6 @@ function clearInvalid(field) {
     if (errorEl) errorEl.remove();
 }
 
-/**
- * Memasang listener khusus untuk form pemasukan
- * (DIPINDAHKAN DARI uiInteractionService.js)
- */
 function attachPemasukanFormListeners(context) {
     if (!context) return;
 
@@ -48,7 +39,6 @@ function attachPemasukanFormListeners(context) {
 
     const formType = form.dataset.type || 'termin';
 
-    // (Validasi klien sudah ditangani oleh listener global)
     initCustomSelects(context);
 
     const numericInputs = form.querySelectorAll('input[inputmode="numeric"], input[name="rate"], input[name="tenor"]');
@@ -191,18 +181,18 @@ async function renderPemasukanFormContent(container, activeTab) {
         fetchAndCacheData('fundingCreditors', fundingCreditorsCol, 'creditorName')
     ]);
     
-    // Dapatkan HTML form
-    const formHTML = getFormPemasukanHTML(activeTab, null); // null = data item (karena ini form baru)
+    const formHTML = getFormPemasukanHTML(activeTab, null);
     container.innerHTML = formHTML;
 
-    // Pasang listener ke form baru
+    const form = container.querySelector('#pemasukan-form, #edit-item-form');
+    if (form) {
+        attachFormDraftPersistence(form);
+    }
+
     attachPemasukanFormListeners(container);
     emit('ui.forms.init', container);
 }
 
-/**
- * Inisialisasi Halaman Form Pemasukan
- */
 export async function initPemasukanFormPage() {
     if (pageEventListenerController) pageEventListenerController.abort();
     pageEventListenerController = new AbortController();
@@ -213,9 +203,8 @@ export async function initPemasukanFormPage() {
 
     const container = $('.page-container');
     
-    // Baca tab yang diminta dari appState (diatur oleh actionHandlers)
     const activeTab = appState.activeSubPage.get('pemasukan_form') || appState.pemasukanFormType || 'termin';
-    appState.pemasukanFormType = null; // Hapus state sementara
+    appState.pemasukanFormType = null;
     appState.activeSubPage.set('pemasukan_form', activeTab);
 
     const tabsData = [
@@ -243,7 +232,6 @@ export async function initPemasukanFormPage() {
     const tabsContainer = container.querySelector('#pemasukan-form-tabs');
     const contentContainer = container.querySelector('#sub-page-content');
 
-    // Listener untuk ganti tab form (Termin/Pinjaman)
     if (tabsContainer) {
         tabsContainer.addEventListener('click', (e) => {
             const tabButton = e.target.closest('.sub-nav-item');
@@ -258,7 +246,6 @@ export async function initPemasukanFormPage() {
         }, { signal: listenerSignal });
     }
     
-    // Listener untuk update dropdown jika master data berubah
     if (unsubscribeLiveQuery) unsubscribeLiveQuery.unsubscribe();
     unsubscribeLiveQuery = liveQueryMulti(
         ['projects', 'fundingCreditors'], 
@@ -267,7 +254,6 @@ export async function initPemasukanFormPage() {
                 const form = contentContainer.querySelector('form');
                 if (form) {
                     const currentTab = appState.activeSubPage.get('pemasukan_form') || 'termin';
-                    // Cukup update dropdown-nya saja
                     if (changedKeys.includes('projects') && currentTab === 'termin') {
                          emit('ui.form.updateCustomSelect', { context: form, type: 'projects' });
                     }
@@ -279,10 +265,8 @@ export async function initPemasukanFormPage() {
         }
     );
 
-    // Render konten form awal
     await renderPemasukanFormContent(contentContainer, activeTab);
 
-    // Listener Unload
     const cleanup = () => {
         if (pageEventListenerController) pageEventListenerController.abort();
         if (unsubscribeLiveQuery) unsubscribeLiveQuery.unsubscribe();

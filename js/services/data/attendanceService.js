@@ -1234,7 +1234,7 @@ export async function handleOpenAttendanceSettings() {
         <div class="card card-pad" id="global-attendance-settings-card">
             <h5 class="detail-section-title">Pengaturan Default Absensi</h5>
             <p class="helper-text">Atur proyek dan tanggal default untuk input absensi manual.</p>
-            ${createMasterDataSelect('global_default_project', 'Pilih Proyek Default', projectOptions, currentDefaultProjectId, null)}
+            ${createMasterDataSelect('global_default_project', 'Pilih Proyek Default', projectOptions, currentDefaultProjectId, null, false, false)}
             <div class="form-group">
                 <label for="global_default_date">Tanggal Absensi (Default)</label>
                 <input type="date" id="global_default_date" name="global_default_date" value="${currentDefaultDate}">
@@ -1341,9 +1341,9 @@ export async function _openWorkerDefaultsModal(workerId, workerName) {
             <p class="helper-text" style="text-align: center; margin-bottom: 1rem;">
                 Atur proyek dan peran yang akan otomatis terisi saat memilih <strong>${workerName}</strong> di absensi manual.
             </p>
-            ${createMasterDataSelect('worker-default-project', 'Proyek Default', projectOptions, currentProjectId, null, false)}
+            ${createMasterDataSelect('worker-default-project', 'Proyek Default', projectOptions, currentProjectId, null, false, false)}
             <div class="form-group" id="worker-default-role-container">
-                ${createMasterDataSelect('worker-default-role', 'Peran Default', roleOptions, currentRole, null, false)}
+                ${createMasterDataSelect('worker-default-role', 'Peran Default', roleOptions, currentRole, null, false, false)}
             </div>
 
             <div class="form-group" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line);">
@@ -1380,11 +1380,10 @@ export async function _openWorkerDefaultsModal(workerId, workerName) {
             const newDefaultRole = ''; 
 
             if (roleContainer) {
-                roleContainer.innerHTML = createMasterDataSelect('worker-default-role', 'Peran Default', newRoleOptions, newDefaultRole, null, false);
+                roleContainer.innerHTML = createMasterDataSelect('worker-default-role', 'Peran Default', newRoleOptions, newDefaultRole, null, false, false);
                 initCustomSelects(roleContainer);
             }
         });
-
         const form = modal.querySelector('#worker-defaults-form');
         form?.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1477,9 +1476,9 @@ function renderProjectRoleRow(entry) {
     <div class="project-role-card" data-entry-id="${entryId}">
          <button type="button" class="btn-icon btn-icon-danger remove-item-btn" data-action="remove-project-role-entry" style="position: absolute; top: 8px; right: 8px; z-index: 2;">
          </button>
-           ${createMasterDataSelect(`project_${entryId}`, 'Proyek', projectOptions, entry.projectId || '', null, true)}
+           ${createMasterDataSelect(`project_${entryId}`, 'Proyek', projectOptions, entry.projectId || '', null, true, false)}
            <div class="form-group role-selector" style="margin-bottom: 0;">
-               ${createMasterDataSelect(`role_${entryId}`, 'Peran', roleOptions, entry.role || '', null, true)}
+               ${createMasterDataSelect(`role_${entryId}`, 'Peran', roleOptions, entry.role || '', null, true, false)}
            </div>
            <input type="hidden" name="status_${entryId}" value="${entry.status || 'full_day'}">
            <input type="hidden" name="customWage_${entryId}" value="${entry.customWage || ''}">
@@ -1526,7 +1525,7 @@ function attachProjectRoleListeners(modal) {
             
             const roleContainer = row.querySelector('.role-selector');
             if (roleContainer) {
-                roleContainer.innerHTML = createMasterDataSelect(`role_${entryId}`, 'Peran', roleOptions, entry.role || '', null, true);
+                roleContainer.innerHTML = createMasterDataSelect(`role_${entryId}`, 'Peran', roleOptions, entry.role || '', null, true, false);
                 initCustomSelects(roleContainer);
                 roleContainer.querySelector(`input[name="role_${entryId}"]`)?.addEventListener('change', (ev) => {
                     entry.role = ev.target.value;
@@ -1652,19 +1651,17 @@ export async function handleOpenProjectRoleModal(context) {
         <p class="confirm-modal-text" style="text-align: left; margin-bottom: 1rem;">
             Atur proyek dan peran untuk <strong>${worker.workerName}</strong> pada ${parseLocalDate(dateStr).toLocaleDateString('id-ID')}.
         </p>
-        <div id="project-role-entry-container" class="project-role-card-container">
-            <div class="project-role-card" data-entry-id="single_entry">
-                ${createMasterDataSelect(`project_edit`, 'Proyek', projectOptions, currentProjectId, null, true)}
-                <div class="form-group role-selector" style="margin-bottom: 0;">
-                    ${createMasterDataSelect(`role_edit`, 'Peran', roleOptions, currentRole, null, true)}
-                </div>
-            </div>
+        
+        ${createMasterDataSelect(`project_edit`, 'Proyek', projectOptions, currentProjectId, null, true, false)}
+        
+        <div class="form-group role-selector" style="margin-bottom: 0;">
+            ${createMasterDataSelect(`role_edit`, 'Peran', roleOptions, currentRole, null, true, false)}
         </div>
+        
         <input type="hidden" name="status_edit" value="${currentStatus}">
         <input type="hidden" name="customWage_edit" value="${customWage || ''}">
     </form>
 `;
-
     const footer = `
         <button type="button" class="btn btn-ghost" data-action="history-back">Batal</button>
         <button type="button" id="save-project-role-btn" class="btn btn-primary">
@@ -1686,7 +1683,7 @@ export async function handleOpenProjectRoleModal(context) {
     } else {
         modalInstance = showDetailPane({
             title: modalTitle,
-            content: `<div class="scrollable-content has-form-padding">${content}</div>`,
+            content: content, // Langsung teruskan 'content'
             footer: footer,
             paneType: 'attendance-project-role-edit'
         });
@@ -1709,11 +1706,10 @@ export async function handleOpenProjectRoleModal(context) {
             const newDefaultRole = worker.defaultRole && newWages[worker.defaultRole] ? worker.defaultRole : (newRoleOptions[0]?.value || '');
 
             if (roleContainer) {
-                roleContainer.innerHTML = createMasterDataSelect(`role_edit`, 'Peran', newRoleOptions, newDefaultRole, null, true);
+                roleContainer.innerHTML = createMasterDataSelect(`role_edit`, 'Peran', newRoleOptions, newDefaultRole, null, true, false);
                 initCustomSelects(roleContainer);
             }
-        });
-        
+        });        
         modalInstance.querySelector('#save-project-role-btn')?.addEventListener('click', () => {
             const projectId = modalInstance.querySelector('input[name="project_edit"]')?.value;
             const role = modalInstance.querySelector('input[name="role_edit"]')?.value;

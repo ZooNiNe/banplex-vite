@@ -3,13 +3,13 @@
   align-items: center;
   gap: .25rem;
   font-size: .6rem;
-  padding: .1rem .35rem;
+  padding: .1rem .25rem;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface-muted);
-  color: var(--text-dim);
+  background: var(--primary-light);
+  color: var(--primary);
   text-transform: capitalize;
   white-space: nowrap;
+  margin-left: -4px;
 }
 
 .meta-badge .badge {
@@ -166,6 +166,7 @@
   justify-content: center;
   align-items: center;
 }
+
 .sidebar-nav-item .notification-badge {
   right: 1rem;
   top: 50%;

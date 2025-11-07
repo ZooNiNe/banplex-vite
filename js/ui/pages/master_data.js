@@ -172,10 +172,15 @@ async function renderTabContent(tabId) {
 
         emit('ui.forms.init', contentContainer);
 
-        // Pasang listener untuk update dropdown jika ada master data lain yang diupdate
         if (pageEventListenerController?.signal) {
             pageState.formUpdateListener = (updateData) => {
                 if (!updateData || !updateData.type) return;
+                
+                if (updateData.type === pageState.type && pageState.activeTab === 'form') {
+                    console.log(`[Master Page] Form data '${updateData.type}' telah disimpan. Mereset form dirty state.`);
+                    resetFormDirty();
+                }
+
                 console.log(`[Master Page] Master data '${updateData.type}' diperbarui. Memperbarui dropdown...`);
                 updateCustomSelectOptions(contentContainer, updateData.type);
             };
@@ -184,20 +189,15 @@ async function renderTabContent(tabId) {
     }
 }
 
-/**
- * Menginisialisasi listener untuk halaman master data
- */
 function initMasterDataListeners() {
     if (pageEventListenerController) pageEventListenerController.abort();
     pageEventListenerController = new AbortController();
     const { signal } = pageEventListenerController;
 
-    const container = $('.page-container');
-    const typeTabsContainer = container?.querySelector('#master-data-type-tabs'); // Tab Tipe (Proyek, Supplier, dll)
-    const formTabsContainer = container?.querySelector('#master-data-tabs'); // Tab Aksi (Daftar, Input)
-    const contentContainer = container?.querySelector('#sub-page-content');
+    const container = $('.page-container'); 
+    const typeTabsContainer = container?.querySelector('#master-data-type-tabs'); 
+    const formTabsContainer = container?.querySelector('#master-data-tabs'); 
 
-    // --- BARU: Listener untuk Tab Tipe Master Data ---
     typeTabsContainer?.addEventListener('click', (e) => {
         const tabButton = e.target.closest('.sub-nav-item');
         if (tabButton && !tabButton.classList.contains('active')) {
@@ -210,27 +210,20 @@ function initMasterDataListeners() {
             }
 
             const proceed = () => {
-                // Update kelas aktif di tab tipe
                 typeTabsContainer.querySelector('.active')?.classList.remove('active');
                 tabButton.classList.add('active');
-
-                // Reset state halaman untuk tipe baru
                 pageState.type = newType;
                 pageState.config = newConfig;
                 pageState.currentItemId = null;
                 pageState.activeTab = 'list';
-                
-                // Reset tab Aksi (Daftar/Input) ke "Daftar"
                 const formTab = formTabsContainer?.querySelector('[data-tab="form"]');
                 if (formTab) formTab.textContent = 'Input Baru';
                 formTabsContainer?.querySelector('.active')?.classList.remove('active');
                 formTabsContainer?.querySelector('[data-tab="list"]')?.classList.add('active');
-                
                 resetFormDirty();
-                renderTabContent('list'); // Render ulang konten untuk tipe baru
+                renderTabContent('list');
             };
 
-            // Cek form dirty sebelum pindah tab tipe
             if (pageState.activeTab === 'form' && checkFormDirty()) {
                 emit('ui.modal.create', 'confirmUserAction', {
                     title: 'Batalkan Perubahan?',
@@ -243,13 +236,11 @@ function initMasterDataListeners() {
             }
         }
     }, { signal });
-    // --- AKHIR BLOK BARU ---
 
-    // Listener untuk Tab Aksi (List/Form)
     formTabsContainer?.addEventListener('click', (e) => {
         const tabButton = e.target.closest('.sub-nav-item');
         if (tabButton && !tabButton.classList.contains('active')) {
-            const newTabId = tabButton.dataset.tab; // 'list' or 'form'
+            const newTabId = tabButton.dataset.tab; 
             const currentTabId = formTabsContainer.querySelector('.active')?.dataset.tab;
 
             const proceed = () => {
@@ -257,11 +248,9 @@ function initMasterDataListeners() {
                 tabButton.classList.add('active');
                 const formTab = formTabsContainer.querySelector('[data-tab="form"]');
                 if (formTab) formTab.textContent = 'Input Baru';
-
                 if (newTabId === 'list') {
                      pageState.currentItemId = null;
                 }
-                
                 resetFormDirty();
                 renderTabContent(newTabId);
             };
@@ -278,38 +267,31 @@ function initMasterDataListeners() {
             }
         }
     }, { signal });
+    on('ui.action.edit-master-item', (context) => {
+        if (appState.activePage !== 'master_data' || !context.itemId || context.type !== pageState.type) {
+            return;
+        }
 
-    // Listener untuk Aksi di dalam Konten (klik item list, dll.)
-    contentContainer?.addEventListener('click', (e) => {
-        const target = e.target.closest('[data-action]');
-        if (!target) return;
+        const { itemId } = context;
+        pageState.currentItemId = itemId;
         
-        const action = target.dataset.action;
-        const itemWrapper = target.closest('.wa-card-v2-wrapper');
-        const itemId = itemWrapper?.dataset.itemId;
-
-        if (action === 'edit-master-item' && itemId) {
-            // Klik "Edit" dari daftar
-            pageState.currentItemId = itemId;
-            
-            const formTab = formTabsContainer?.querySelector('[data-tab="form"]');
-            if (formTab) {
-                formTab.textContent = 'Edit Data';
-                formTab.click(); // Pindah ke tab form
+        const formTab = formTabsContainer?.querySelector('[data-tab="form"]');
+        if (formTab) {
+            formTab.textContent = 'Edit Data';
+            if (!formTab.classList.contains('active')) {
+                formTabsContainer?.querySelector('[data-tab="list"]')?.classList.remove('active');
+                formTab.classList.add('active');
+                renderTabContent('form'); 
+            } else {
+                renderTabContent('form');
             }
         }
-        else if (action === 'delete-master-item' && itemId) {
-            // Klik "Hapus" dari daftar
-            emit('ui.action.delete-master-item', { itemId, type: pageState.type });
-        }
+
     }, { signal });
-    
-    // Listener global untuk event bus
     on('ui.form.markDirty', (isDirty) => {
-        pageState.isFormDirty = isDirty;
+        pageState.isDirty = isDirty; // <-- Ganti nama state ini jika perlu
     }, { signal });
 
-    // Hapus listener saat halaman ditutup
     on('app.unload.master_data', () => {
         if (pageAbortController) pageAbortController.abort();
         if (pageEventListenerController) pageEventListenerController.abort();
@@ -321,40 +303,39 @@ function initMasterDataListeners() {
         unsubscribeLiveQuery = null;
         pageState.formUpdateListener = null;
 
-        // Reset tipe pageState saat unload
         pageState.type = null; 
         
         off('app.unload.master_data');
     }, { signal });
 }
 
-/**
- * Inisialisasi Halaman Master Data
- */
 export async function initMasterDataPage() {
-    // 1. Ambil data request dari appState
     const request = appState.masterDataOpenRequest || {};
     appState.masterDataOpenRequest = null; // Hapus request setelah dibaca
 
-    // --- LOGIKA BARU UNTUK MENENTUKAN TIPE ---
     const availableTypes = getAvailableMasterTypes();
     const defaultType = availableTypes.length > 0 ? availableTypes[0].id : '';
 
-    // Prioritas: Request -> State Halaman Saat Ini -> Default ('projects')
-    const type = request.type || pageState.type || defaultType;
-    const itemId = (request.type === type) ? request.itemId : null; // Hanya pakai itemId jika tipe-nya cocok
-    const activeFormTab = itemId ? 'form' : 'list'; // Tab 'Daftar' or 'Form'
 
-    const config = masterDataConfig[type];
-    // --- AKHIR LOGIKA BARU ---
-
-    // --- FIX [START] --- (Ini adalah fix dari langkah sebelumnya, kita pertahankan)
-    if (!config) {
-        console.error(`[MasterDataPage] Konfigurasi tidak valid untuk tipe: ${type}. Ini bisa terjadi jika halaman di-refresh atau diakses langsung. Mengalihkan ke 'pengaturan'.`);
+        let type, itemId, activeFormTab, config;
+    
+        if (request.type) {
+            type = request.type;
+            itemId = request.itemId || null;
+            activeFormTab = request.activeTab || (itemId ? 'form' : 'list'); // <--- INI FIX-NYA
+        } else {
+            type = pageState.type || defaultType; // Gunakan state terakhir atau default
+            itemId = null; // Selalu reset item ID
+            activeFormTab = 'list'; // Selalu default ke 'list'
+        }
+    
+        config = masterDataConfig[type];
         
-        const container = $('.page-container');
-        if (container) {
-            // Tampilkan pesan error sementara
+        if (!config) {
+            console.error(`[MasterDataPage] Konfigurasi tidak valid untuk tipe: ${type}. Mengalihkan ke 'pengaturan'.`);
+             
+             const container = $('.page-container');
+             if (container) {          
             container.innerHTML = `
                 <div class="content-panel">
                     <div class="panel-header">
@@ -372,29 +353,21 @@ export async function initMasterDataPage() {
         }, 1500); // Beri waktu 1.5 detik untuk membaca pesan
         return; // Hentikan eksekusi lebih lanjut
     }
-    // --- FIX [END] ---
-
-    // 2. Setup state halaman
     pageState.type = type;
     pageState.config = config;
-    pageState.currentItemId = itemId || null;
+    pageState.currentItemId = itemId;
     pageState.activeTab = activeFormTab;
     pageState.isFormDirty = false;
 
-    // 3. Render Shell Halaman
     const container = $('.page-container');
     const title = `Kelola Master Data`; // Judul generik
 
-    // --- BARU: Navigasi Tipe Master Data ---
     const masterTypeNavHTML = createTabsHTML({
         id: 'master-data-type-tabs', // ID baru untuk sub-nav
         tabs: availableTypes,
         activeTab: type, // Tab aktif adalah tipe data (e.g., 'projects')
         customClasses: 'category-sub-nav' // Gunakan style yang bisa di-scroll
     });
-    // --- AKHIR BARU ---
-
-    // Tab Aksi (Daftar / Input)
     const tabs = [
         { id: 'list', label: 'Daftar Data' },
         { id: 'form', label: itemId ? 'Edit Data' : 'Input Baru' }

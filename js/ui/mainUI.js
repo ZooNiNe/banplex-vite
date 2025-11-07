@@ -5,7 +5,6 @@ import { $ } from "../utils/dom.js";
 import { renderPageContent } from "./pages/pageManager.js";
 import { checkFormDirty, resetFormDirty, closeModal, closeDetailPane, closeAllModals } from "./components/modal.js";
 import { emit } from "../state/eventBus.js";
-// PERBAIKAN: Impor lengkap untuk onSnapshot
 import { onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { commentsCol } from "../config/firebase.js";
 
@@ -207,17 +206,16 @@ export function renderUI() {
         $('#mobile-sidebar-overlay')?.remove();
     } else if (userStatus === 'active') {
         document.body.className = '';
+        
+        if (pageContainer) {
+            pageContainer.innerHTML = '';
+        }
+        
         const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === '1';
         document.body.classList.toggle('sidebar-collapsed', sidebarCollapsed);
         renderSidebar();
         renderBottomNav();
         try { ensureGlobalCommentsListener(); } catch(_) {}
-        
-        // !!! PERBAIKAN DI SINI !!!
-        // Hapus baris yang mengosongkan pageContainer.
-        // const pageContainer = $('#page-container'); // <-- Dihapus
-        // if (pageContainer) pageContainer.innerHTML = ''; // <-- Dihapus
-        // !!! AKHIR PERBAIKAN !!!
     }
 }
 

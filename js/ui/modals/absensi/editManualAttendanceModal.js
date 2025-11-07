@@ -7,6 +7,7 @@ import { emit } from "../../../state/eventBus.js";
 import { toast } from "../../components/toast.js";
 import { getJSDate, getLocalDayBounds, parseLocalDate } from "../../../utils/helpers.js";
 
+// ... (State lokal dan fungsi createIcon tidak berubah) ...
 // State lokal khusus untuk modal ini
 let modalState = {
     workerId: null,
@@ -37,6 +38,7 @@ function createIcon(iconName, size = 18, classes = '') {
  * @returns {boolean} True jika setup berhasil.
  */
 function setupModalState(context) {
+    // ... (fungsi tidak berubah) ...
     const { workerId } = context;
     const dateStr = appState.defaultAttendanceDate;
     const worker = appState.workers.find(w => w.id === workerId);
@@ -148,16 +150,16 @@ function renderEntryRow(entry) {
         <div class="multi-item-row" data-entry-id="${entryId}">
             <div class="multi-item-main-line">
                 <div class="item-name-wrapper">
-                    ${createMasterDataSelect(`project_${entryId}`, 'Proyek', projectOptions, entry.projectId || '', null, true)}
+                    ${createMasterDataSelect(`project_${entryId}`, 'Proyek', projectOptions, entry.projectId || '', null, true, false)}
                 </div>
                 <button type="button" class="btn-icon btn-icon-danger remove-item-btn" data-action="remove-entry">${createIcon('trash-2')}</button>
             </div>
             <div class="multi-item-details-line" ${isAbsent ? 'style="display: none;"' : ''}>
                 <div class="form-group role-selector">
-                    ${createMasterDataSelect(`role_${entryId}`, 'Peran', roleOptions, entry.role || '', null, !isAbsent)}
+                    ${createMasterDataSelect(`role_${entryId}`, 'Peran', roleOptions, entry.role || '', null, !isAbsent, false)}
                 </div>
                 <div class="form-group">
-                    ${createMasterDataSelect(`status_${entryId}`, 'Status', statusOptions, entry.status || 'full_day', null, true)}
+                    ${createMasterDataSelect(`status_${entryId}`, 'Status', statusOptions, entry.status || 'full_day', null, true, false)}
                 </div>
             </div>
             <div class="multi-item-details-line" style="grid-template-columns: 1fr 1fr; ${isAbsent ? 'display: none;' : ''}">
@@ -178,6 +180,7 @@ function renderEntryRow(entry) {
  * Menambah baris entri baru ke state dan UI.
  */
 function addEntryRow(container, defaultProjectId = null) {
+    // ... (fungsi tidak berubah) ...
     const newEntry = {
         id: `local_${Math.random().toString(36).substring(2, 9)}`,
         projectId: defaultProjectId || modalState.projects[0]?.id || '',
@@ -200,6 +203,7 @@ function addEntryRow(container, defaultProjectId = null) {
  * Mengupdate upah untuk satu baris entri.
  */
 function updatePay(rowElement) {
+    // ... (fungsi tidak berubah) ...
     if (!rowElement) return;
     const entryId = rowElement.dataset.entryId;
     const entry = modalState.entries.find(e => e.id === entryId);
@@ -232,6 +236,7 @@ function updatePay(rowElement) {
  * Menghitung total upah dari semua entri dan menampilkannya.
  */
 function updateTotalPay() {
+    // ... (fungsi tidak berubah) ...
     const total = modalState.entries.reduce((sum, entry) => {
         // Hanya hitung jika status bukan 'absen'
         return entry.status !== 'absent' ? (sum + (entry.pay || 0)) : sum;
@@ -247,6 +252,7 @@ function updateTotalPay() {
  * Memasang listener ke semua input di dalam modal.
  */
 function attachEntryListeners(modal) {
+    // ... (fungsi tidak berubah) ...
     const container = modal.querySelector('#manual-entry-container');
     if (!container) return;
 
@@ -276,7 +282,8 @@ function attachEntryListeners(modal) {
             
             const roleContainer = row.querySelector('.role-selector');
             if (roleContainer) {
-                roleContainer.innerHTML = createMasterDataSelect(`role_${entryId}`, 'Peran', roleOptions, entry.role || '', null, true);
+                // PERBAIKAN (BUG 3): Tambah 'false' untuk showSearch di dropdown Peran
+                roleContainer.innerHTML = createMasterDataSelect(`role_${entryId}`, 'Peran', roleOptions, entry.role || '', null, true, false);
                 initCustomSelects(roleContainer);
                 
                 const newRoleSelect = roleContainer.querySelector(`input[name="role_${entryId}"]`);
@@ -356,6 +363,7 @@ function attachEntryListeners(modal) {
 }
 
 export function handleOpenManualAttendanceModal(context) {
+    // ... (fungsi tidak berubah) ...
     if (!setupModalState(context)) return; // Setup state
 
     const date = parseLocalDate(modalState.date);
@@ -366,7 +374,6 @@ export function handleOpenManualAttendanceModal(context) {
     const content = `
         <form id="edit-manual-attendance-form" data-worker-id="${modalState.workerId}">
             <div class="card card-pad">
-                <!-- Hero Section -->
                 <div class="success-hero success-hero--attendance" style="margin-bottom:.75rem;">
                     <svg class="success-hero-art" width="120" height="88" viewBox="0 0 120 88" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="ha_edit" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="var(--primary)" stop-opacity="0.18" /><stop offset="100%" stop-color="var(--primary)" stop-opacity="0.05" /></linearGradient></defs><rect x="8" y="12" width="84" height="52" rx="10" fill="url(#ha_edit)" stroke="var(--line)"/><rect x="20" y="26" width="40" height="8" rx="4" fill="var(--primary)" opacity="0.25" /><rect x="20" y="40" width="30" height="8" rx="4" fill="var(--primary)" opacity="0.15" /></svg>
                     <div class="success-preview-icon">${createIcon('hard-hat', 28)}</div>
@@ -377,7 +384,6 @@ export function handleOpenManualAttendanceModal(context) {
                     <div><dt>Tanggal</dt><dd>${formattedDate}</dd></div>
                 </dl>
 
-                <!-- Container untuk entri absensi (multi-proyek) -->
                 <div id="manual-entry-container" style="margin-top: 1rem;">
                     ${entriesHTML}
                 </div>
@@ -387,7 +393,6 @@ export function handleOpenManualAttendanceModal(context) {
                 </button>
             </div>
             
-            <!-- Summary Total Upah -->
             <div class="card card-pad" style="margin-top: 1rem;">
                 <div class="invoice-total attendance-manual-summary" id="attendance-manual-summary">
                     <span>Total Estimasi Upah</span>
@@ -418,6 +423,7 @@ export function handleOpenManualAttendanceModal(context) {
         
         // Pasang listener ke tombol Simpan
         modal.querySelector('#save-manual-attendance-btn')?.addEventListener('click', () => {
+            // ... (logika simpan tidak berubah) ...
             // 1. Validasi: Kumpulkan semua entri yang valid
             const finalEntries = modalState.entries.filter(e => {
                 if (e.status === 'absent') return true; // Absen selalu valid
@@ -458,6 +464,7 @@ export function handleOpenManualAttendanceModal(context) {
 }
 
 export async function _showAttendanceFilterModal(onApply) {
+    // ... (fungsi tidak berubah) ...
     const { professions = [] } = appState;
     const { professionId = 'all' } = appState.attendanceFilter || {};
 
@@ -506,6 +513,7 @@ export async function _showAttendanceFilterModal(onApply) {
 }
 
 export function _showAttendanceSortModal(onApply) {
+    // ... (fungsi tidak berubah) ...
     const { sortBy = 'status', sortDirection = 'desc' } = appState.attendanceFilter || {};
 
     const content = `

@@ -48,19 +48,20 @@ export function initializeGlobalClickListeners() {
         }
 
         const target = e.target;
-        const resolvedContext = resolveActionContext(target);
-        const actionTarget = resolvedContext?.target;
-
-        const isIgnoredButton = target.closest('.custom-select-trigger');
+                const resolvedContext = resolveActionContext(target);
+                const actionTarget = resolvedContext?.target;
+        
+                const isIgnoredButton = target.closest('.custom-select-trigger');
+                const isInsideCustomSelectOptions = target.closest('.custom-select-options');
                 const isInDetailPaneFormSubmit = target.closest('#detail-pane form button[type="submit"], #detail-pane .form-footer-actions button[type="submit"]');
         
                 const isCommentButton = target.closest('.composer-capsule,.composer-wrapper,[data-action="post-comment"], [data-action="reply-comment"], .comment-menu');
         
-                if (isIgnoredButton || isInDetailPaneFormSubmit || isCommentButton) {
-                    return;
-                }
-
-        const openMenu = document.querySelector('.actions-menu.show');
+                if (isIgnoredButton || isInDetailPaneFormSubmit || isCommentButton || isInsideCustomSelectOptions) {
+                    return;
+                }
+                
+                const openMenu = document.querySelector('.actions-menu.show');
         if (openMenu && !openMenu.contains(target) && actionTarget !== openMenu.originElement) {
             if (window.closeContextMenu) {
                 window.closeContextMenu(e);

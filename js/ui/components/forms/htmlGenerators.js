@@ -5,6 +5,7 @@ import { _createAttachmentManagerHTML } from "./attachmentManager.js";
 import { masterDataConfig } from "../../../config/constants.js";
 import { createMasterDataSelect } from "./customSelect.js";
 
+// ... (fungsi createIcon dan safeYMD tidak berubah) ...
 function createIcon(iconName, size = 18, classes = '') {
     const icons = {
         save: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-save ${classes}"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`,
@@ -22,6 +23,7 @@ function createIcon(iconName, size = 18, classes = '') {
 }
 
 function safeYMD(dateVal, fallbackYMD) {
+    // ... (fungsi tidak berubah) ...
     try {
         if (!dateVal) return fallbackYMD;
         const d = getJSDate(dateVal);
@@ -32,6 +34,7 @@ function safeYMD(dateVal, fallbackYMD) {
 }
 
 export function _createFormGroupHTML(id, labelText, inputHTML) {
+  // ... (fungsi tidak berubah) ...
   const inputWithId = inputHTML.includes(' id=') ? inputHTML : inputHTML.replace(/<(\w+)/, `<$1 id="${id}"`);
 
   return `
@@ -43,6 +46,7 @@ export function _createFormGroupHTML(id, labelText, inputHTML) {
 }
 
 export function getFormPengeluaranHTML(type, categoryOptions, categoryMasterType, categoryLabel, supplierOptions, projectOptions, itemData = null) {
+    // ... (logika fungsi tidak berubah) ...
     const isEdit = !!itemData;
     const formId = isEdit ? 'edit-item-form' : 'pengeluaran-form';
     const formActionAttrs = isEdit
@@ -94,7 +98,7 @@ export function getFormPengeluaranHTML(type, categoryOptions, categoryMasterType
     const formContent = `
         <form id="${formId}" class="desktop-form-layout" ${formActionAttrs} data-async="${!isEdit}">
             <div class="form-grid-2col">
-                ${createMasterDataSelect('expense-project', 'Proyek', projectOptions, selectedProjectId, 'projects', true)}
+                ${createMasterDataSelect('expense-project', 'Proyek', projectOptions, selectedProjectId, 'projects', true, false)}
                 ${createMasterDataSelect('expense-category', categoryLabel, categoryOptions, selectedCategoryId, categoryMasterType, true)}
 
                 <div class="form-group">
@@ -129,6 +133,7 @@ export function getFormPengeluaranHTML(type, categoryOptions, categoryMasterType
 
 
 export function getFormPemasukanHTML(type, itemData = null) {
+    // ... (logika fungsi tidak berubah) ...
     const isEdit = !!itemData;
     const formId = isEdit ? 'edit-item-form' : 'pemasukan-form';
     const formActionAttrs = isEdit
@@ -153,6 +158,7 @@ export function getFormPemasukanHTML(type, itemData = null) {
     let formHTML = '';
 
     if (type === 'termin') {
+        // ... (logika 'termin' tidak berubah) ...
         const projectOptions = (appState.projects || [])
             .filter(p => p.projectType === 'main_income' && !p.isDeleted)
             .map(p => ({
@@ -174,8 +180,8 @@ export function getFormPemasukanHTML(type, itemData = null) {
                         </linearGradient>
                     </defs>
                     <rect x=\"8\" y=\"12\" width=\"84\" height=\"52\" rx=\"10\" fill=\"url(#fm1)\" stroke=\"var(--line)\"/>
-                    <rect x=\"20\" y=\"26\" width=\"40\" height=\"8\" rx=\"4\" fill=\"var(--primary)\" opacity=\"0.25\" />
-                    <rect x=\"20\" y=\"40\" width=\"30\" height=\"8\" rx=\"4\" fill=\"var(--primary)\" opacity=\"0.15\" />
+                    <rect x="20" y="26" width="40" height="8" rx="4" fill="var(--primary)" opacity="0.25" />
+                    <rect x="20" y="40" width="30" height="8" rx="4" fill="var(--primary)" opacity="0.15" />
                 </svg>
                 <div class=\"success-preview-icon\">${createIcon('wallet', 24)}</div>
             </div>`;
@@ -184,7 +190,7 @@ export function getFormPemasukanHTML(type, itemData = null) {
                 <form id="${formId}" ${formActionAttrs}>
                     ${heroHTML}
                     <div class="form-grid-2col">
-                        ${createMasterDataSelect('pemasukan-proyek', 'Proyek Terkait', projectOptions, selectedProjectId, 'projects', true)}
+                        ${createMasterDataSelect('pemasukan-proyek', 'Proyek Terkait', projectOptions, selectedProjectId, 'projects', true, false)}
                         <div class="form-group">
                             <label>Jumlah Termin Diterima</label>
                             <input type="text" inputmode="numeric" id="pemasukan-jumlah" name="amount" required placeholder="Masukkan jumlah termin..." value="${amountValue}">
@@ -207,6 +213,7 @@ export function getFormPemasukanHTML(type, itemData = null) {
                 </form>
         `;
     } else if (type === 'pinjaman') {
+        // ... (logika 'pinjaman' tidak berubah) ...
         const creditorOptions = (appState.fundingCreditors || []).filter(c => !c.isDeleted).map(c => ({
             value: c.id,
             text: c.creditorName
@@ -235,8 +242,8 @@ export function getFormPemasukanHTML(type, itemData = null) {
                         </linearGradient>
                     </defs>
                     <rect x=\"8\" y=\"12\" width=\"84\" height=\"52\" rx=\"10\" fill=\"url(#fm2)\" stroke=\"var(--line)\"/>
-                    <rect x=\"20\" y=\"26\" width=\"36\" height=\"8\" rx=\"4\" fill=\"var(--primary)\" opacity=\"0.25\" />
-                    <rect x=\"20\" y=\"40\" width=\"28\" height=\"8\" rx=\"4\" fill=\"var(--primary)\" opacity=\"0.15\" />
+                    <rect x="20" y="26" width="36" height="8" rx="4" fill="var(--primary)" opacity="0.25" />
+                    <rect x="20" y="40" width="28" height="8" rx="4" fill="var(--primary)" opacity="0.15" />
                 </svg>
                 <div class=\"success-preview-icon\">${createIcon('wallet', 24)}</div>
             </div>`;
@@ -256,7 +263,7 @@ export function getFormPemasukanHTML(type, itemData = null) {
 
                         ${createMasterDataSelect('pemasukan-kreditur', 'Kreditur', creditorOptions, selectedCreditorId, 'creditors', true)}
 
-                        ${createMasterDataSelect('loan-interest-type', 'Jenis Pinjaman', loanTypeOptions, selectedInterestType, null, true)}
+                        ${createMasterDataSelect('loan-interest-type', 'Jenis Pinjaman', loanTypeOptions, selectedInterestType, null, true, false)}
 
                         <div class="form-group full-width">
                             <label for="pemasukan-catatan">Catatan (Opsional)</label>
@@ -290,6 +297,7 @@ export function getFormPemasukanHTML(type, itemData = null) {
 }
 
 export function getFormFakturMaterialHTML(itemData = null, options = {}) {
+    // ... (logika fungsi tidak berubah) ...
     const { convertToInvoice = false, suppressInlineSubmit = false } = options;
     const isEdit = !!itemData;
     const formId = isEdit ? 'edit-item-form' : 'material-invoice-form';
@@ -308,6 +316,7 @@ export function getFormFakturMaterialHTML(itemData = null, options = {}) {
 
     let initialItemsHTML = '';
     if (isEdit && itemData.items && itemData.items.length > 0) {
+        // ... (logika 'isEdit' tidak berubah) ...
         initialItemsHTML = itemData.items.map((item, index) => {
             const priceNum = item.price || 0;
             const qtyNum = item.qty || 0;
@@ -342,6 +351,7 @@ export function getFormFakturMaterialHTML(itemData = null, options = {}) {
             `;
         }).join('');
     } else if (!isEdit) {
+        // ... (logika 'else if' tidak berubah) ...
         const materialOptions = (appState.materials || []).filter(m => !m.isDeleted).map(m => ({ value: m.id, text: m.materialName }));
         const isSuratJalan = formType === 'surat_jalan' && !convertToInvoice;
         const priceValue = isSuratJalan ? fmtIDR(0).replace('Rp', '').trim() : '';
@@ -373,7 +383,6 @@ export function getFormFakturMaterialHTML(itemData = null, options = {}) {
         `;
     }
 
-
     const formTypeToggleHTML = !isEdit ? `
         <div class="form-group full-width">
             <label>Jenis Input</label>
@@ -393,7 +402,6 @@ export function getFormFakturMaterialHTML(itemData = null, options = {}) {
         </div>
     `;
 
-
     const attachmentHTML = _createAttachmentManagerHTML(itemData || {}, { inputName: 'attachment', containerId: 'new-attachment-container' });
 
     const submitButtonHTML = `
@@ -410,7 +418,7 @@ export function getFormFakturMaterialHTML(itemData = null, options = {}) {
         <form id="${formId}" class="desktop-form-layout" ${formActionAttrs} data-async="${!isEdit}">
             ${formTypeToggleHTML}
             <div class="form-grid-2col">
-                ${createMasterDataSelect('project-id', 'Proyek', projectOptions, selectedProjectId, 'projects', true)}
+                ${createMasterDataSelect('project-id', 'Proyek', projectOptions, selectedProjectId, 'projects', true, false)}
                 ${createMasterDataSelect('supplier-id', 'Supplier', supplierOptions, selectedSupplierId, 'suppliers', true)}
                 <div class="form-group">
                     <label>No. Faktur/Surat Jalan</label>
@@ -475,6 +483,7 @@ export function getFormFakturMaterialHTML(itemData = null, options = {}) {
 }
 
 export async function getMasterDataFormHTML(type, itemData = null) {
+    // ... (logika fungsi tidak berubah) ...
     const isEdit = !!itemData;
     const config = masterDataConfig[type];
     if (!config) return '<p class="empty-state">Form tidak tersedia untuk tipe data ini.</p>';
@@ -491,6 +500,7 @@ export async function getMasterDataFormHTML(type, itemData = null) {
     `;
     switch (type) {
         case 'materials':
+            // ... (logika 'materials' tidak berubah) ...
             fieldsHTML += `
                 <div class="form-group">
                     <label for="itemUnit">Satuan</label>
@@ -503,19 +513,19 @@ export async function getMasterDataFormHTML(type, itemData = null) {
             `;
             break;
         case 'suppliers':
+            // --- PERBAIKAN (BUG 3): Tambah 'false' untuk showSearch di dropdown statis ---
             fieldsHTML += createMasterDataSelect('itemCategory', 'Kategori Supplier', [
                 { value: 'Material', text: 'Material' },
                 { value: 'Operasional', text: 'Operasional' },
                 { value: 'Lainnya', text: 'Lainnya' }
-            ], isEdit ? itemData.category : 'Material', null, true);
+            ], isEdit ? itemData.category : 'Material', null, true, false); // <-- 'false' ditambahkan
             break;
         case 'projects':
              fieldsHTML += `
                 ${createMasterDataSelect('projectType', 'Tipe Proyek', [
                     { value: 'main_income', text: 'Proyek Utama (Pendapatan)' },
                     { value: 'internal_expense', text: 'Proyek Internal (Beban)' }
-                ], isEdit ? itemData.projectType : 'internal_expense', null, true)}
-                <div class="form-group">
+                ], isEdit ? itemData.projectType : 'internal_expense', null, true, false)} <div class="form-group">
                     <label for="budget">Anggaran (Opsional)</label>
                     <input type="text" id="budget" name="budget" inputmode="numeric" value="${isEdit && itemData.budget ? new Intl.NumberFormat('id-ID').format(itemData.budget) : '0'}" placeholder="Contoh: 100.000.000">
                 </div>
@@ -529,6 +539,7 @@ export async function getMasterDataFormHTML(type, itemData = null) {
              `;
             break;
         case 'workers': {
+            // ... (logika 'workers' tidak berubah) ...
             const professionOptions = (appState.professions || []).filter(p => !p.isDeleted).map(p => ({ value: p.id, text: p.professionName }));
             const statusOptions = [
                 { value: 'active', text: 'Aktif' },
@@ -537,6 +548,7 @@ export async function getMasterDataFormHTML(type, itemData = null) {
 
             let wagesSummaryHTML = '<p class="empty-state-small empty-state-small--left">Belum ada pengaturan upah.</p>';
             if (isEdit && itemData.projectWages) {
+                // ... (logika wagesSummaryHTML tidak berubah) ...
                 const projectWages = Object.entries(itemData.projectWages);
                 if (projectWages.length > 0) {
                     wagesSummaryHTML = projectWages.map(([projectId, roles]) => {
@@ -564,8 +576,7 @@ export async function getMasterDataFormHTML(type, itemData = null) {
 
             fieldsHTML += `
                 ${createMasterDataSelect('professionId', 'Profesi', professionOptions, isEdit ? itemData.professionId : '', 'professions', true)}
-                ${createMasterDataSelect('workerStatus', 'Status', statusOptions, isEdit ? itemData.status : 'active', null, true)}
-                <div class="form-group full-width">
+                ${createMasterDataSelect('workerStatus', 'Status', statusOptions, isEdit ? itemData.status : 'active', null, true, false)} <div class="form-group full-width">
                     <label>Pengaturan Upah per Proyek</label>
                     <div class="card" style="padding: 1rem; background-color: var(--surface-muted);">
                         <div id="worker-wages-summary-list" class="dense-list-container">${wagesSummaryHTML}</div>
@@ -579,18 +590,18 @@ export async function getMasterDataFormHTML(type, itemData = null) {
             break;
         }
         case 'staff':
+            // --- PERBAIKAN (BUG 3): Tambah 'false' untuk showSearch di dropdown statis ---
             fieldsHTML += `
                 ${createMasterDataSelect('paymentType', 'Tipe Pembayaran', [
                     { value: 'fixed_monthly', text: 'Gaji Tetap Bulanan' },
                     { value: 'per_termin', text: 'Fee per Termin (%)' },
                     { value: 'fixed_per_termin', text: 'Fee Tetap per Termin' }
-                ], isEdit ? itemData.paymentType : '', null, true)}
-
-                <div class="form-group staff-payment-field staff-salary-group" style="display:none;">
+                ], isEdit ? itemData.paymentType : '', null, true, false)} <div class="form-group staff-payment-field staff-salary-group" style="display:none;">
                     <label for="salary">Gaji Bulanan</label>
                     <input type="text" id="salary" name="salary" inputmode="numeric" value="${isEdit && itemData.salary ? new Intl.NumberFormat('id-ID').format(itemData.salary) : ''}" placeholder="Contoh: 5.000.000">
                 </div>
-
+                
+                // ... (sisa field 'staff' tidak berubah) ...
                 <div class="form-group staff-payment-field staff-fee-group" style="display:none;">
                     <label for="feePercentage">Persentase Fee (%)</label>
                     <input type="number" id="feePercentage" name="feePercentage" step="0.1" value="${isEdit ? (itemData.feePercentage || '') : ''}" placeholder="Contoh: 2.5">
@@ -617,6 +628,7 @@ export async function getMasterDataFormHTML(type, itemData = null) {
 
     const submitButtonText = isEdit ? 'Simpan Perubahan' : 'Simpan Data Baru';
 
+    // ... (sisa 'heroHTML_Master' dan return tidak berubah) ...
     const variantClass = type === 'materials' ? 'success-hero--material'
         : type === 'suppliers' ? 'success-hero--expense'
         : type === 'projects' ? 'success-hero--income'

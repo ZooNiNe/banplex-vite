@@ -467,3 +467,22 @@ body.selection-active .meta-badge span {
         max-width: 150px;
     }
 }
+#worker-wages-summary-list .item-main-content .item-sub-content .role-summary{
+  margin-top: 0rem;
+}
+#worker-wages-summary-list .item-main-content strong{
+  font-size: .7rem;
+}
+#worker-wages-summary-list{
+  border-radius: 6px;
+  background-color: var(--line);
+}
+#worker-wages-summary-list .item-main-content{
+  padding: .35rem 0;
+  padding-left: .75rem;
+}
+
+#worker-wages-summary-list .item-actions{
+  padding-right: .5rem;
+  gap: 0rem;
+}

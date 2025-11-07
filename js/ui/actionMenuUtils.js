@@ -102,13 +102,17 @@ export function getItemActions(context) {
         if (paneType === 'user-management') page = 'manajemen_user';
         else if (paneType.startsWith('master-data-')) page = 'master';
         else if (paneType === 'recycleBin') page = 'recycleBin';
+        else if (page === 'master_data') {
+            page = 'master';
+        }
     } else if (appState.activePage === 'recycle_bin') {
         page = 'recycleBin';
     } else if (appState.activePage === 'pengaturan') {
         if (table === 'members') page = 'manajemen_user';
         else if (Object.values(masterDataConfig).some(cfg => cfg.dbTable === table)) page = 'master';
+    } else if (page === 'master_data') {
+        page = 'master';
     }
-
 
      if (page === 'tagihan') {
         const isExpense = type === 'expense';
@@ -260,21 +264,22 @@ export function getItemActions(context) {
         ];
     } else if (page === 'master') {
         const itemType = context.type || context.table;
-        const allowedForEditor = new Set(['projects', 'staff']);
+        const editorRestricted = (appState.userRole === 'Editor' && (itemType === 'projects' || itemType === 'staff'));
         const configExists = itemType && typeof itemType === 'string' && masterDataConfig.hasOwnProperty(itemType);
 
         if (configExists) {
-            if (!isViewer() && (appState.userRole === 'Owner' || allowedForEditor.has(itemType))) {
+            if (!isViewer() && !editorRestricted) {
                 baseActions = [
                     { icon: 'edit', label: 'Edit', action: 'edit-master-item', type: itemType },
                     { icon: 'delete', label: 'Hapus', action: 'delete-master-item', type: itemType, isDanger: true }
                 ];
-            } else {
+            } else { 
                  baseActions.push({ icon: 'visibility', label: 'Lihat Detail', action: 'edit-master-item', type: itemType });
             }
         } else {
              console.warn(`[getItemActions] Konfigurasi master data tidak ditemukan untuk tipe: ${itemType}`);
         }
+    
     } else if (page === 'attendance-settings' && type === 'worker-setting') {
         baseActions = [
             { icon: 'edit', label: 'Edit Default Proyek/Peran', action: 'open-worker-defaults-modal' }

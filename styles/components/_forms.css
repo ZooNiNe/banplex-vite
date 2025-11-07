@@ -214,9 +214,25 @@ select,
   overflow-y: auto;
   padding: .5rem;
 }
+.custom-select-wrapper.opens-above .custom-select-options {
+  /* Pindahkan dari bawah trigger ke atas trigger */
+  top: auto;
+  bottom: 100%;
+  
+  /* Beri sedikit jarak dari trigger */
+  margin-top: 0;
+  margin-bottom: 4px;
+  
+  /* Ubah asal transformasi untuk animasi */
+  transform-origin: bottom;
+  
+  /* Sesuaikan bayangan (shadow) jika perlu */
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+}
+
 
 .custom-select-wrapper.active .custom-select-options {
-  display: block; /* Shown with JS */
+  display: block;
   animation: fade-in-sm .15s ease;
 }
 
@@ -241,6 +257,7 @@ select,
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  z-index: 9999;
 }
 
 .custom-select-option:hover {
@@ -671,3 +688,4 @@ select,
 #sub-page-content > div{
   margin-top: 0;
 }
+

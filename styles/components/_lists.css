@@ -272,7 +272,7 @@
  .dense-list-item .item-title,
  .detail-list-item .item-title {
    font-weight: 600;
-   font-size: 0.9rem;
+   font-size: 0.85rem;
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
@@ -319,7 +319,7 @@
      display: flex;
      flex-wrap: wrap;
      gap: 6px;
-     margin-top: 4px;
+     margin-top: 0px;
  }
  /* Style untuk sub-konten di dense list */
  .dense-list-item .item-subtitle {

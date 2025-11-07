@@ -31,6 +31,7 @@ function createIcon(iconName, size = 16, classes = '') {
     return icons[iconName] || '';
 }
 
+
 export function createUnifiedCard({
     id,
     title = '',
@@ -46,7 +47,7 @@ export function createUnifiedCard({
     moreAction = true,
     selectionEnabled = false,
     isSelected = false,
-    unreadCount = 0 // PERUBAHAN: Tambahkan parameter unreadCount
+    unreadCount = 0
 }) {
 
     const allDataAttributes = Object.entries(dataset)
@@ -132,8 +133,8 @@ export function createUnifiedCard({
         } else if (pageContext === 'absensi' && itemType === 'worker') {
             actionName = 'open-project-role-editor';
         } else if (pageContext === 'attendance-settings' && itemType === 'worker-setting') {
-            actionName = 'open-worker-defaults-modal'; // <-- Aksi yang benar untuk halaman ini
-        }
+            actionName = 'open-worker-defaults-modal';
+        } 
         
         actionsDisplayHTML = `
             <div class="wa-card-v2__actions">
@@ -169,7 +170,6 @@ export function createUnifiedCard({
         </div>
     `;
 }
-
 
 export function createGenericCard(contentHTML, customClasses = '') {
     return `
@@ -216,8 +216,13 @@ export function _getMasterDataListHTML(type, items, config) {
              mainContent = `<div class="wa-card-v2__description">${paymentText}</div>`;
         }
 
-
-        const dataset = { 'item-id': itemId, type: type, table: config.dbTable || type };
+        const dataset = { 
+            'item-id': itemId, 
+            type: type, 
+            table: config.dbTable || type,
+            pageContext: 'master_data', // <-- Tambahkan konteks halaman
+            title: title // <-- Tambahkan judul untuk modal
+        };
 
         return createUnifiedCard({
             id: `master-${itemId}`,

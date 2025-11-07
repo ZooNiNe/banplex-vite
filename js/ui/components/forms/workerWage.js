@@ -2,6 +2,7 @@ import { appState } from "../../../state/appState.js";
 import { fmtIDR, parseFormattedNumber } from "../../../utils/formatters.js";
 import { emit } from "../../../state/eventBus.js";
 import { toast } from "../toast.js";
+// [PERBAIKAN] Impor createMasterDataSelect
 import { createMasterDataSelect, initCustomSelects } from "./customSelect.js";
 import { formatNumberInput } from "./inputFormatters.js";
 import { createModal, resetFormDirty } from "../modal.js";
@@ -10,11 +11,14 @@ import { toProperCase } from "../../../utils/helpers.js";
 function createIcon(iconName, size = 18, classes = '') {
     const icons = {
         'trash-2': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2 ${classes}"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`, // Used for delete
+        // [BARU] Ikon untuk tombol 'Tambah' di footer
+        'plus': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus ${classes}"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`
     };
     return icons[iconName] || '';
 }
 
 export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) {
+    // [TUGAS 3.1] Ini sudah benar untuk mendeteksi mobile
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
 
     const projectOptions = (appState.projects || [])
@@ -25,26 +29,44 @@ export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) 
             disabled: !!existingWages[p.id] && p.id !== projectId
         }));
 
+    // [TUGAS 1 & 3.3] Tambahkan parameter 'false' di akhir createMasterDataSelect untuk menyembunyikan search
     const content = `
         <form id="worker-wage-form">
-            ${createMasterDataSelect('wage-project-id', 'Proyek', projectOptions, projectId || '', null, true)}
+            ${createMasterDataSelect(
+                'wage-project-id', 
+                'Proyek', 
+                projectOptions, 
+                projectId || '', 
+                null, 
+                true, 
+                false // <-- INI PERBAIKANNYA: showSearch = false
+            )}
             <div class="role-wage-list"></div>
-            <button type="button" class="btn btn-secondary" data-action="add-role-wage-row">Tambah Peran & Upah</button>
-        </form>
+            </form>
     `;
-    const footer = `<button type="submit" form="worker-wage-form" class="btn btn-primary">Simpan</button>`;
+    
+    // [TUGAS 3.2] Pindahkan tombol "Tambah" ke footer, di samping "Simpan"
+    const footer = `
+        <button type="button" class="btn btn-secondary" data-action="add-role-wage-row" style="margin-right: auto;">
+            ${createIcon('plus', 18)}
+            <span class="btn-text">Tambah Peran</span>
+        </button>
+        <button type="submit" form="worker-wage-form" class="btn btn-primary">Simpan</button>
+    `;
 
-    // PERBAIKAN 3: Gunakan layoutClass untuk membuatnya responsif
+    // [TUGAS 3.1] Gunakan layoutClass untuk membuatnya responsif
     const modal = createModal('dataDetail', {
         title: projectId ? 'Edit Upah Proyek' : 'Tambah Upah Proyek',
         content,
         footer,
+        // Ini akan otomatis menjadi bottom-sheet di mobile
         layoutClass: isMobile ? 'is-bottom-sheet' : 'is-simple-dialog'
     });
 
     const form = modal.querySelector('#worker-wage-form');
     const roleList = modal.querySelector('.role-wage-list');
 
+    // Fungsi addRow tetap sama
     const addRow = (name = '', wage = '') => {
         const row = document.createElement('div');
         row.className = 'role-wage-row';
@@ -72,6 +94,23 @@ export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) 
 
     initCustomSelects(modal);
 
+    // [TUGAS 3.2] Tambahkan listener untuk tombol "Tambah" yang baru di footer
+    const addRowBtn = modal.querySelector('[data-action="add-role-wage-row"]');
+    if (addRowBtn) {
+        // Hati-hati: Kita definisikan addRow di dalam scope ini, jadi ini aman
+        addRowBtn.addEventListener('click', () => addRow());
+    }
+
+    // [BARU] Tambahkan listener untuk hapus baris (jika belum ada listener global)
+    // Sebaiknya listener ini ditaruh di sini agar spesifik ke modal ini
+    roleList.addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('[data-action="remove-role-wage-row"]');
+        if (removeBtn) {
+            removeBtn.closest('.role-wage-row').remove();
+            emit('ui.form.markDirty', true); // Tandai form kotor
+        }
+    });
+
     form.addEventListener('submit', (e) => {
         e.preventDefault();
         const selectedProjectId = form.elements['wage-project-id'].value;
@@ -86,7 +125,7 @@ export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) 
             const name = row.querySelector('[name="role_name"]').value.trim();
             const wage = parseFormattedNumber(row.querySelector('[name="role_wage"]').value);
             if (name && wage > 0) {
-                roles[name] = wage;
+                roles[toProperCase(name)] = wage;
             } else {
                 isValid = false;
             }
