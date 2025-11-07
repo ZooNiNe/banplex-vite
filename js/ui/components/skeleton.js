@@ -1,3 +1,5 @@
+// js/ui/components/skeleton.js
+
 import { createTabsHTML } from "./tabs.js";
 import { appState } from "../../state/appState.js";
 
@@ -98,7 +100,6 @@ function createCategoryNavSkeleton() {
 }
 
 // --- [FUNGSI SKELETON SPESIFIK HALAMAN] ---
-// (Fungsi-fungsi Anda yang sudah ada dipindahkan ke sini)
 
 export function createTagihanPageSkeletonHTML() {
     return `
@@ -158,6 +159,58 @@ export function createPengeluaranPageSkeletonHTML() {
             <div class="panel-header">
                 ${createToolbarSkeleton('Input Pengeluaran')}
                 ${createTabsSkeleton(3)}
+            </div>
+            <div id="sub-page-content" class="panel-body scrollable-content">
+                ${formSkeleton}
+            </div>
+        </div>
+    `;
+}
+
+// Skeleton form untuk Pemasukan Baru
+export function createPemasukanFormPageSkeletonHTML() {
+    // Kita cek tab aktif untuk 'pemasukan_form'
+    const activeTab = appState.activeSubPage.get('pemasukan_form') || 'termin';
+
+    // Struktur skeleton ini meniru 'createPengeluaranPageSkeletonHTML'
+    const formSkeleton = `
+        <div class="card card-pad skeleton-wrapper" style="gap: 1rem; padding: 1.5rem;">
+            <div class="skeleton" style="height: 100px; width: 100%; border-radius: 12px; margin-bottom: 1rem;"></div>
+            
+            <div class="form-grid-2col" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group"><div class="skeleton" style="height: 12px; width: 60%;"></div><div class="skeleton" style="height: 40px; width: 100%;"></div></div>
+                <div class="form-group"><div class="skeleton" style="height: 12px; width: 60%;"></div><div class="skeleton" style="height: 40px; width: 100%;"></div></div>
+            </div>
+
+            <div class="form-grid-2col" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div class="form-group"><div class="skeleton" style="height: 12px; width: 60%;"></div><div class="skeleton" style="height: 40px; width: 100%;"></div></div>
+                ${activeTab === 'pinjaman' ? `
+                    <div class="form-group"><div class="skeleton" style="height: 12px; width: 60%;"></div><div class="skeleton" style="height: 40px; width: 100%;"></div></div>
+                ` : '<div class="form-group"></div>'}
+            </div>
+
+            <div class="form-group" style="margin-top: 1.5rem;">
+                 <div class="skeleton" style="height: 12px; width: 30%;"></div>
+                 <div class="skeleton" style="height: 80px; width: 100%; border-radius: 8px;"></div>
+            </div>
+            
+            ${activeTab === 'pinjaman' ? `
+                <div class="skeleton" style="height: 100px; width: 100%; border-radius: 12px; margin-top: 1rem;"></div>
+            ` : `
+                <div class="skeleton" style="height: 60px; width: 100%; border-radius: 12px; margin-top: 1rem;"></div>
+            `}
+
+            <div class="form-footer-actions" style="padding-top: 1rem; border-top: 1px solid var(--line); display:flex; justify-content: flex-end;">
+                <div class="skeleton" style="height: 42px; width: 120px; border-radius: 8px;"></div>
+            </div>
+        </div>
+    `;
+
+    return `
+        <div class="content-panel">
+            <div class="panel-header">
+                ${createToolbarSkeleton('Input Pemasukan')}
+                ${createTabsSkeleton(2)} 
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content">
                 ${formSkeleton}
@@ -451,8 +504,28 @@ function createChatPageSkeletonHTML() {
 }
 
 
+// --- PERBAIKAN DI SINI ---
+// Skeleton baru untuk Halaman Master Data
+function createMasterDataPageSkeletonHTML() {
+    const listSkeleton = createListSkeletonHTML(6); // Default list view
+    
+    return `
+        <div class="content-panel">
+            <div class="panel-header">
+                ${createToolbarSkeleton('Kelola Master Data')}
+                ${createCategoryNavSkeleton()}
+                ${createTabsSkeleton(2)}
+            </div>
+            <div id="sub-page-content" class="panel-body scrollable-content">
+                ${listSkeleton}
+            </div>
+        </div>
+    `;
+}
+// --- AKHIR PERBAIKAN ---
+
+
 // --- [FUNGSI ROUTER UTAMA] ---
-// (Fungsi _getSkeletonLoaderHTML Anda yang sudah ada, diperbarui)
 export const _getSkeletonLoaderHTML = (type = 'page') => {
     switch (type) {
         case 'dashboard':
@@ -461,6 +534,8 @@ export const _getSkeletonLoaderHTML = (type = 'page') => {
             return createTagihanPageSkeletonHTML();
         case 'pengeluaran':
             return createPengeluaranPageSkeletonHTML();
+        case 'pemasukan_form':
+            return createPemasukanFormPageSkeletonHTML();
         case 'pemasukan':
             return createPemasukanPageSkeletonHTML();
         case 'jurnal':
@@ -483,6 +558,12 @@ export const _getSkeletonLoaderHTML = (type = 'page') => {
             return createRecycleBinPageSkeletonHTML();
         case 'chat':
             return createChatPageSkeletonHTML();
+        
+        // --- PERBAIKAN DI SINI ---
+        case 'master_data':
+            return createMasterDataPageSkeletonHTML(); // Gunakan skeleton baru
+        // --- AKHIR PERBAIKAN ---
+
         case 'komentar': // Halaman Komentar Desktop
              return `
                 <div class="content-panel">

@@ -1,7 +1,7 @@
 import { appState } from "../state/appState.js";
 import { emit, on } from "../state/eventBus.js";
 import { createModal, closeModal, closeModalImmediate, closeDetailPaneImmediate, closeDetailPane, handleDetailPaneBack, hideMobileDetailPage, closeAllModals } from "./components/modal.js";
-import { handleOpenBillDetail, handleOpenPemasukanDetail, handleOpenEditItem, handleOpenPemasukanForm } from "../services/data/uiInteractionService.js";
+import { handleOpenBillDetail, handleOpenPemasukanDetail, handleOpenEditItem } from "../services/data/uiInteractionService.js";
 import { signInWithGoogle, handleLogout } from "../services/authService.js";
 import { toggleTheme } from "../utils/theme.js";
 import { syncToServer, requestSync } from "../services/syncService.js";
@@ -112,7 +112,8 @@ export const clickActions = {
          emit('ui.form.markDirty', true);
     },
     'open-pemasukan-form': (ctx) => {
-        handleOpenPemasukanForm({ type: ctx.type || 'termin' });
+        appState.pemasukanFormType = ctx.type || 'termin';
+        emit('ui.navigate', 'pemasukan_form');
     },
     'open-comments-view': (ctx) => {
         const { parentId, parentType, prefilledText } = ctx;

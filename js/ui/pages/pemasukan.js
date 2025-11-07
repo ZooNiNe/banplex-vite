@@ -1,3 +1,5 @@
+// js/ui/pages/pemasukan.js
+
 import { appState } from '../../state/appState.js';
 import { $ } from '../../utils/dom.js';
 import { createPageToolbarHTML } from '../components/toolbar.js';
@@ -90,7 +92,11 @@ function renderGroupedList(groupedData, type) {
         html += `<div class="date-group-header">${label}</div>`;
         html += `<div class="date-group-body">${groupedData[label].map(item => _getSinglePemasukanHTML(item, type)).join('')}</div>`;
     });
-    return `<div class="wa-card-list-wrapper grouped" id="income-grouped-wrapper">${html}</div>`;
+    
+    // --- PERBAIKAN DI SINI ---
+    // Hapus wrapper div dari return statement ini
+    return html;
+    // --- AKHIR PERBAIKAN ---
 }
 
 
@@ -193,6 +199,7 @@ async function renderPemasukanContent(append = false) {
             return;
         }
 
+        // listHTML sekarang HANYA berisi grup-grup
         const groupedData = groupItemsByDate(itemsToDisplay, 'date');
         const listHTML = renderGroupedList(groupedData, activeTab);
         
@@ -203,15 +210,18 @@ async function renderPemasukanContent(append = false) {
 
         if (append) {
             if (!listWrapper) {
+                // --- PERBAIKAN: Tambahkan wrapper di sini ---
                 container.innerHTML = `<div class="wa-card-list-wrapper grouped" id="income-grouped-wrapper">${listHTML}</div>`;
                 listWrapper = container.querySelector('#income-grouped-wrapper');
             } else {
+                // --- PERBAIKAN: Logika ini sekarang sudah benar ---
                 const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = listHTML;
-                newlyAddedElements = Array.from(tempDiv.children);
-                newlyAddedElements.forEach(el => listWrapper.appendChild(el));
+                tempDiv.innerHTML = listHTML; // listHTML HANYA berisi grup
+                newlyAddedElements = Array.from(tempDiv.children); // elemen adalah grup
+                newlyAddedElements.forEach(el => listWrapper.appendChild(el)); // Menambahkan grup ke wrapper
             }
         } else {
+            // --- PERBAIKAN: Tambahkan wrapper di sini ---
             container.innerHTML = `<div class="wa-card-list-wrapper grouped" id="income-grouped-wrapper">${listHTML}</div>`;
             listWrapper = container.querySelector('#income-grouped-wrapper');
             container.scrollTop = 0;
@@ -281,6 +291,7 @@ async function renderPemasukanContent(append = false) {
     }
 }
 
+// ... (sisa file: loadMorePemasukan, _showPemasukanSortModal, initPemasukanPage, export) ...
 function loadMorePemasukan() {
     if (appState.activePage !== 'pemasukan') return;
 

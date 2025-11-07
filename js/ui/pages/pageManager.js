@@ -35,7 +35,7 @@ async function renderPageContent() {
 
     container.className = 'page-container';
 
-    if (['tagihan', 'pemasukan', 'jurnal', 'stok', 'pengeluaran', 'recycle_bin', 'log_aktivitas', 'absensi'].includes(activePage)) {
+    if (['tagihan', 'pemasukan', 'jurnal', 'stok', 'pengeluaran', 'recycle_bin', 'log_aktivitas', 'absensi', 'pemasukan_form'].includes(activePage)) {
         container.classList.add('page-container--has-panel');
     }
 
@@ -75,6 +75,10 @@ async function renderPageContent() {
         switch (activePage) {
             case 'dashboard': pageModule = await import('./dashboard.js'); break;
             case 'pemasukan': pageModule = await import('./pemasukan.js'); break;
+            case 'pemasukan_form': 
+                pageModule = await import('./pemasukan_form.js'); 
+                initFunctionName = 'initPemasukanFormPage';
+                break;
             case 'pengeluaran': pageModule = await import('./pengeluaran.js'); break;
             case 'absensi': pageModule = await import('./absensi.js'); break;
             case 'jurnal': pageModule = await import('./jurnal.js'); break;
@@ -134,7 +138,7 @@ function restorePageFab() {
     let fabHTML = '';
 
     const fabConfigs = {
-        pemasukan: { action: 'open-pemasukan-form', icon: 'account_balance_wallet', label: 'Buat Pemasukan', tooltip: 'Tambah Pemasukan Baru' },
+        pemasukan: { action: 'navigate', nav: 'pemasukan_form', icon: 'account_balance_wallet', label: 'Buat Pemasukan', tooltip: 'Tambah Pemasukan Baru' },
         tagihan: { action: 'navigate', nav: 'pengeluaran', icon: 'post_add', label: 'Buat Tagihan', tooltip: 'Buat Pengeluaran / Tagihan Baru' },
         jurnal: { action: 'navigate', nav: 'absensi', icon: 'person_add', label: 'Input Absensi', tooltip: 'Buka Halaman Input Absensi' },
         // dashboard: { action: 'navigate', nav: 'komentar', icon: 'chat', label: 'Chat', tooltip: 'Buka Halaman Chat' },

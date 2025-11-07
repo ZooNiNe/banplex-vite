@@ -314,26 +314,6 @@
     box-shadow: var(--shadow-lg), 0 0 15px -3px rgba(96, 165, 250, 0.3); /* Enhance glow on hover */
 }
 
-/* --- SNACKBAR OVERRIDE --- */
-.dark-theme .snackbar-content {
-  background-color: var(--surface-muted); /* Muted surface for snackbar */
-  color: var(--text);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-lg); /* Add glow */
-}
-.dark-theme .snackbar-action-btn {
-    color: var(--primary) !important; /* Brighter primary for action */
-}
-.dark-theme .snackbar-action-btn:hover {
-    background: rgba(96, 165, 250, 0.1) !important; /* Primary translucent hover */
-}
-.dark-theme .snackbar-close {
-  color: var(--text-dim);
-}
-.dark-theme .snackbar-close:hover {
-  background: rgba(255, 255, 255, 0.05) !important;
-}
-
 .dark-theme .selection-bar {
   background-color: var(--surface-muted);
   border-bottom-color: var(--line);

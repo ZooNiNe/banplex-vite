@@ -4,7 +4,7 @@ import { removeItemFromListWithAnimation, $ } from "../../utils/dom.js";
 import { attachClientValidation } from '../../utils/validation.js';
 import { toProperCase } from "../../utils/helpers.js";
 import { handleDeleteItem } from "../../services/data/recycleBinService.js";
-import { handleOpenBillDetail, handleOpenEditItem, handleOpenPemasukanDetail, handleOpenPemasukanForm } from "../../services/data/uiInteractionService.js";
+import { handleOpenBillDetail, handleOpenEditItem, handleOpenPemasukanDetail } from "../../services/data/uiInteractionService.js";
  
 import { toast } from "../components/toast.js";
 import { createModal, closeModal, closeModalImmediate, closeDetailPane } from "../components/modal.js";
@@ -341,7 +341,8 @@ export function initializeEventBusListeners() {
     });          
     on('ui.action.manage-master', (dataset) => handleManageMasterData(dataset.type, dataset));
     on('ui.action.open-pemasukan-form', (dataset) => {
-        handleOpenPemasukanForm({ type: dataset?.type });
+        appState.pemasukanFormType = dataset?.type || 'pinjaman';
+        emit('ui.navigate', 'pemasukan_form');
     });
     on('ui.action.cetak-kwitansi-pembayaran', (context) => {
         if (typeof context.kwitansi === 'string' && context.kwitansi.trim() !== '') {

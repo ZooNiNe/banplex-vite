@@ -135,6 +135,15 @@ export function getFormPemasukanHTML(type, itemData = null) {
         ? `data-id="${itemData.id}" data-type="${type}"`
         : `data-type="${type}" data-async="true"`;
     const submitText = isEdit ? 'Simpan Perubahan' : 'Simpan';
+    const submitButtonHTML = `
+        <div class="form-footer-actions full-width">
+            <button type="submit" id="pemasukan-submit-btn" class="btn btn-primary">
+                ${createIcon('save')}
+                <span>${submitText}</span>
+            </button>
+        </div>
+    `;
+
     const today = new Date();
     const offset = today.getTimezoneOffset();
     const todayLocal = new Date(today.getTime() - (offset * 60 * 1000));
@@ -193,6 +202,8 @@ export function getFormPemasukanHTML(type, itemData = null) {
                      <p class="form-notice full-width">
                         ${createIcon('info', 16)} Termin akan dialokasikan sebagai pemasukan utama. Fee Staf (jika ada) akan dihitung otomatis berdasarkan pengaturan staf.
                      </p>
+                     
+                     ${isEdit ? '' : submitButtonHTML}
                 </form>
         `;
     } else if (type === 'pinjaman') {
@@ -269,6 +280,8 @@ export function getFormPemasukanHTML(type, itemData = null) {
                      <p class="form-notice full-width">
                         ${createIcon('info', 16)} Masukkan detail pinjaman. Jika pinjaman berbunga, isi suku bunga per bulan dan tenor untuk menghitung total pengembalian.
                      </p>
+                     
+                     ${isEdit ? '' : submitButtonHTML}
                 </form>
         `;
     }
