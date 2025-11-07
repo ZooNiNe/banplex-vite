@@ -49,17 +49,16 @@ export function notify(key) {
         return;
     }
     
-    // PERBAIKAN: Normalisasi nama tabel DB (cth: funding_sources)
-    // ke nama appState (cth: fundingSources)
     const stateKeyMap = { 
-        'funding_sources': 'funding_sources', // DIUBAH: Menjadi snake_case
-        'operational_categories': 'operational_categories', // DIUBAH: Menjadi snake_case
-        'material_categories': 'material_categories', // DIUBAH: Menjadi snake_case
-        'other_categories': 'other_categories', // DIUBAH: Menjadi snake_case
-        'funding_creditors': 'funding_creditors', // DIUBAH: Menjadi snake_case
-        'attendance_records': 'attendance_records', // DIUBAH: Menjadi snake_case
-        'stock_transactions': 'stock_transactions' // DIUBAH: Menjadi snake_case
+        'funding_sources': 'fundingSources', 
+        'operational_categories': 'operationalCategories', 
+        'material_categories': 'materialCategories', 
+        'other_categories': 'otherCategories', 
+        'funding_creditors': 'fundingCreditors', 
+        'attendance_records': 'attendanceRecords', 
+        'stock_transactions': 'stockTransactions'
     };
+    
     const appStateKey = stateKeyMap[key] || key;
     
     scheduleNotification(appStateKey);

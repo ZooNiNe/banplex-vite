@@ -137,19 +137,16 @@ async function syncFromServer(options = {}) {
 }
 
 async function _applyChangesToStateAndUI(changes, collectionName, signal) {
-    // --- PERBAIKAN BUG 3 ---
-    // Sesuaikan nilai (value) di map ini agar cocok dengan key di appState.js
-    // Contoh: 'funding_creditors' (di Firestore) HARUS dipetakan ke 'funding_creditors' (di appState)
     const stateKeyMap = { 
-        'funding_creditors': 'funding_creditors', 
-        'operational_categories': 'operational_categories', 
-        'material_categories': 'material_categories', 
-        'other_categories': 'other_categories', 
-        'funding_sources': 'funding_sources', 
-        'attendance_records': 'attendance_records', 
-        'stock_transactions': 'stock_transactions' 
+        'funding_creditors': 'fundingCreditors', 
+        'operational_categories': 'operationalCategories', 
+        'material_categories': 'materialCategories', 
+        'other_categories': 'otherCategories', 
+        'funding_sources': 'fundingSources', 
+        'attendance_records': 'attendanceRecords', 
+        'stock_transactions': 'stockTransactions' 
     };
-    // --- AKHIR PERBAIKAN BUG 3 ---
+    
     const stateKey = stateKeyMap[collectionName] || collectionName;
 
     if (!appState[stateKey]) {
