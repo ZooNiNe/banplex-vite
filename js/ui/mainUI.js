@@ -131,7 +131,7 @@ export function handleNavigation(targetPage, options = {}) {
             onConfirm: () => {
                 resetFormDirty();
                 emit('ui.modal.closeAll');
-                if (isMobileSidebarOpen) { document.body.classList.remove('mobile-sidebar-open'); }
+                if (isMobileSidebarOpen) { ensureMobileSidebarClosed(); }
                 setTimeout(() => proceedNavigation(targetPage, push), 50);
             },
             onCancel: () => {}
@@ -150,14 +150,16 @@ export function handleNavigation(targetPage, options = {}) {
     }
 
     if (isMobileSidebarOpen) {
-        document.body.classList.remove('mobile-sidebar-open');
+        ensureMobileSidebarClosed();
     }
 
     proceedNavigation(targetPage, push);
 }
 
 function proceedNavigation(targetPage, push = true) {
-    if (appState.activePage === targetPage && document.getElementById('page-container')?.innerHTML.trim() !== '') return;
+    // Jangan tahan navigasi jika masih di layar guest/pending
+    const isAuthShell = document.body.classList.contains('guest-mode') || document.body.classList.contains('pending-mode');
+    if (appState.activePage === targetPage && !isAuthShell && document.getElementById('page-container')?.innerHTML.trim() !== '') return;
 
     appState.activePage = targetPage;
     localStorage.setItem('lastActivePage', targetPage);
@@ -238,4 +240,18 @@ function ensureGlobalCommentsListener() {
     } catch (e) {
         console.warn('Gagal memulai global comments listener:', e);
     }
+}
+
+// Tutup overlay sidebar mobile dan hapus layer transparan dengan aman
+export function ensureMobileSidebarClosed() {
+    try {
+        document.body.classList.remove('mobile-sidebar-open');
+        const overlay = document.getElementById('mobile-sidebar-overlay');
+        if (overlay) {
+            overlay.style.opacity = '0';
+            overlay.replaceWith(overlay.cloneNode(false)); // Lepas event listener yang terpasang
+            // Pastikan dihapus setelah animasi
+            setTimeout(() => { try { overlay.remove(); } catch(_) {} }, 280);
+        }
+    } catch(_) {}
 }

@@ -5,12 +5,14 @@ import { initializeAppSession } from "./services/authService.js";
 import { _initQuotaResetScheduler, updateSyncIndicator, syncToServer } from "./services/syncService.js";
 import { _initToastSwipeHandler } from "./ui/components/toast.js";
 import { initRouter } from "./router.js";
+import { ensureMobileSidebarClosed } from "./ui/mainUI.js";
 import { initServiceUIBridge } from "./ui/bridges/serviceUIBridge.js";
 import { initResizeHandle } from "./ui/components/resizeHandle.js";
 import { on, emit } from "./state/eventBus.js";
 import { appState } from "./state/appState.js";
 import { renderErrorPage } from "./ui/errorScreens.js";
 import { subscribeToPushNotifications } from "./services/notificationService.js";
+import { showTopNotification } from "./ui/components/notificationBar.js";
 
 
 let globalFallbackTimer = null;
@@ -166,6 +168,10 @@ async function main() {
               illustrationKey: "offline",
               showRetryButton: true
           });
+          // Pastikan error screen tampil lebih dulu, lalu tampilkan notifikasi ringkas
+          setTimeout(() => {
+              try { emit('ui.toast', { args: ['info', 'Mode offline: sambungkan internet untuk memuat data awal.', 5000] }); } catch(_) {}
+          }, 100);
           return;
       }
   }
@@ -177,14 +183,12 @@ async function main() {
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'SHOW_IN_APP_NOTIFICATION') {
         console.log('Menerima notifikasi in-app dari Service Worker:', event.data.payload);
-        
-        const payload = event.data.payload;
-        emit('ui.toast', {
-          args: [
-            'info', // tipe toast
-            payload.body || 'Anda memiliki pembaruan baru.', // pesan
-            5000 // durasi
-          ]
+        const payload = event.data.payload || {};
+        showTopNotification({
+          title: payload.title || 'Notifikasi Baru',
+          message: payload.body || 'Anda memiliki pembaruan baru.',
+          avatarUrl: payload.icon || '',
+          userName: payload.userName || ''
         });
       }
     });
@@ -230,12 +234,16 @@ async function main() {
                 hideGlobalLoader(); 
                 
                 renderErrorPage({
-                    title: "Gagal Memuat Sesi",
-                    message: "Tidak dapat memuat data pengguna atau profil Anda. Periksa koneksi internet Anda dan coba lagi.",
-                    details: initError.message,
-                    illustrationKey: "database-error",
-                    showRetryButton: true
-                });
+                    title: "Gagal Memuat Sesi",
+                    message: "Tidak dapat memuat data pengguna atau profil Anda. Periksa koneksi internet Anda dan coba lagi.",
+                    details: initError.message,
+                    illustrationKey: "database-error",
+                    showRetryButton: true
+                });
+                // Pastikan error screen tampil sebelum toast peringatan
+                setTimeout(() => {
+                    try { emit('ui.toast', { args: ['error', 'Inisialisasi gagal: periksa koneksi Anda, lalu coba lagi.', 5000] }); } catch(_) {}
+                }, 150);
             }
           } else {
       console.log("[App Log] Tidak ada user. Merender UI guest.");
@@ -269,6 +277,32 @@ async function main() {
         console.warn("Gagal cek service worker:", e);
     }
   }
+
+  // Tangani tombol Back perangkat (Capacitor) agar menutup overlay lebih dulu
+  try {
+    const CapApp = (window.Capacitor && window.Capacitor.App) ? window.Capacitor.App : null;
+    if (CapApp && typeof CapApp.addListener === 'function') {
+      CapApp.addListener('backButton', () => {
+        const hasModal = document.querySelector('#modal-container .modal-bg.show');
+        const hasMobilePane = document.body.classList.contains('detail-view-active');
+        const hasDesktopPane = document.body.classList.contains('detail-pane-open');
+        const hasMobileSidebar = document.body.classList.contains('mobile-sidebar-open');
+        if (hasModal || hasMobilePane || hasDesktopPane) {
+          history.back();
+          return;
+        }
+        if (hasMobileSidebar) {
+          ensureMobileSidebarClosed();
+          return;
+        }
+        if (appState.activePage !== 'dashboard') {
+          history.back();
+        } else {
+          // Di dashboard tanpa overlay: biarkan OS menangani (keluar/minimize)
+        }
+      });
+    }
+  } catch(_) {}
 }
 
 main();

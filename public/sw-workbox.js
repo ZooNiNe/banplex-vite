@@ -125,7 +125,12 @@ self.addEventListener('notificationclick', (event) => {
   console.log('[Service Worker] Notification click Received.');
   event.notification.close();
 
+  const action = event.action || 'open';
   const urlToOpen = event.notification.data?.url || '/index.html?page=dashboard';
+
+  if (action === 'dismiss') {
+    return; // Do nothing
+  }
 
   event.waitUntil(
     clients.matchAll({

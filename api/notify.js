@@ -60,7 +60,10 @@ export default async function handler(request, response) {
         icon: '/public/icons-logo.png', // Pastikan path ini benar
         data: {
           url: '/index.html?page=dashboard' 
-        }
+        },
+        actions: [
+          { action: 'open', title: 'Buka' }
+        ]
       };
       sendNotificationToUser(recipientUserId, pushPayload).catch(err => {
          console.error(`Gagal mengirim OS Push (non-blocking): ${err.message}`);

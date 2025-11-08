@@ -148,6 +148,7 @@ export function initializeGlobalClickListeners() {
             'add-role-wage-row', 'remove-role-wage-row',
             'upload-attachment', 'trigger-single-upload', 'trigger-payment-upload',
             'replace-attachment', 'delete-temp-attachment', 'remove-payment-attachment',
+            'delete-payment', 'delete-loan-payment',
             'delete-attachment',
             'open-manual-attendance-control',
             'save-all-pending-attendance',

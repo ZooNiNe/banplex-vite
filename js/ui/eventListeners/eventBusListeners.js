@@ -16,7 +16,7 @@ import { handleManageMasterData, handleDeleteMasterItem } from '../../services/d
 import { _handleRestoreItems, _handleDeletePermanentItems } from '../../services/data/recycleBinService.js';
 import { addInvoiceItemRow, handleInvoiceItemChange, createMasterDataSelect, initCustomSelects } from "../components/forms/index.js";
 import { getItemActions, displayActions, displayBottomSheetActions } from '../actionMenuUtils.js';
-import { handleProcessBillPayment, handleProcessPayment, handleProcessIndividualSalaryPayment } from "../../services/data/transactions/paymentService.js";
+import { handleProcessBillPayment, handleProcessPayment, handleProcessIndividualSalaryPayment, handleDeleteBillPayment, handleDeleteLoanPayment } from "../../services/data/transactions/paymentService.js";
 import { handleAttachmentAction } from "./attachmentListeners.js";
 import { handleDeleteAttachment, handleReplaceAttachment } from "../../services/data/transactions/attachmentService.js";
 import { handlePostComment, handleDeleteComment } from "../../services/data/commentService.js";
@@ -424,6 +424,8 @@ export function initializeEventBusListeners() {
      });
      on('ui.action.view-attachment', (context) => emit('ui.modal.create', 'imageView', { src: context.src }));
     on('ui.action.view-payment-attachment', (context) => emit('ui.attachments.viewPayment', context));
+    on('ui.action.delete-payment', (dataset) => handleDeleteBillPayment(dataset));
+    on('ui.action.delete-loan-payment', (dataset) => handleDeleteLoanPayment(dataset));
     on('ui.action.set-worker-role', (dataset) => {
         try {
             const workerId = dataset.workerId;

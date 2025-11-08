@@ -1,6 +1,7 @@
 import { notificationsCol } from '../config/firebase.js';
 import { appState } from '../state/appState.js';
 import { emit } from '../state/eventBus.js';
+import { showTopNotification } from '../ui/components/notificationBar.js';
 import { onSnapshot, query, where, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
 let unsubscribeFromNotifications = null;
@@ -87,13 +88,11 @@ export function listenForNotifications() {
 
         console.log('New in-app notification received:', notification);
 
-        emit('ui.toast', {
-          args: [
-            'info',
-            notification.message,
-            5000
-          ]
-        });
+        // Tampilkan notifikasi sebagai bar di atas layar (bukan snackbar)
+        const title = notification.userName || 'Notifikasi Baru';
+        const message = notification.message || '';
+        const avatarUrl = notification.userAvatarUrl || '';
+        showTopNotification({ title, message, avatarUrl, userName: notification.userName, timeoutMs: 5000 });
 
       }
     });
@@ -119,7 +118,9 @@ function showOSNotification(message) {
   if (Notification.permission === 'granted') {
     const notification = new Notification('Pembaruan Baru', {
       body: message,
-      icon: '/public/icons-logo.png'
+      icon: '/public/icons-logo.png',
+      requireInteraction: false,
+      actions: [ { action: 'open', title: 'Buka' } ]
     });
     notification.onclick = () => {
       window.focus();

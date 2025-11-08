@@ -80,16 +80,17 @@ async function initializeAppSession(user) {
         listenForNotifications();
         const createdAt = userData.createdAt ? getJSDate(userData.createdAt) : new Date();
         const isNewUser = (new Date() - createdAt) < 5 * 60 * 1000;
-        
-        // Selalu tampilkan modal Welcome saat sesi aplikasi dimulai
-        setTimeout(() => {
+
+        // Tampilkan modal Welcome hanya saat user pertama kali memasuki UI utama (status active)
+        const maybeShowWelcome = () => {
             try {
-                emit('ui.modal.create', 'welcomeOnboarding', {
-                    userName: userData.name,
-                    isNewUser: isNewUser
-                });
+                if (appState.userStatus !== 'active') return;
+                const key = `welcomeShown:${user.uid}`;
+                if (localStorage.getItem(key) === '1') return;
+                emit('ui.modal.create', 'welcomeOnboarding', { userName: userData.name, isNewUser });
+                localStorage.setItem(key, '1');
             } catch(_) {}
-        }, 900);
+        };
 
         updateLoadingMessage('Memastikan data master...'); // Update pesan
         await ensureMasterDataFresh(['projects', 'workers', 'professions', 'suppliers', 'materials']); // Muat master data penting di awal
@@ -164,6 +165,8 @@ async function initializeAppSession(user) {
 
         // Navigasi ke halaman terakhir SETELAH semua siap
         navigate(appState.activePage);
+        // Setelah navigasi pertama dan UI aktif, coba tampilkan welcome jika relevan
+        setTimeout(maybeShowWelcome, 800);
 
     } catch (error) {
         console.error("Gagal inisialisasi sesi:", error);
@@ -188,6 +191,18 @@ function attachRoleListener(userDocRef) {
                     userStatus: status
                 });
                 renderUI(); // Render ulang UI jika role/status berubah
+                // Jika status berubah menjadi active, tampilkan welcome bila belum pernah
+                try {
+                    const user = auth.currentUser;
+                    if (user && status === 'active') {
+                        const key = `welcomeShown:${user.uid}`;
+                        if (localStorage.getItem(key) !== '1') {
+                            const name = appState.currentUser?.displayName || 'Pengguna';
+                            emit('ui.modal.create', 'welcomeOnboarding', { userName: name, isNewUser: false });
+                            localStorage.setItem(key, '1');
+                        }
+                    }
+                } catch(_) {}
             }
         }
     });

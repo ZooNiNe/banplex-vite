@@ -141,6 +141,15 @@ export async function apiRequest(method, url, payload = null) {
       try { return await res.json(); } catch (_) { return null; }
 }
 
+// Publik: paksa simpan draft form saat ini (berguna sebelum navigasi sementara)
+export function forceSaveFormDraft(form) {
+    if (!(form instanceof HTMLFormElement)) return;
+    try {
+        // Gunakan fungsi internal yang sudah teruji
+        saveFormDraft(form);
+    } catch (_) {}
+}
+
 export function mapDeleteEndpoint(entity, id) {
       if (entity === 'termin' || entity === 'income') return `/api/incomes/${id}`;
       if (entity === 'pinjaman' || entity === 'loan') return `/api/loans/${id}`;

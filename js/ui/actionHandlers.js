@@ -22,6 +22,7 @@ import { handleOpenConflictsPanel, handleOpenStorageStats } from "../utils/sync.
 import { isViewer } from "../utils/helpers.js";
 import { toast } from "./components/toast.js";
 import { handleNavigation, renderSidebar } from "./mainUI.js";
+import { forceSaveFormDraft } from "../utils/formPersistence.js";
 import { getRecycleBinHeaderOverflowActions } from './pages/recycleBin.js';
 import { getHeaderOverflowActions, getItemActions, displayActions, displayBottomSheetActions } from "./actionMenuUtils.js";
 import { attachBottomSheetActionListeners } from "./eventListeners/dynamicElementListeners.js";
@@ -58,7 +59,13 @@ export const clickActions = {
     },
     'auth-action': () => { appState.currentUser ? createModal('confirmLogout', { onConfirm: handleLogout }) : signInWithGoogle(); },
     'toggle-theme': () => { toggleTheme(); },
-    'manage-master': (ctx) => { handleManageMasterData(ctx.type, { sourceForm: ctx.target?.closest('form') }); },
+    'manage-master': (ctx) => {
+        const sourceForm = ctx.target?.closest('form');
+        if (sourceForm) {
+            try { forceSaveFormDraft(sourceForm); } catch(_) {}
+        }
+        handleManageMasterData(ctx.type, { sourceForm });
+    },
     'open-master-data-grid': () => { openMasterDataGrid(); },
     'open-tools-grid': () => { openToolsGrid(); },
     'open-report-generator': () => { handleGenerateReportModal(); },

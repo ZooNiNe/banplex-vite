@@ -86,9 +86,31 @@ export function initCustomSelects(context = document) {
         const searchInput = wrapper.querySelector('.custom-select-search');
 
         if (!trigger || !hiddenInput || !triggerSpan || !optionsContainer || !optionsList) {
-
              return;
         }
+
+        // Sinkronkan label dengan nilai tersembunyi saat inisialisasi
+        try {
+            const currentVal = hiddenInput.value;
+            if (currentVal) {
+                const selected = optionsList.querySelector(`.custom-select-option[data-value="${CSS.escape(currentVal)}"]`);
+                if (selected) triggerSpan.textContent = selected.textContent.trim();
+            }
+        } catch(_) {}
+
+        const decideOpenDirection = () => {
+            // Reset arah terlebih dahulu
+            wrapper.classList.remove('opens-above');
+            const rect = trigger.getBoundingClientRect();
+            const viewportH = window.innerHeight || document.documentElement.clientHeight || 0;
+            const spaceBelow = Math.max(0, viewportH - rect.bottom - 8);
+            const optionCount = optionsList.children.length || 0;
+            // Perkiraan tinggi: 36px per item + search (48) + padding (16)
+            const estimatedHeight = Math.min(250, (optionCount * 36) + (wrapper.querySelector('.custom-select-search') ? 48 : 0) + 16);
+            if (estimatedHeight > spaceBelow) {
+                wrapper.classList.add('opens-above');
+            }
+        };
 
 
         trigger.removeEventListener('click', trigger._clickHandler);
@@ -100,6 +122,7 @@ export function initCustomSelects(context = document) {
             const isActive = wrapper.classList.contains('active');
 
             closeAllSelects(isActive ? null : wrapper);
+            if (!isActive) decideOpenDirection();
             wrapper.classList.toggle('active', !isActive);
 
 

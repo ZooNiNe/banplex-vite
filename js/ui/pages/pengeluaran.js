@@ -3,6 +3,7 @@ import { $ } from '../../utils/dom.js';
 import { createPageToolbarHTML } from '../components/toolbar.js';
 import { createTabsHTML } from '../components/tabs.js';
 import { getFormPengeluaranHTML, getFormFakturMaterialHTML, attachPengeluaranFormListeners, initCustomSelects } from '../components/forms/index.js'; // Import initCustomSelects
+import { attachFormDraftPersistence } from '../../utils/formPersistence.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
 import { fetchAndCacheData } from '../../services/data/fetch.js';
@@ -137,6 +138,12 @@ async function renderPengeluaranContent() {
     }
 
     container.innerHTML = formHTML;
+
+    // Pasang persistensi draft agar nilai tidak hilang saat keluar sementara ke master_data
+    try {
+        const form = container.querySelector('#pengeluaran-form, #material-invoice-form');
+        if (form) attachFormDraftPersistence(form);
+    } catch (_) {}
 
     if (activeTab === 'material') {
         attachPengeluaranFormListeners('material', container);

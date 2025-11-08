@@ -330,7 +330,9 @@ async function syncToServer(options = {}) {
                 if (operationSignal.aborted) throw new DOMException('Sync aborted', 'AbortError');
                 try {
                     const targetRef = payment.paymentType === 'loan' ? doc(fundingSourcesCol, payment.billId) : doc(billsCol, payment.billId); // Adjust based on payment type
-                    const paymentRef = doc(collection(targetRef, 'payments'));
+                    const paymentRef = payment.paymentId
+                        ? doc(collection(targetRef, 'payments'), payment.paymentId)
+                        : doc(collection(targetRef, 'payments'));
                     let attachmentUrl = null;
                     if (payment.localAttachmentId) {
                         const fileRecord = await localDB.files.get(payment.localAttachmentId);

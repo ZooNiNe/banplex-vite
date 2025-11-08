@@ -5,6 +5,7 @@ import { db, expensesCol, billsCol, incomesCol, fundingSourcesCol, attendanceRec
 import { doc, runTransaction, serverTimestamp, Timestamp, collection, getDoc, setDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { syncToServer, _isQuotaExceeded, requestSync, syncFromServer } from "../../syncService.js";
 import { toast } from "../../../ui/components/toast.js";
+import { showLoadingModal, hideLoadingModal } from "../../../ui/components/modal.js";
 import { _logActivity } from "../../logService.js";
 import { _uploadFileToCloudinary, _compressImage, _enforceLocalFileStorageLimit } from "../../fileService.js";
 import { parseFormattedNumber, fmtIDR } from "../../../utils/formatters.js";
@@ -20,6 +21,12 @@ export async function handleProcessBillPayment(formElement) {
     const now = new Date();
     const date = new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate(), now.getHours(), now.getMinutes(), 0, 0);
     const file = formElement.elements.paymentAttachment?.files?.[0];
+    // Idempotency untuk cicilan pinjaman
+    let clientPaymentId = formElement.dataset.paymentId;
+    if (!clientPaymentId) {
+        try { clientPaymentId = crypto.randomUUID(); } catch(_) { clientPaymentId = `loan-pay-${id}-${Date.now()}`; }
+        formElement.dataset.paymentId = clientPaymentId;
+    }
 
     createModal('confirmPayBill', {
         message: `Anda akan membayar tagihan sebesar <strong>${amountFormatted}</strong>. Lanjutkan?`,
@@ -27,7 +34,10 @@ export async function handleProcessBillPayment(formElement) {
             let loadingToast;
             let containerToClose = null;
             try {
-                loadingToast = toast('syncing', 'Memproses pembayaran...');
+                // Ganti snackbar loading dengan modal loading
+                showLoadingModal('Memproses pembayaran...');
+                // Simpan placeholder agar referensi lama tidak error
+                loadingToast = { close: () => {} };
                 containerToClose = formElement.closest('.modal-bg, #detail-pane');
 
                 if (amountToPay <= 0) {
@@ -36,6 +46,12 @@ export async function handleProcessBillPayment(formElement) {
 
                 let attachmentUrl = null;
                 let localAttachmentId = null;
+                // Idempotency key untuk menghindari duplikasi pembayaran offline
+                let clientPaymentId = formElement.dataset.paymentId;
+                if (!clientPaymentId) {
+                    try { clientPaymentId = crypto.randomUUID(); } catch(_) { clientPaymentId = `pay-${billId}-${Date.now()}`; }
+                    formElement.dataset.paymentId = clientPaymentId;
+                }
 
                 const processPayment = async () => {
                      if (navigator.onLine && !_isQuotaExceeded()) {
@@ -58,7 +74,7 @@ export async function handleProcessBillPayment(formElement) {
                                     updatedAt: serverTimestamp(),
                                     ...(isNowPaid && { paidAt: Timestamp.fromDate(date) })
                                 });
-                                const paymentRef = doc(collection(billRef, 'payments'));
+                                const paymentRef = doc(collection(billRef, 'payments'), clientPaymentId);
                                 const paymentData = {
                                     amount: amountToPay,
                                     date: Timestamp.fromDate(date),
@@ -103,7 +119,7 @@ export async function handleProcessBillPayment(formElement) {
                                 if (isNowPaid && bill.type === 'gaji' && bill.recordIds && bill.recordIds.length > 0) {
                                     await localDB.attendance_records.where('id').anyOf(bill.recordIds).modify({ isPaid: true, syncState: 'pending_update' });
                                 }
-                                await localDB.pending_payments.add({ billId, amount: amountToPay, date, localAttachmentId, createdAt: new Date() });
+                                await localDB.pending_payments.add({ billId, amount: amountToPay, date, localAttachmentId, createdAt: new Date(), paymentId: clientPaymentId });
                             });
                             _logActivity(`Membayar Tagihan Cicilan (Offline)`, { billId, amount: amountToPay });
                             requestSync({ silent: true });
@@ -141,7 +157,7 @@ export async function handleProcessBillPayment(formElement) {
                     containerToClose = null;
                 }
 
-                if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+                hideLoadingModal();
                 emit('uiInteraction.showPaymentSuccessPreviewPanel', {
                     title: 'Pembayaran Tagihan Berhasil!',
                     description: `Pembayaran untuk: ${bill.description}`,
@@ -156,7 +172,7 @@ export async function handleProcessBillPayment(formElement) {
                 return true; // Signal sukses ke modalEventListeners
 
             } catch (error) {
-                if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+                hideLoadingModal();
                 // PERBAIKAN: Gunakan fungsi penutup 'Immediate'
                 if (containerToClose) {
                     if (containerToClose.id === 'detail-pane') {
@@ -201,7 +217,8 @@ export async function handleProcessPayment(formElement) {
              let loadingToast;
              let containerToClose = null;
             try {
-                loadingToast = toast('syncing', 'Memproses pembayaran...');
+                showLoadingModal('Memproses pembayaran...');
+                loadingToast = { close: () => {} };
                 containerToClose = formElement.closest('.modal-bg, #detail-pane');
 
                 const processPayment = async () => {
@@ -226,7 +243,7 @@ export async function handleProcessPayment(formElement) {
                                     updatedAt: serverTimestamp(),
                                     ...(isPaidServer && { paidAt: Timestamp.fromDate(date) })
                                 });
-                                const paymentRef = doc(collection(loanRef, 'payments'));
+                                const paymentRef = doc(collection(loanRef, 'payments'), clientPaymentId);
                                 const paymentData = { amount: amountToPay, date: Timestamp.fromDate(date), createdAt: serverTimestamp() };
                                 if (attachmentUrl) paymentData.attachmentUrl = attachmentUrl;
                                 transaction.set(paymentRef, paymentData);
@@ -265,7 +282,11 @@ export async function handleProcessPayment(formElement) {
                                 await localDB.pending_payments.add({
                                     billId: id,
                                     paymentType: 'loan',
-                                    amount: amountToPay, date, localAttachmentId, createdAt: new Date()
+                                    amount: amountToPay,
+                                    date,
+                                    localAttachmentId,
+                                    createdAt: new Date(),
+                                    paymentId: clientPaymentId
                                 });
                             });
                             _logActivity(`Membayar Cicilan Pinjaman (Offline)`, { loanId: id, amount: amountToPay });
@@ -315,7 +336,7 @@ export async function handleProcessPayment(formElement) {
                     containerToClose = null;
                 }
 
-                if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+                hideLoadingModal();
 
                 emit('uiInteraction.showPaymentSuccessPreviewPanel', {
                     title: 'Pembayaran Cicilan Berhasil!',
@@ -334,7 +355,7 @@ export async function handleProcessPayment(formElement) {
                 return true; // Signal sukses
 
             } catch (error) {
-                if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+                hideLoadingModal();
                 // PERBAIKAN: Gunakan fungsi penutup 'Immediate'
                 if (containerToClose) {
                     if (containerToClose.id === 'detail-pane') {
@@ -354,6 +375,152 @@ export async function handleProcessPayment(formElement) {
         }
     });
     return true;
+}
+
+// Hapus Pembayaran Tagihan
+export async function handleDeleteBillPayment(dataset) {
+    try {
+        const { billId, paymentId, source, amount, pendingId } = dataset;
+        if (!billId) { toast('error', 'ID tagihan tidak ditemukan.'); return; }
+
+        createModal('confirmUserAction', {
+            title: 'Hapus Pembayaran?',
+            message: 'Tindakan ini akan membatalkan pembayaran terkait. Lanjutkan? ',
+            onConfirm: async () => {
+                showLoadingModal('Menghapus pembayaran...');
+                try {
+                    if (source === 'server' && paymentId) {
+                        await runTransaction(db, async (tx) => {
+                            const billRef = doc(billsCol, billId);
+                            const snap = await tx.get(billRef);
+                            if (!snap.exists()) throw new Error('Tagihan tidak ditemukan di server.');
+                            const bill = snap.data();
+                            const newPaid = Math.max(0, (bill.paidAmount || 0) - (Number(amount) || 0));
+                            const isPaid = newPaid >= (bill.amount || 0);
+                            tx.update(billRef, {
+                                paidAmount: newPaid,
+                                status: isPaid ? 'paid' : 'unpaid',
+                                updatedAt: serverTimestamp(),
+                                rev: (bill.rev || 0) + 1,
+                                ...(isPaid ? {} : { paidAt: null })
+                            });
+                        });
+                        const { writeBatch } = await import("https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js");
+                        const batch = writeBatch(db);
+                        const parentRef = doc(billsCol, billId);
+                        batch.delete(doc(collection(parentRef, 'payments'), paymentId));
+                        await batch.commit();
+                        await syncFromServer();
+                    } else if (source === 'pending' && pendingId) {
+                        // Revert perubahan lokal dan hapus pending payment
+                        await localDB.transaction('rw', localDB.bills, localDB.pending_payments, async () => {
+                            const bill = await localDB.bills.get(billId);
+                            const amt = Number(amount) || 0;
+                            const newPaid = Math.max(0, (bill?.paidAmount || 0) - amt);
+                            await localDB.bills.update(billId, {
+                                paidAmount: newPaid,
+                                status: newPaid >= (bill?.amount || 0) ? 'paid' : 'unpaid',
+                                updatedAt: new Date(),
+                                syncState: 'pending_update'
+                            });
+                            await localDB.pending_payments.delete(Number(pendingId));
+                        });
+                        requestSync({ silent: true });
+                    } else {
+                        throw new Error('Konteks penghapusan pembayaran tidak lengkap.');
+                    }
+
+                    hideLoadingModal();
+                    toast('success', 'Pembayaran berhasil dihapus.');
+                    await loadAllLocalDataToState();
+                    emit('ui.modal.openPaymentHistory', { id: billId });
+                    return true;
+                } catch (e) {
+                    hideLoadingModal();
+                    console.error('Gagal menghapus pembayaran:', e);
+                    toast('error', `Gagal menghapus pembayaran: ${e.message}`);
+                    return false;
+                }
+            }
+        });
+    } catch (e) {
+        console.error('[handleDeleteBillPayment] error:', e);
+        toast('error', 'Gagal memulai penghapusan pembayaran.');
+    }
+}
+
+// Hapus Pembayaran Pinjaman
+export async function handleDeleteLoanPayment(dataset) {
+    try {
+        const { loanId, paymentId, source, amount, pendingId } = dataset;
+        const id = loanId || dataset.id;
+        if (!id) { toast('error', 'ID pinjaman tidak ditemukan.'); return; }
+
+        createModal('confirmUserAction', {
+            title: 'Hapus Pembayaran?',
+            message: 'Tindakan ini akan membatalkan pembayaran cicilan terkait. Lanjutkan?',
+            onConfirm: async () => {
+                showLoadingModal('Menghapus pembayaran...');
+                try {
+                    if (source === 'server' && paymentId) {
+                        await runTransaction(db, async (tx) => {
+                            const loanRef = doc(fundingSourcesCol, id);
+                            const snap = await tx.get(loanRef);
+                            if (!snap.exists()) throw new Error('Data pinjaman tidak ditemukan di server.');
+                            const loan = snap.data();
+                            const newPaid = Math.max(0, (loan.paidAmount || 0) - (Number(amount) || 0));
+                            const total = loan.totalRepaymentAmount || loan.totalAmount || 0;
+                            const isPaid = newPaid >= total;
+                            tx.update(loanRef, {
+                                paidAmount: newPaid,
+                                status: isPaid ? 'paid' : 'unpaid',
+                                updatedAt: serverTimestamp(),
+                                rev: (loan.rev || 0) + 1,
+                                ...(isPaid ? {} : { paidAt: null })
+                            });
+                        });
+                        const { writeBatch } = await import("https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js");
+                        const batch = writeBatch(db);
+                        const parentRef = doc(fundingSourcesCol, id);
+                        batch.delete(doc(collection(parentRef, 'payments'), paymentId));
+                        await batch.commit();
+                        await syncFromServer();
+                    } else if (source === 'pending' && pendingId) {
+                        await localDB.transaction('rw', localDB.funding_sources, localDB.pending_payments, async () => {
+                            const loan = await localDB.funding_sources.get(id);
+                            const amt = Number(amount) || 0;
+                            const newPaid = Math.max(0, (loan?.paidAmount || 0) - amt);
+                            const total = loan?.totalRepaymentAmount || loan?.totalAmount || 0;
+                            await localDB.funding_sources.update(id, {
+                                paidAmount: newPaid,
+                                status: newPaid >= total ? 'paid' : 'unpaid',
+                                updatedAt: new Date(),
+                                syncState: 'pending_update'
+                            });
+                            await localDB.pending_payments.delete(Number(pendingId));
+                        });
+                        requestSync({ silent: true });
+                    } else {
+                        throw new Error('Konteks penghapusan pembayaran tidak lengkap.');
+                    }
+
+                    hideLoadingModal();
+                    toast('success', 'Pembayaran berhasil dihapus.');
+                    await loadAllLocalDataToState();
+                    emit('ui.modal.openLoanPaymentHistory', { id });
+                    return true;
+                } catch (e) {
+                    hideLoadingModal();
+                    console.error('Gagal menghapus pembayaran pinjaman:', e);
+                    toast('error', `Gagal menghapus pembayaran: ${e.message}`);
+                    return false;
+                }
+            }
+        });
+    } catch (e) {
+        console.error('[handleDeleteLoanPayment] error:', e);
+        toast('error', 'Gagal memulai penghapusan pembayaran.');
+    }
 }
 
 
@@ -382,10 +549,11 @@ export async function handleProcessIndividualSalaryPayment(formElement) {
     createModal('confirmPayBill', {
          message: `Anda akan membayar gaji <strong>${workerDetail.name}</strong> sebesar <strong>${amountFormatted}</strong>. Lanjutkan?`,
          onConfirm: async () => {
-              let loadingToast;
-              let containerToClose = null;
-             try {
-                 loadingToast = toast('syncing', 'Memproses pembayaran...');
+             let loadingToast;
+             let containerToClose = null;
+            try {
+                 showLoadingModal('Memproses pembayaran...');
+                 loadingToast = { close: () => {} };
                  containerToClose = formElement.closest('.modal-bg, #detail-pane');
 
                  const processPayment = async () => {
@@ -419,8 +587,12 @@ export async function handleProcessIndividualSalaryPayment(formElement) {
                                      syncState: 'pending_update',
                                      updatedAt: new Date()
                                  });
-                                 await localDB.pending_payments.add({
-                                     billId: bill.id, amount: amountToPay, date, workerId: workerDetail.id || workerId,
+                                  await localDB.pending_payments.add({
+                                      billId: bill.id,
+                                      amount: amountToPay,
+                                      date,
+                                      workerId: workerDetail.id || workerId,
+                                      paymentId: (formElement.dataset.paymentId || `pay-${billId}-${workerId}-${Date.now()}`),
                                      workerName: workerDetail.name, localAttachmentId, createdAt: new Date()
                                  });
                              });
@@ -494,7 +666,7 @@ export async function handleProcessIndividualSalaryPayment(formElement) {
                     containerToClose = null;
                 }
 
-                 if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+                 hideLoadingModal();
                  emit('uiInteraction.showPaymentSuccessPreviewPanel', {
                      title: 'Pembayaran Gaji Berhasil!',
                      description: `Pembayaran gaji untuk ${workerDetail.name}`,
@@ -509,7 +681,7 @@ export async function handleProcessIndividualSalaryPayment(formElement) {
                  return true; // Signal sukses
 
              } catch (error) {
-                 if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+                 hideLoadingModal();
                 // PERBAIKAN: Gunakan fungsi penutup 'Immediate'
                 if (containerToClose) {
                     if (containerToClose.id === 'detail-pane') {
