@@ -224,10 +224,18 @@ async function _renderWorkerListForManualAttendance() {
         } else {
             isSelected = appState.selectionMode.selectedIds.has(worker.id);
             
-            const defaultProjectId = worker.defaultProjectId || appState.manualAttendanceSelectedProjectId || appState.defaultAttendanceProjectId;
+            let defaultProjectId = worker.defaultProjectId || appState.manualAttendanceSelectedProjectId || appState.defaultAttendanceProjectId;
+            if (!defaultProjectId && appState.projects.length > 0) {
+                const activeProjects = appState.projects.filter(p => p.status === 'active' && !p.isDeleted);
+                if (activeProjects.length > 0) {
+                    defaultProjectId = activeProjects[0].id;
+                    appState.manualAttendanceSelectedProjectId = defaultProjectId;
+                }
+            }
+
             if (defaultProjectId) {
                 const wages = (worker.projectWages || {})[defaultProjectId] || {};
-                const role = worker.defaultRole || Object.keys(wages)[0] || '';
+                const role = worker.defaultRole || (Object.keys(wages).length > 0 ? Object.keys(wages)[0] : '');
                 if (role) {
                     const projectName = appState.projects.find(p => p.id === defaultProjectId)?.projectName || 'P?';
                     const projectInitials = projectName.split(' ').map(s => s.charAt(0)).join('').substring(0, 3).toUpperCase();
