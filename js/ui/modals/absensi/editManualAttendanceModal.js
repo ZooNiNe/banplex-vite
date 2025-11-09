@@ -198,16 +198,17 @@ function addEntryRow(container, defaultProjectId = null) {
  * Mengupdate upah untuk satu baris entri.
  */
 function updatePay(rowElement) {
-    // ... (fungsi tidak berubah) ...
     if (!rowElement) return;
     const entryId = rowElement.dataset.entryId;
     const entry = modalState.entries.find(e => e.id === entryId);
     if (!entry) return;
 
     const worker = appState.workers.find(w => w.id === modalState.workerId);
-    const customWageVal = parseFormattedNumber(rowElement.querySelector(`[name="customWage_${entryId}"]`)?.value || '0');
+    const customWageInput = rowElement.querySelector(`[name="customWage_${entryId}"]`);
+    const customWageValue = customWageInput ? parseFormattedNumber(customWageInput.value) : 0;
+
     const baseWage = (worker?.projectWages?.[entry.projectId] || {})[entry.role] || 0;
-    const wageToUse = customWageVal > 0 ? customWageVal : baseWage;
+    const wageToUse = customWageValue > 0 ? customWageValue : baseWage;
 
     let pay = 0;
     if (entry.status === 'full_day') {
@@ -217,7 +218,7 @@ function updatePay(rowElement) {
     }
     
     entry.pay = pay;
-    entry.customWage = customWageVal > 0 ? customWageVal : null;
+    entry.customWage = customWageValue > 0 ? customWageValue : null;
     
     const payInput = rowElement.querySelector(`input[name="pay_${entryId}"]`);
     if (payInput) {
@@ -448,11 +449,13 @@ export function handleOpenManualAttendanceModal(context) {
             }
             
             // 3. Emit event untuk update UI utama
-            emit('ui.absensi.renderManualForm'); // Render ulang list
-            emit('ui.absensi.updateFooter'); // Update hitungan [Simpan Semua]
+            emit('ui.absensi.renderManualForm');
+            emit('ui.absensi.updateFooter');
             
             toast('success', `Perubahan untuk ${modalState.workerName} siap disimpan.`);
-            emit('ui.modal.closeDetailPane'); // Tutup modal/sheet
+
+            // [PERBAIKAN-BUG] Ganti fungsi close pane
+            emit('ui.detailPane.close');
         });
     }
 }

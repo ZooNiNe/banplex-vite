@@ -230,7 +230,7 @@ export function _getMasterDataListHTML(type, items, config) {
             headerMeta: '',
             metaBadges: badges,
             mainContentHTML: mainContent,
-            dataset: dataset,
+            dataset: { ...dataset, action: 'edit-item' },
             moreAction: true,
             actions: [],
             selectionEnabled: selectionActive,
@@ -333,78 +333,6 @@ export async function _createBillDetailContentHTML(bill, expenseData) {
         return `<div class="card card-pad">${summaryHTML}<div class="detail-section">${detailsHTML}</div></div>${notesHTML}`;
     }
 
-export function _createSalaryBillDetailContentHTML(bill, payments) {
-    const total = bill?.amount || 0;
-    const paid = bill?.paidAmount || 0;
-    const remaining = Math.max(0, total - paid);
-    const status = bill?.status || 'unpaid';
-    const createdDate = getJSDate(bill?.createdAt);
-    const createdBy = bill?.createdByName || 'Sistem';
-
-    const summaryHTML = `
-        <div class="detail-summary-grid">
-            <div class="summary-item">
-                <span class="label">Total Gaji</span>
-                <strong class="value">${fmtIDR(total)}</strong>
-            </div>
-             <div class="summary-item">
-                <span class="label">Sisa Tagihan</span>
-                <strong class="value ${remaining > 0 ? 'negative' : ''}">${fmtIDR(remaining)}</strong>
-            </div>
-            <div class="summary-item">
-                <span class="label">Status</span>
-                <strong class="value"><span class="status-badge status-badge--${status === 'paid' ? 'positive' : 'warn'}">${status === 'paid' ? 'Lunas' : 'Belum Lunas'}</span></strong>
-            </div>
-        </div>`;
-
-    const detailsHTML = `
-         <dl class="detail-list">
-            <div><dt>Dibuat Pada</dt><dd>${createdDate.toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' })}</dd></div>
-            <div><dt>Dibuat Oleh</dt><dd>${createdBy}</dd></div>
-        </dl>
-    `;
-
-    const workersHTML = `
-        <h5 class="detail-section-title">Rincian Gaji Pekerja</h5>
-        <div class="detail-list-container">
-            ${(bill.workerDetails || []).map(w => {
-                const workerId = w.id || w.workerId;
-                
-                const totalPaidForWorker = (payments || [])
-                    .filter(p => p.workerId === workerId)
-                    .reduce((sum, p) => sum + (p.amount || 0), 0);
-                const remainingForWorker = Math.max(0, (w.amount || 0) - totalPaidForWorker);
-                const isWorkerPaid = remainingForWorker === 0;
-
-                const statusBadge = isWorkerPaid
-                    ? `<span class="status-badge status-badge--positive">Lunas</span>`
-                    : `<span class="status-badge status-badge--warn">Belum Lunas</span>`;
-
-                return `
-                    <div class="detail-list-item-card" style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
-                        <div class="item-main" style="flex: 1; min-width: 0;">
-                            <strong class="item-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${w.name || 'Pekerja Dihapus'}</strong>
-                        </div>
-                        <div class="item-secondary" style="flex-shrink: 0; display: flex; align-items: center; gap: 0.75rem;">
-                            ${statusBadge}
-                            <strong class="item-amount">${fmtIDR(w.amount)}</strong>
-                        </div>
-                    </div>`;
-            }).join('')}
-        </div>
-    </div>
-    `;
-
-    const notes = bill?.notes;
-    const notesHTML = notes ? `
-        <div class="card card-pad" style="margin-top: 1rem;">
-            <h5 class="detail-section-title" style="margin-top: 0;">${createIcon('sticky-note', 16)} Catatan</h5>
-            <p style="white-space: pre-wrap; line-height: 1.6; color: var(--text-dim);">${notes}</p>
-        </div>
-    ` : '';
-
-    return `<div class="card card-pad">${summaryHTML}<div class="detail-section">${detailsHTML}</div></div><div class="card card-pad" style="margin-top:1rem;">${workersHTML}</div>${notesHTML}`;
-}
 
 export function _createDetailContentHTML(item, type) {
     let details = [];

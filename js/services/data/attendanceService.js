@@ -1156,14 +1156,18 @@ export async function openManualAbsenceStatusPanel(selectedWorkerIds = []) {
                         if (entries.length === 0) {
                             
                             const defaultProjectId = worker.defaultProjectId || appState.manualAttendanceSelectedProjectId || appState.defaultAttendanceProjectId;
+                            if (!defaultProjectId) {
+                                skippedCount++;
+                                skippedNames.push(worker.workerName);
+                                continue;
+                            }
                             const wages = (worker.projectWages || {})[defaultProjectId] || {};
                             const role = worker.defaultRole || Object.keys(wages)[0] || '';
-                            
-                            
-                            if (!defaultProjectId || !role) {
-                                 skippedCount++;
-                                 skippedNames.push(worker.workerName);
-                                 continue;
+
+                            if (!role) {
+                                skippedCount++;
+                                skippedNames.push(worker.workerName);
+                                continue;
                             }
                             
                             const pay = (wages[role] || 0) * (newStatus === 'full_day' ? 1 : 0.5);
