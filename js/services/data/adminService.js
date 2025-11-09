@@ -374,3 +374,114 @@ export async function handleDevResetAllData() {
     emit('ui.modal.create', 'dataDetail', { title, content, footer });
 }
 
+const BENEFICIARY_COLLECTION = 'penerimaManfaat';
+const CHUNK_SIZE = 400;
+
+function buildBeneficiaryQuery(filters = {}) {
+    const collectionRef = collection(db, BENEFICIARY_COLLECTION);
+    const constraints = [];
+    Object.entries(filters || {}).forEach(([field, value]) => {
+        if (value === undefined || value === null) return;
+        const normalizedValue = typeof value === 'string' ? value.trim() : value;
+        if (normalizedValue !== '') {
+            constraints.push(where(field, '==', normalizedValue));
+        }
+    });
+    return constraints.length > 0 ? query(collectionRef, ...constraints) : collectionRef;
+}
+
+function prepareBeneficiaryPayload(data = {}, includeCreatedAt = false) {
+    const payload = {};
+    Object.entries(data || {}).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        const normalizedKey = typeof key === 'string' ? key.trim() : key;
+        if (!normalizedKey) return;
+        if (typeof value === 'string') {
+            const trimmedValue = value.trim();
+            if (trimmedValue === '') return;
+            payload[normalizedKey] = trimmedValue;
+        } else {
+            payload[normalizedKey] = value;
+        }
+    });
+    payload.updatedAt = serverTimestamp();
+    if (includeCreatedAt) {
+        payload.createdAt = serverTimestamp();
+    }
+    return payload;
+}
+
+export async function getBeneficiaries(filters = {}) {
+    try {
+        const queryTarget = buildBeneficiaryQuery(filters);
+        const snapshot = await getDocs(queryTarget);
+        const items = [];
+        snapshot.forEach((docSnap) => {
+            items.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        return items;
+    } catch (error) {
+        if (error?.code === 'failed-precondition') {
+            console.error('[AdminService] Composite index missing for provided filters.', error);
+            throw new Error("Filter requires a composite index. Check browser console for link.");
+        }
+        throw error;
+    }
+}
+
+export async function batchImportBeneficiaries(dataArray = []) {
+    if (!Array.isArray(dataArray) || dataArray.length === 0) {
+        throw new Error('Tidak ada data yang dapat diimpor.');
+    }
+    const rows = dataArray.filter(row => row && Object.keys(row).length > 0);
+    if (rows.length === 0) {
+        throw new Error('Format data tidak valid.');
+    }
+    try {
+        for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+            const batch = writeBatch(db);
+            const chunk = rows.slice(i, i + CHUNK_SIZE);
+            chunk.forEach((entry) => {
+                const docRef = doc(collection(db, BENEFICIARY_COLLECTION));
+                batch.set(docRef, prepareBeneficiaryPayload(entry, true));
+            });
+            await batch.commit();
+        }
+    } catch (error) {
+        console.error('[AdminService] Batch import failed.', error);
+        throw error;
+    }
+}
+
+export async function addBeneficiary(data = {}) {
+    const docRef = await addDoc(collection(db, BENEFICIARY_COLLECTION), prepareBeneficiaryPayload(data, true));
+    return docRef.id;
+}
+
+export async function updateBeneficiary(docId, dataToUpdate = {}) {
+    if (!docId) {
+        throw new Error('ID dokumen wajib diisi untuk memperbarui data.');
+    }
+    const docRef = doc(db, BENEFICIARY_COLLECTION, docId);
+    await updateDoc(docRef, prepareBeneficiaryPayload(dataToUpdate, false));
+}
+
+export async function deleteBeneficiary(docId) {
+    if (!docId) {
+        throw new Error('ID dokumen wajib diisi untuk menghapus data.');
+    }
+    await deleteDoc(doc(db, BENEFICIARY_COLLECTION, docId));
+}
+
+export const adminPanelService = {
+    getBeneficiaries,
+    batchImportBeneficiaries,
+    addBeneficiary,
+    updateBeneficiary,
+    deleteBeneficiary,
+};
+
+if (typeof window !== 'undefined') {
+    window.adminService = Object.assign({}, window.adminService || {}, adminPanelService);
+}
+

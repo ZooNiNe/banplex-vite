@@ -30,11 +30,6 @@
   text-align: center; /* Pastikan teks rata tengah */
 }
 
-@media (max-width:600px){
-#page.dashboard.fab-extended.fab.pop.in{
-display:none;
-}
-}
 /* Pastikan label terlihat dan bisa wrap */
 .fab .fab-label {
   font-size: 0.5rem; /* Kecilkan sedikit font untuk 2 baris */

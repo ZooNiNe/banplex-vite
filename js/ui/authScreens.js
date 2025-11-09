@@ -77,11 +77,11 @@ function getAuthScreenHTML() {
                 <p class="returning-user-name">${lastUser.displayName}</p>
                 
                 <div class="auth-actions">
-                    <button class="btn btn-primary btn-block" data-action="auth-action">
+                    <button type="button" class="btn btn-primary btn-block" data-action="auth-action">
                         ${createIcon('login')}
                         Masuk sebagai ${lastUser.displayName.split(' ')[0]}
                     </button>
-                    <button class="btn btn-secondary btn-block" data-action="login-different-account">
+                    <button type="button" class="btn btn-secondary btn-block" data-action="login-different-account">
                         ${createIcon('user-plus')}
                         Gunakan akun lain
                     </button>
@@ -100,7 +100,7 @@ function getAuthScreenHTML() {
                 <p class="auth-description">Masuk dengan akun Google Anda untuk memulai sinkronisasi data proyek, absensi, dan keuangan.</p>
                 
                 <div class="auth-actions">
-                    <button class="btn btn-primary btn-block btn-google" data-action="auth-action">
+                    <button type="button" class="btn btn-primary btn-block btn-google" data-action="auth-action">
                         ${createIcon('google-logo', 20)}
                         Masuk dengan Google
                     </button>

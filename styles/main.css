@@ -38,6 +38,7 @@
 @import "components/_loaders.css";
 @import "components/_tooltip.css";
 @import 'components/_pull-to-refresh.css';
+@import './components/_info-modal.css';
 
 /* 4. PAGE-SPECIFIC STYLES */
 @import "pages/_chat.css";
@@ -52,6 +53,7 @@
 @import "pages/_stock.css";
 @import "pages/_analysis.css";
 @import "pages/_search.css"; /* Added */
+@import "pages/_file-storage.css";
 
 /* 5. THEMES (Dark Mode, Print) */
 @import "themes/_dark.css";

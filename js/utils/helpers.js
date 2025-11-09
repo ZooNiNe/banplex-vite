@@ -1,4 +1,5 @@
 import { appState } from "../state/appState.js";
+import { emit } from "../state/eventBus.js";
 
 export function generateUUID() {
     try {
@@ -39,7 +40,33 @@ export function getJSDate(dateObject) {
 }
 
 export function isViewer() {
-  return appState.userRole === 'Viewer';
+  return typeof window !== 'undefined'
+    ? !!window.appState?.isViewerRole?.()
+    : appState.userRole === 'Viewer';
+}
+
+export function canWriteAdministrasi() {
+    return typeof window !== 'undefined'
+        ? !!window.appState?.canWriteAdministrasi?.()
+        : true;
+}
+
+export function canWriteLapangan() {
+    return typeof window !== 'undefined'
+        ? !!window.appState?.canWriteLapangan?.()
+        : true;
+}
+
+export function isPrivilegedUser() {
+    return typeof window !== 'undefined'
+        ? !!window.appState?.isPrivileged?.()
+        : appState.userRole === 'Owner';
+}
+
+export function canReadData() {
+    return typeof window !== 'undefined'
+        ? !!window.appState?.canRead?.()
+        : true;
 }
 
 export function resolveUserDisplay(ref) {
@@ -84,14 +111,16 @@ export function validateAndPrepareData(data, defaults) {
   return preparedData;
 }
 
-export function setLastCommentViewTimestamp(parentId) {
-  if (!parentId) return;
-  try {
-    const key = `comment_view_ts_${parentId}`;
-    localStorage.setItem(key, Date.now().toString());
-  } catch (e) {
-    console.error("Gagal menyimpan timestamp Komentar:", e);
-  }
+export function setLastCommentViewTimestamp(parentId, meta = {}) {
+    if (!parentId) return;
+    try {
+        const key = `comment_view_ts_${parentId}`;
+        localStorage.setItem(key, Date.now().toString());
+        emit('ui.dashboard.updateCommentsBadge');
+        emit('ui.comments.threadViewed', { parentId, ...meta });
+    } catch (e) {
+        console.error("Gagal menyimpan timestamp Komentar:", e);
+    }
 }
 
 export function getUnreadCommentCount(parentId, commentsList) {
@@ -123,4 +152,75 @@ export function toProperCase(str) {
       return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
     }
   );
+}
+
+export function sanitizeDigits(value = '') {
+    if (value === null || value === undefined) return '';
+    return String(value).replace(/\D+/g, '');
+}
+
+export function isValidNik(value) {
+    const digits = sanitizeDigits(value);
+    return digits.length === 16;
+}
+
+export function isValidNikKk(value) {
+    if (typeof value !== 'string') return false;
+    const digits = value.replace(/\D/g, ''); // Hapus semua yang bukan angka
+    return /^\d{16}$/.test(digits);
+}
+
+export function normalizeDistanceToMeters(value, options = {}) {
+    const { allowZero = false } = options;
+    if (value === null || value === undefined) return null;
+    let raw = String(value).trim();
+    if (!raw) return null;
+
+    const lower = raw.toLowerCase();
+    let multiplier = 1;
+    if (lower.includes('km') || lower.includes('kilometer')) {
+        multiplier = 1000;
+    }
+
+    let numericPortion = lower.replace(/[^0-9.,-]/g, '');
+    if (!numericPortion) return null;
+
+    if (numericPortion.includes(',') && !numericPortion.includes('.')) {
+        numericPortion = numericPortion.replace(',', '.');
+    } else {
+        numericPortion = numericPortion.replace(/,/g, '');
+    }
+
+    const parsed = parseFloat(numericPortion);
+    if (!Number.isFinite(parsed)) return null;
+
+    const meters = parsed * multiplier;
+    if (!allowZero && meters <= 0) return null;
+    if (allowZero && meters < 0) return null;
+
+    return Math.round(meters);
+}
+export function sanitizePhone(phoneStr) {
+    if (typeof phoneStr !== 'string' || !phoneStr) return '';
+    
+    // Hanya izinkan digit dan '+'
+    let digits = phoneStr.replace(/[^\d+]/g, '');
+
+    // Tangani awalan umum Indonesia
+    if (digits.startsWith('08')) {
+        // Ganti 08 -> 628
+        digits = '628' + digits.substring(2);
+    } else if (digits.startsWith('+62')) {
+        // Ganti +62 -> 62
+        digits = '62' + digits.substring(3);
+    }
+
+    // Pastikan '+' hanya ada di awal (meskipun sudah kita tangani)
+    // dan bersihkan jika ada '+' ganda
+    if (digits.startsWith('62')) {
+        return digits.replace(/(?!^)[+]/g, ''); // Hapus '+' di tengah
+    }
+    
+    // Kembalikan nomor yang sudah bersih
+    return digits;
 }

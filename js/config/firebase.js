@@ -66,6 +66,7 @@ export const logsCol = collection(db, 'teams', TEAM_ID, 'logs');
 export const materialsCol = collection(db, 'teams', TEAM_ID, 'materials');
 export const stockTransactionsCol = collection(db, 'teams', TEAM_ID, 'stock_transactions');
 export const staffCol = collection(db, 'teams', TEAM_ID, 'staff');
+export const hrdApplicantsCol = collection(db, 'teams', TEAM_ID, 'hrd_applicants');
 export const commentsCol = collection(db, 'teams', TEAM_ID, 'comments');
 export const notificationsCol = collection(db, 'teams', TEAM_ID, 'notifications');
 export const settingsDocRef = doc(db, 'teams', TEAM_ID, 'settings', 'pdf');

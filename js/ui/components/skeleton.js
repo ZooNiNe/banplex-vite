@@ -237,6 +237,107 @@ export function createPemasukanFormPageSkeletonHTML() {
     `;
 }
 
+function _createDataRepositorySummarySkeleton(subtitle = '') {
+    return `
+        <div class="card card-pad skeleton-wrapper" style="position: relative; overflow: hidden;">
+            <div class="skeleton" style="position:absolute; top: 1rem; right: 1rem; width: 36px; height: 36px; border-radius: 10px;"></div>
+            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                <div class="skeleton skeleton-text" style="width: 140px; height: 14px;"></div>
+                <div class="skeleton" style="width: 120px; height: 36px; border-radius: 12px;"></div>
+                ${subtitle ? `<div class="skeleton skeleton-text" style="width: 80%; height: 14px;"></div>` : ''}
+            </div>
+            <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:1rem;">
+                <div class="skeleton" style="height:40px; border-radius:10px;"></div>
+                <div class="skeleton" style="height:40px; border-radius:10px;"></div>
+            </div>
+        </div>
+    `;
+}
+
+function _createDataRepositoryFiltersSkeleton() {
+    return `
+        <div class="card card-pad skeleton-wrapper" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 1rem;">
+            ${Array.from({ length: 4 }).map(() => `
+                <div>
+                    <div class="skeleton skeleton-text" style="width: 60%; height: 12px; margin-bottom: 6px;"></div>
+                    <div class="skeleton" style="height: 40px; border-radius: 10px;"></div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function _createDataRepositoryTableSkeleton() {
+    return `
+        <div class="card card-pad skeleton-wrapper">
+            <div class="skeleton" style="height: 18px; width: 160px; margin-bottom: 1rem;"></div>
+            ${Array.from({ length: 5 }).map(() => `
+                <div style="display:grid; grid-template-columns: 60px 1fr 1fr 1fr 80px; gap: 0.75rem; align-items:center; margin-bottom: 0.5rem;">
+                    <div class="skeleton" style="height: 32px; border-radius: 10px;"></div>
+                    <div class="skeleton skeleton-text" style="height: 14px; width: 90%;"></div>
+                    <div class="skeleton skeleton-text" style="height: 14px; width: 70%;"></div>
+                    <div class="skeleton skeleton-text" style="height: 14px; width: 80%;"></div>
+                    <div class="skeleton" style="height: 32px; border-radius: 10px;"></div>
+                </div>
+            `).join('')}
+            <div class="skeleton" style="height: 36px; border-radius: 10px; margin-top: 1rem;"></div>
+        </div>
+    `;
+}
+
+function _createDataRepositoryPageSkeletonHTML(title) {
+    return `
+        <div class="content-panel file-storage-panel">
+            <div class="panel-header">
+                ${_createStandardToolbarSkeleton(title)}
+            </div>
+            <div class="panel-content scrollable-content has-padding">
+                ${_createDataRepositorySummarySkeleton()}
+                ${_createDataRepositoryFiltersSkeleton()}
+                ${_createDataRepositoryTableSkeleton()}
+            </div>
+        </div>
+    `;
+}
+
+function _createDataRepositoryFormSkeletonHTML(title) {
+    const doubleRow = () => `
+        <div class="form-row" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 1rem;">
+            <div>
+                <div class="skeleton skeleton-text" style="height: 12px; width: 60%; margin-bottom: 6px;"></div>
+                <div class="skeleton" style="height: 44px; border-radius: 10px;"></div>
+            </div>
+            <div>
+                <div class="skeleton skeleton-text" style="height: 12px; width: 50%; margin-bottom: 6px;"></div>
+                <div class="skeleton" style="height: 44px; border-radius: 10px;"></div>
+            </div>
+        </div>
+    `;
+
+    return `
+        <div class="content-panel file-storage-panel">
+            <div class="panel-header">
+                ${_createStandardToolbarSkeleton(title)}
+            </div>
+            <div class="panel-content scrollable-content has-padding">
+                <div class="card card-pad skeleton-wrapper" style="display:flex; flex-direction:column; gap:1rem;">
+                    ${doubleRow()}
+                    ${doubleRow()}
+                    ${doubleRow()}
+                    <div>
+                        <div class="skeleton skeleton-text" style="height: 12px; width: 40%; margin-bottom: 6px;"></div>
+                        <div class="skeleton" style="height: 90px; border-radius: 10px;"></div>
+                    </div>
+                    <div class="form-footer-actions" style="display:flex; justify-content:flex-end; gap:0.5rem; padding-top:1rem; border-top:1px solid var(--line);">
+                        <div class="skeleton" style="height: 42px; width: 120px; border-radius: 10px;"></div>
+                        <div class="skeleton" style="height: 42px; width: 150px; border-radius: 10px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 export function createPengaturanPageSkeletonHTML() {
     const profileSkeleton = `
         <div class="profile-card-settings card skeleton-wrapper" style="gap: 1rem; padding: 1.25rem; align-items: center;">
@@ -810,6 +911,14 @@ export const _getSkeletonLoaderHTML = (type = 'page') => {
             return createSalaryBillDetailSkeletonHTML();
         case 'detail-pemasukan':
             return createPemasukanDetailSkeletonHTML();
+            case 'file_storage':
+                return _createDataRepositoryPageSkeletonHTML('Database File Storage');
+            case 'hrd_applicants':
+                return _createDataRepositoryPageSkeletonHTML('Database Pelamar HRD');
+            case 'file_storage_form':
+                return _createDataRepositoryFormSkeletonHTML('Input File Storage');
+            case 'hrd_applicants_form':
+                return _createDataRepositoryFormSkeletonHTML('Input Pelamar HRD');    
 
         // --- FALLBACK ---
         case 'page':

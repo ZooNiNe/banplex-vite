@@ -36,6 +36,7 @@ android/
 
 # File server pengembangan lokal (Opsional, ini sudah benar)
 dev-server.js
+firestore.rules.md
 
 # 
 # -------------------------------------------------------------------

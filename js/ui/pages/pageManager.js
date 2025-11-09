@@ -35,7 +35,7 @@ async function renderPageContent() {
 
     container.className = 'page-container';
 
-    if (['tagihan', 'pemasukan', 'jurnal', 'stok', 'pengeluaran', 'recycle_bin', 'log_aktivitas', 'absensi', 'pemasukan_form'].includes(activePage)) {
+    if (['tagihan', 'pemasukan', 'jurnal', 'stok', 'pengeluaran', 'recycle_bin', 'log_aktivitas', 'absensi', 'pemasukan_form', 'file_storage_form', 'hrd_applicants', 'hrd_applicants_form'].includes(activePage)) {
         container.classList.add('page-container--has-panel');
     }
 
@@ -103,10 +103,26 @@ async function renderPageContent() {
                  initFunctionName = 'initRecycleBinPage';
                  pageModule = await import('./recycleBin.js');
                  break;
-                 case 'master_data':
-                    initFunctionName = 'initMasterDataPage';
-                    pageModule = await import('./master_data.js');
-                    break;    
+            case 'master_data':
+                initFunctionName = 'initMasterDataPage';
+                pageModule = await import('./master_data.js');
+                break;    
+            case 'file_storage':
+                initFunctionName = 'initFileStoragePage';
+                pageModule = await import('./file_storage.js');
+                break;
+            case 'file_storage_form':
+                initFunctionName = 'initFileStorageFormPage';
+                pageModule = await import('./file_storage_form.js');
+                break;
+            case 'hrd_applicants':
+                initFunctionName = 'initHrdApplicantsPage';
+                pageModule = await import('./hrd_applicants.js');
+                break;
+            case 'hrd_applicants_form':
+                initFunctionName = 'initHrdApplicantsFormPage';
+                pageModule = await import('./hrd_applicants_form.js');
+                break;
             default:
                 emit('ui.transitionContent', container, getEmptyStateHTML({ icon: 'error', title: 'Halaman Tidak Ditemukan', desc: 'Halaman yang diminta tidak valid.', illustration: 'lost' }));
                 if (activePage !== 'absensi') { restorePageFab(); }

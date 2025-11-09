@@ -10,6 +10,10 @@ export const ALL_NAV_LINKS = [
     { id: 'stok', icon: 'inventory_2', label: 'Stok', roles: ['Owner', 'Editor', 'Viewer'] },
     { id: 'tagihan', icon: 'receipt_long', label: 'Tagihan', roles: ['Owner', 'Editor', 'Viewer'] },
     { id: 'laporan', icon: 'monitoring', label: 'Laporan', roles: ['Owner', 'Viewer', 'Editor'] },
+    { id: 'file_storage', icon: 'database', label: 'File Storage', roles: ['Owner', 'Editor'] },
+    { id: 'file_storage_form', icon: 'file_plus', label: 'Input File Storage', roles: ['Owner', 'Editor'] },
+    { id: 'hrd_applicants', icon: 'badge', label: 'Database Pelamar HRD', roles: ['Owner', 'Editor'] },
+    { id: 'hrd_applicants_form', icon: 'how_to_reg', label: 'Input Pelamar HRD', roles: ['Owner', 'Editor'] },
     { id: 'pengaturan', icon: 'settings', label: 'Pengaturan', roles: ['Owner', 'Editor', 'Viewer'] },
 ];
 

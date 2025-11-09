@@ -4,17 +4,84 @@ import { localDB } from "../localDbService.js";
 import { generateUUID } from "../../utils/helpers.js";
 import { requestSync } from "../syncService.js";
 import { queueOutbox } from "../outboxService.js";
+import { triggerNotification } from "../notificationService.js";
 import { _logActivity } from "../logService.js";
 import { doc, setDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { commentsCol } from "../../config/firebase.js";
 
+function sanitizeInlineText(str = '') {
+    return String(str || '')
+        .replace(/[\r\n]+/g, ' ')
+        .replace(/[<>]/g, '')
+        .trim();
+}
 
-/**
- * PERUBAHAN: Menerima 'replyToId' sebagai argumen baru.
- */
+function getCommentTargetInfo(parentId, parentType) {
+    const type = (parentType || '').toLowerCase();
+    let label = 'item';
+    let name = '';
+
+    if (type === 'bill') {
+        const bill = (appState.bills || []).find(b => b.id === parentId);
+        label = 'tagihan';
+        name = bill?.description || '';
+    } else if (type === 'expense') {
+        const expense = (appState.expenses || []).find(e => e.id === parentId);
+        label = 'pengeluaran';
+        name = expense?.description || '';
+    } else if (type === 'loan' || type === 'funding_source') {
+        const loan = (appState.fundingSources || []).find(f => f.id === parentId);
+        label = 'pinjaman';
+        name = loan?.description || loan?.name || '';
+    } else if (type === 'income') {
+        const income = (appState.incomes || []).find(i => i.id === parentId);
+        label = 'pemasukan';
+        name = income?.description || income?.name || '';
+    } else if (type === 'journal') {
+        label = 'jurnal harian';
+        name = '';
+    }
+
+    if (!name && parentId) {
+        name = `#${String(parentId).slice(0, 6)}`;
+    }
+
+    return {
+        label,
+        name: sanitizeInlineText(name)
+    };
+}
+
+function buildCommentNotificationMessage(commentItem) {
+    if (!commentItem || !appState.currentUser) {
+        return '';
+    }
+
+    const { parentId, parentType } = commentItem;
+    if (!parentId || !parentType) {
+        return '';
+    }
+
+    const { label, name } = getCommentTargetInfo(parentId, parentType);
+    const snippetSource = sanitizeInlineText(commentItem.content || '');
+    const snippet = snippetSource.length > 100 ? `${snippetSource.slice(0, 97)}…` : snippetSource;
+
+    let message = `${appState.currentUser.displayName} mengomentari ${label}${name ? ` ${name}` : ''}`;
+
+    if (snippet) {
+        message += `: "${snippet}"`;
+    } else if (commentItem.attachments) {
+        message += ' dan menyertakan lampiran.';
+    } else {
+        message += '.';
+    }
+
+    return message;
+}
+
+
 export async function handlePostComment(dataset, attachmentData = null, replyToId = null) {
     let item;
-    // PERUBAHAN: Dapatkan elemen dari container yang lebih spesifik, jangan global
     const composer = document.querySelector('.composer-wrapper:not(.modal-footer .composer-wrapper) footer.composer, .modal-footer footer.composer');
     const ta = composer ? composer.querySelector('textarea') : null;
     const sendButton = composer ? composer.querySelector('.chat-send-btn') : null;
@@ -71,6 +138,15 @@ export async function handlePostComment(dataset, attachmentData = null, replyToI
         
         // Minta sinkronisasi
         requestSync({ silent: true });
+
+        try {
+            const notificationMessage = buildCommentNotificationMessage(item);
+            if (notificationMessage) {
+                triggerNotification(notificationMessage, appState.currentUser.displayName, 'comment');
+            }
+        } catch (notifyErr) {
+            console.warn('Gagal memicu notifikasi komentar:', notifyErr);
+        }
 
 
         // Reset composer UI

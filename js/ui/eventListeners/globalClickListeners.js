@@ -12,9 +12,12 @@ let pointerStartY = 0;
 let _suppressClickUntil = 0;
 let isLongPress = false;
 let longPressTimer = null;
+let __globalClicksInitialized = false;
 
 
 export function initializeGlobalClickListeners() {
+    if (__globalClicksInitialized) return;
+    __globalClicksInitialized = true;
 
 
     document.body.addEventListener('contextmenu', (e) => {

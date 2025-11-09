@@ -1,6 +1,6 @@
 import { GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
 import { doc, getDoc, setDoc, onSnapshot, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
-import { auth, membersCol } from "../config/firebase.js";
+import { auth, db, membersCol } from "../config/firebase.js";
 import { OWNER_EMAIL } from "../config/constants.js";
 import { appState } from "../state/appState.js";
 import { localDB, loadAllLocalDataToState, _verifyDataIntegrity } from "./localDbService.js";
@@ -42,7 +42,12 @@ async function handleLogout() {
 
         await signOut(auth);
         toast('success', 'Anda telah keluar.');
-        renderUI(); // Render UI guest setelah logout
+        try { window.appState?.clearUser?.(); } catch (_) { appState.currentUser = null; }
+        if (window.router?.navigateTo) {
+            window.router.navigateTo('/auth');
+        } else {
+            renderUI();
+        }
     } catch (error) {
         toast('error', `Gagal keluar.`);
     }
@@ -56,8 +61,36 @@ function updateLoadingMessage(message) {
     }
 }
 
+function setUserOnState(user) {
+    if (typeof appState.setUser === 'function') {
+        appState.setUser(user);
+    } else {
+        appState.currentUser = user;
+    }
+}
+
+async function assignUserRoleFromProfile(user) {
+    if (!user || !user.uid) return null;
+    try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        const role = userDocSnap.exists() ? userDocSnap.data().role || null : null;
+        if (role) {
+            user.role = role;
+        } else if ('role' in user) {
+            delete user.role;
+        }
+        setUserOnState(user);
+        return role;
+    } catch (error) {
+        console.warn('[Auth] Failed to fetch user role from /users collection.', error);
+        return null;
+    }
+}
+
 async function initializeAppSession(user) {
-    appState.currentUser = user;
+    setUserOnState(user);
+    await assignUserRoleFromProfile(user);
     const userDocRef = doc(membersCol, user.uid);
     try {
         updateLoadingMessage('Memeriksa profil pengguna...'); // Update pesan
@@ -80,17 +113,16 @@ async function initializeAppSession(user) {
         listenForNotifications();
         const createdAt = userData.createdAt ? getJSDate(userData.createdAt) : new Date();
         const isNewUser = (new Date() - createdAt) < 5 * 60 * 1000;
-
-        // Tampilkan modal Welcome hanya saat user pertama kali memasuki UI utama (status active)
-        const maybeShowWelcome = () => {
+        
+        // Selalu tampilkan modal Welcome saat sesi aplikasi dimulai
+        setTimeout(() => {
             try {
-                if (appState.userStatus !== 'active') return;
-                const key = `welcomeShown:${user.uid}`;
-                if (localStorage.getItem(key) === '1') return;
-                emit('ui.modal.create', 'welcomeOnboarding', { userName: userData.name, isNewUser });
-                localStorage.setItem(key, '1');
+                emit('ui.modal.create', 'welcomeOnboarding', {
+                    userName: userData.name,
+                    isNewUser: isNewUser
+                });
             } catch(_) {}
-        };
+        }, 900);
 
         updateLoadingMessage('Memastikan data master...'); // Update pesan
         await ensureMasterDataFresh(['projects', 'workers', 'professions', 'suppliers', 'materials']); // Muat master data penting di awal
@@ -165,18 +197,14 @@ async function initializeAppSession(user) {
 
         // Navigasi ke halaman terakhir SETELAH semua siap
         navigate(appState.activePage);
-        // Setelah navigasi pertama dan UI aktif, coba tampilkan welcome jika relevan
-        setTimeout(maybeShowWelcome, 800);
 
-    } catch (error) {
-        console.error("Gagal inisialisasi sesi:", error);
-        toast('error', 'Gagal memuat profil. Menggunakan mode terbatas.');
-        // Tetap emit ready dan render UI dasar meskipun error
-        emit('app.ready');
-        renderUI();
+
+    } catch (error) {
+            console.error("Gagal inisialisasi sesi:", error);
+            throw error; 
+        }
     }
-}
-
+    
 function attachRoleListener(userDocRef) {
     onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
@@ -191,18 +219,6 @@ function attachRoleListener(userDocRef) {
                     userStatus: status
                 });
                 renderUI(); // Render ulang UI jika role/status berubah
-                // Jika status berubah menjadi active, tampilkan welcome bila belum pernah
-                try {
-                    const user = auth.currentUser;
-                    if (user && status === 'active') {
-                        const key = `welcomeShown:${user.uid}`;
-                        if (localStorage.getItem(key) !== '1') {
-                            const name = appState.currentUser?.displayName || 'Pengguna';
-                            emit('ui.modal.create', 'welcomeOnboarding', { userName: name, isNewUser: false });
-                            localStorage.setItem(key, '1');
-                        }
-                    }
-                } catch(_) {}
             }
         }
     });

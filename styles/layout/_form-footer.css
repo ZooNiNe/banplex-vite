@@ -14,9 +14,6 @@
 .form-footer-actions:has(.btn:only-child) {
   grid-template-columns: 1fr;
 }
-.form-footer-actions:has(.btn:nth-child(3):last-child) {
-    grid-template-columns: 1fr 1fr 1fr;
-}
 .form-footer-actions .btn {
   width: 100%;
   justify-content: center;
@@ -33,6 +30,20 @@
 .form-footer-actions .btn:first-child:not(.btn-primary):hover {
     background-color: var(--surface-muted);
     color: var(--text);
+}
+
+.form-footer-actions.form-footer-actions--balanced {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.form-footer-actions.form-footer-actions--balanced .btn {
+  width: 100%;
+}
+
+.form-footer-actions.form-footer-actions--balanced .btn[data-span="full"] {
+  grid-column: 1 / -1;
 }
 
 

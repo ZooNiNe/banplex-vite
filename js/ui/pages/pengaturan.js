@@ -118,5 +118,10 @@ function proceedTabSwitch(tabsContainer, tabButton, newTabId) {
 }
 
 
-on('ui.pengaturan.renderContent', renderPengaturanContent);
+
+function renderPengaturanSection() {
+    renderPengaturanContent();
+}
+
+on('ui.pengaturan.renderContent', renderPengaturanSection);
 export { initPengaturanPage };

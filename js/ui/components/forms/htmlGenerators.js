@@ -46,7 +46,6 @@ export function _createFormGroupHTML(id, labelText, inputHTML) {
 }
 
 export function getFormPengeluaranHTML(type, categoryOptions, categoryMasterType, categoryLabel, supplierOptions, projectOptions, itemData = null) {
-    // ... (logika fungsi tidak berubah) ...
     const isEdit = !!itemData;
     const formId = isEdit ? 'edit-item-form' : 'pengeluaran-form';
     const formActionAttrs = isEdit
@@ -128,7 +127,7 @@ export function getFormPengeluaranHTML(type, categoryOptions, categoryMasterType
         </form>
     `;
 
-    return `<div class="card card-pad">${heroHTML}${formContent}</div>`;
+    return `<div class="form-card accent-pink">${heroHTML}${formContent}</div>`;
 }
 
 
@@ -293,7 +292,7 @@ export function getFormPemasukanHTML(type, itemData = null) {
         `;
     }
 
-    return `<div class="card card-pad desktop-form-layout">${formHTML}</div>`;
+    return `<div class="form-card accent-amber">${formHTML}</div>`;
 }
 
 export function getFormFakturMaterialHTML(itemData = null, options = {}) {
@@ -475,7 +474,7 @@ export function getFormFakturMaterialHTML(itemData = null, options = {}) {
     </div>`;
 
     return `
-    <div class="card card-pad" style="padding-top: 1.5rem;">
+    <div class="form-card accent-purple">
         ${heroHTML_Material}
         ${formContent}
     </div>
@@ -600,8 +599,6 @@ export async function getMasterDataFormHTML(type, itemData = null) {
                     <label for="salary">Gaji Bulanan</label>
                     <input type="text" id="salary" name="salary" inputmode="numeric" value="${isEdit && itemData.salary ? new Intl.NumberFormat('id-ID').format(itemData.salary) : ''}" placeholder="Contoh: 5.000.000">
                 </div>
-                
-                // ... (sisa field 'staff' tidak berubah) ...
                 <div class="form-group staff-payment-field staff-fee-group" style="display:none;">
                     <label for="feePercentage">Persentase Fee (%)</label>
                     <input type="number" id="feePercentage" name="feePercentage" step="0.1" value="${isEdit ? (itemData.feePercentage || '') : ''}" placeholder="Contoh: 2.5">
@@ -651,7 +648,7 @@ export async function getMasterDataFormHTML(type, itemData = null) {
         </div>`;
 
     return `
-        <div class="card card-pad">
+        <div class="form-card accent-green">
             ${heroHTML_Master}
             <form id="${formId}" data-action="${formAction}" data-type="${type}" ${isEdit ? `data-id="${itemData.id}"` : ''}>
                 ${fieldsHTML}

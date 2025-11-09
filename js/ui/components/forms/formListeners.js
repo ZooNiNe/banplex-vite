@@ -436,6 +436,26 @@ export function initializeFormListeners() {
         } catch (e) { console.error(e); }
     });
 
+    // Hapus pengaturan upah proyek pada ringkasan di form pekerja
+    on('ui.form.removeWorkerWage', ({ target } = {}) => {
+        try {
+            const form = (target && target.closest && target.closest('form#master-data-form[data-type="workers"]')) || document.querySelector('form#master-data-form[data-type="workers"]');
+            if (!form) return;
+            const list = form.querySelector('#worker-wages-summary-list');
+            if (!list) return;
+            const item = target && target.closest ? target.closest('.worker-wage-summary-item') : null;
+            if (item) {
+                item.remove();
+                // Jika kosong, tampilkan placeholder kosong
+                if (!list.querySelector('.worker-wage-summary-item')) {
+                    const emptyHTML = '<p class="empty-state-small empty-state-small--left">Belum ada pengaturan upah.</p>';
+                    list.innerHTML = emptyHTML;
+                }
+                markFormDirty(true);
+            }
+        } catch (e) { console.error(e); }
+    });
+
     on('ui.form.addRoleWageRow', ({ target } = {}) => {
         try {
             const context = (target && target.closest && target.closest('.modal-bg, .detail-pane')) || document;

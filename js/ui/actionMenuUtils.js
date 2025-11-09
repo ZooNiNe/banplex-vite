@@ -5,7 +5,7 @@ import { masterDataConfig } from "../config/constants.js";
 import { isViewer, getLocalDayBounds, parseLocalDate } from "../utils/helpers.js";
 import { getRecycleBinHeaderOverflowActions } from "./pages/recycleBin.js";
 import { attachMenuActionListeners, attachBottomSheetActionListeners } from "./eventListeners/dynamicElementListeners.js";
-import { createModal } from "./components/modal.js";
+import { createModal, closeModalImmediate } from "./components/modal.js";
 import { fmtIDR } from "../utils/formatters.js";
 
 function createIcon(iconName, size = 20, classes = '') {
@@ -153,8 +153,7 @@ export function getItemActions(context) {
                     if (parentId) {
                         const allComments = appState.comments || [];
                         const unreadCount = getUnreadCommentCount(parentId, allComments.filter(c => c.parentType === parentType && c.parentId === parentId));
-                        const label = (unreadCount > 0) ? `Komentar (${unreadCount})` : 'Komentar';
-                        baseActions.push({ label: label, action: 'open-comments-view', icon: 'forum', parentId: parentId, parentType: parentType, unreadCount: unreadCount });
+                        baseActions.push({ label: 'Komentar', action: 'open-comments-view', icon: 'forum', parentId: parentId, parentType: parentType, unreadCount });
                     }
                     // ---
                     
@@ -262,19 +261,20 @@ export function getItemActions(context) {
             { icon: 'restore_from_trash', label: 'Pulihkan', action: 'restore-item', table: table },
             { icon: 'delete_forever', label: 'Hapus Permanen', action: 'delete-permanent-item', table: table, isDanger: true }
         ];
-    } else if (page === 'master') {
+    } else if (page === 'master' || page === 'master_data') {
         const itemType = context.type || context.table;
+        const itemId = context.itemId || context['item-id'];
         const editorRestricted = (appState.userRole === 'Editor' && (itemType === 'projects' || itemType === 'staff'));
         const configExists = itemType && typeof itemType === 'string' && masterDataConfig.hasOwnProperty(itemType);
 
         if (configExists) {
             if (!isViewer() && !editorRestricted) {
                 baseActions = [
-                    { icon: 'edit', label: 'Edit', action: 'edit-master-item', type: itemType },
-                    { icon: 'delete', label: 'Hapus', action: 'delete-master-item', type: itemType, isDanger: true }
+                    { icon: 'edit', label: 'Edit', action: 'edit-master-item', type: itemType, itemId },
+                    { icon: 'delete', label: 'Hapus', action: 'delete-master-item', type: itemType, itemId, isDanger: true }
                 ];
             } else { 
-                 baseActions.push({ icon: 'visibility', label: 'Lihat Detail', action: 'edit-master-item', type: itemType });
+                 baseActions.push({ icon: 'visibility', label: 'Lihat Detail', action: 'edit-master-item', type: itemType, itemId });
             }
         } else {
              console.warn(`[getItemActions] Konfigurasi master data tidak ditemukan untuk tipe: ${itemType}`);
@@ -375,11 +375,20 @@ function _createDataAttributes(dataObject) {
 export function displayActions(actions, targetElement, clickCoords = null) {
     if (!actions || actions.length === 0) return;
 
-    const menuItemsHTML = actions.map(a => `
+    const menuItemsHTML = actions.map(a => {
+        const unreadCount = Number(a.unreadCount ?? a['unread-count'] ?? 0);
+        const badgeHTML = unreadCount > 0
+            ? `<span class="notification-badge">${unreadCount > 99 ? '99+' : unreadCount}</span>`
+            : '';
+        return `
         <button class="actions-menu-item ${a.isDanger ? 'danger' : ''}" data-action="${a.action}" ${_createDataAttributes(a)}>
-            ${createIcon(a.icon, 20)}
-            <span>${a.label}</span>
-        </button>`).join('');
+            <span class="actions-menu-item-main">
+                ${a.icon ? createIcon(a.icon, 20) : ''}
+                <span>${a.label}</span>
+            </span>
+            ${badgeHTML}
+        </button>`;
+    }).join('');
 
     document.querySelectorAll('.actions-menu').forEach(m => m.remove());
     const menu = document.createElement('div');
@@ -444,14 +453,23 @@ export function displayActions(actions, targetElement, clickCoords = null) {
 }
 
 
-export function displayBottomSheetActions(actions, context, targetElement) {
+export function displayBottomSheetActions(actions, context = {}, targetElement) {
     if (!actions || actions.length === 0) return;
 
-    const itemsHTML = actions.map(a => `
+    const itemsHTML = actions.map(a => {
+        const unreadCount = Number(a.unreadCount ?? a['unread-count'] ?? 0);
+        const badgeHTML = unreadCount > 0
+            ? `<span class="notification-badge">${unreadCount > 99 ? '99+' : unreadCount}</span>`
+            : '';
+        return `
         <button class="actions-menu-item ${a.isDanger ? 'danger' : ''}" data-action="${a.action}" ${_createDataAttributes(a)}>
-            ${createIcon(a.icon, 20)}
-            <span>${a.label}</span>
-        </button>`).join('');
+            <span class="actions-menu-item-main">
+                ${a.icon ? createIcon(a.icon, 20) : ''}
+                <span>${a.label}</span>
+            </span>
+            ${badgeHTML}
+        </button>`;
+    }).join('');
 
     const bottomSheetContent = `<div class="actions-modal-list">${itemsHTML}</div>`;
 
@@ -465,9 +483,15 @@ export function displayBottomSheetActions(actions, context, targetElement) {
         setTimeout(() => {
             attachBottomSheetActionListeners(modal);
         }, 0);
+        const cancelButton = modal.querySelector('[data-role="action-sheet-cancel"]');
+        if (cancelButton) {
+            cancelButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                closeModalImmediate(modal);
+            }, { once: true });
+        }
     }
 }
-
 
 export function resolveActionContext(clickedElement) {
     let actionTarget = null;

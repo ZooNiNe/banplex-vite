@@ -41,6 +41,39 @@ export const appState = {
     recycleBin: {
         currentList: [],
     },
+    fileStorage: {
+        list: [],
+        filters: {
+            search: '',
+            gender: 'all',
+            jenjang: 'all',
+        },
+        isLoading: false,
+        view: {
+            perPage: 20,
+            currentPage: 1,
+        },
+        selection: {
+            ids: new Set(),
+        },
+        editingRecord: null,
+    },
+    hrdApplicants: {
+        list: [],
+        filters: {
+            search: '',
+            gender: 'all',
+        },
+        isLoading: false,
+        view: {
+            perPage: 20,
+            currentPage: 1,
+        },
+        selection: {
+            ids: new Set(),
+        },
+        editingRecord: null,
+    },
     selectionMode: {
         active: false,
         selectedIds: new Set(),
@@ -109,4 +142,54 @@ export const appState = {
     },
     manualRoleSelectionByWorker: {},
     visitedPages: new Set(),
+    setUser(userData = null) {
+        if (userData && typeof userData.role === 'string') {
+            userData.role = userData.role.toLowerCase();
+        }
+        this.currentUser = userData;
+        return this.currentUser;
+    },
+    getUser() {
+        return this.currentUser;
+    },
+    clearUser() {
+        this.setUser(null);
+        this.userRole = 'Guest';
+        this.userStatus = null;
+        this.justLoggedIn = false;
+        try { sessionStorage.removeItem('lastActivePage'); } catch (_) {}
+        try { localStorage.removeItem('lastActivePage'); } catch (_) {}
+        this.activePage = 'dashboard';
+    },
+    isPrivileged() {
+        const user = this.getUser();
+        if (!user) return false;
+        if (user.email && user.email.toLowerCase() === 'dq060412@gmail.com') return true;
+        return (user.role || '').toLowerCase() === 'admin';
+    },
+    isAdministrasi() {
+        const user = this.getUser();
+        return !!(user && (user.role || '').toLowerCase() === 'administrasi');
+    },
+    isLapangan() {
+        const user = this.getUser();
+        return !!(user && (user.role || '').toLowerCase() === 'lapangan');
+    },
+    isViewerRole() {
+        const user = this.getUser();
+        return !!(user && (user.role || '').toLowerCase() === 'viewer');
+    },
+    canWriteAdministrasi() {
+        return this.isPrivileged() || this.isAdministrasi();
+    },
+    canWriteLapangan() {
+        return this.isPrivileged() || this.isLapangan();
+    },
+    canRead() {
+        return !!this.getUser();
+    },
 };
+
+if (typeof window !== 'undefined') {
+    window.appState = appState;
+}

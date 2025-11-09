@@ -110,10 +110,9 @@
   padding: 1.25rem;
   flex-grow: 1;
   min-height: 0;
-  overflow: hidden; 
   display: flex;
   flex-direction: column;
-  overscroll-behavior: contain; /* <--- TAMBAHKAN INI */
+  overscroll-behavior: contain;
 }
 
 
@@ -244,6 +243,40 @@
   overflow-y: auto;
   flex-grow: 1;
   min-height: 0;
+}
+
+/* --- Full Screen Modal Variant --- */
+.modal-bg.modal-full-screen {
+  align-items: stretch;
+  padding: 0;
+}
+
+.modal-bg.modal-full-screen .modal-content {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
+}
+
+.modal-body.admin-modal-body {
+  padding: 0;
+  background: var(--panel);
+}
+
+.modal-footer.sticky-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  z-index: 2;
+}
+
+.modal-footer.sticky-footer .btn {
+  flex: 1;
 }
 
 

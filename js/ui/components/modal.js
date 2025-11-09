@@ -4,7 +4,6 @@ import { attachModalEventListeners } from "./modalEventListeners.js";
 import { appState } from "../../state/appState.js";
 import { restorePageFab } from "../pages/pageManager.js";
 import { initCustomSelects, formatNumberInput } from "./forms/index.js";
-// PERUBAHAN: Impor setCommentsScope
 import { setCommentsScope } from "../../services/syncService.js";
 import { getEmptyStateHTML } from "./emptyState.js";
 import { emit } from "../../state/eventBus.js";

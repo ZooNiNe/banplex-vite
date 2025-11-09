@@ -57,9 +57,13 @@ function getModalLayout(type, data = {}) {
                  }
             }
             
-            // PERBAIKAN: Bungkus data.message dengan <p>
             const content = `<p class="confirm-modal-text">${data.message || 'Apakah Anda yakin?'}</p>${extraContent}`;
-            const footer = `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary" data-default-status="${defaultStatus}">Ya, Lanjutkan</button>`;
+            const cancelLabel = data.cancelLabel || 'Batal';
+            const confirmLabel = data.confirmLabel || 'Ya, Lanjutkan';
+            const cancelClass = data.cancelClass || 'btn btn-ghost';
+            const confirmClass = data.confirmClass || 'btn btn-primary';
+            const defaultFooter = `<button type="button" class="${cancelClass}" data-action="close-modal">${cancelLabel}</button><button type="button" id="confirm-btn" class="${confirmClass}" data-default-status="${defaultStatus}">${confirmLabel}</button>`;
+            const footer = data.footer || defaultFooter;
             return _getSimpleDialogHTML(data.title || 'Konfirmasi Aksi', content, footer);
         },
         'confirmDeleteAttachment': () => _getSimpleDialogHTML('Hapus Lampiran', `<p class="confirm-modal-text">${data.message || 'Anda yakin ingin menghapus lampiran ini?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-danger">Ya, Hapus</button>`),
@@ -86,13 +90,28 @@ function getModalLayout(type, data = {}) {
                 : _getSimpleDialogHTML('Pilih Sumber Lampiran', body, '');
             return { layoutClass: isMobile ? 'is-bottom-sheet' : 'is-simple-dialog', contentHTML };
         },
-        'dataDetail': () => _getModalWithHeader(data.title, data.content, data.footer),
+        'formView': () => {
+            const dialog = _getModalWithHeader(data.title, data.content, data.footer);
+            dialog.layoutClass = [dialog.layoutClass, data.layoutClass].filter(Boolean).join(' ').trim();
+            return dialog;
+        },
+        'dataDetail': () => {
+            const dialog = _getModalWithHeader(data.title, data.content, data.footer);
+            dialog.layoutClass = [dialog.layoutClass, data.layoutClass].filter(Boolean).join(' ').trim();
+            return dialog;
+        },
+        'dataBottomSheet': () => {
+            const body = data.content || '';
+            const footer = data.footer || '';
+            const contentHTML = _getBottomSheetContent(data.title || '', body, footer);
+            return { layoutClass: 'is-bottom-sheet', contentHTML };
+        },
         'payment': () => _getModalWithHeader(data.title, data.content, data.footer),
-        'formView': () => _getModalWithHeader(data.title, data.content, data.footer),
         'imageView': () => _getImageViewerHTML(data.src),
         'invoiceItemsDetail': () => _getInvoiceItemsDetailHTML(data),
         'welcomeOnboarding': () => _getWelcomeOnboardingHTML(data),
-        'actionsMenu': () => ({ layoutClass: 'is-actions-menu', contentHTML: data.content })
+        'actionsMenu': () => ({ layoutClass: 'is-actions-menu', contentHTML: data.content }),
+        'infoSheet': () => _getInfoSheetContent(data)
     };
 
     const generator = contentGenerators[type] || (() => ({ layoutClass: 'is-simple-dialog', contentHTML: 'Konten tidak ditemukan' }));
@@ -229,6 +248,31 @@ function _getWelcomeOnboardingHTML(data = {}) {
     const dialog = _getSimpleDialogHTML('', contentHTML, footerHTML);
     dialog.layoutClass = 'is-simple-dialog is-welcome-modal'; 
     return dialog;
+}
+
+function _getInfoSheetContent(options) {
+    const content = options.message || '<p>Konten tidak ditemukan.</p>';
+    
+    return {
+        layoutClass: `is-info-sheet ${options.modalClass || 'modal-large'}`,
+        contentHTML: `
+            <div class="modal-header">
+                <h2 class="modal-title">${options.title || 'Informasi'}</h2>
+                <button type="button" class="btn-icon btn-icon--close" data-action="closeModal" aria-label="Tutup modal">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body-scroller">
+                ${content}
+            </div>
+            <div class="modal-footer">
+                ${options.footer || '<button type="button" class="btn btn-primary" data-action="closeModal">Tutup</button>'}
+            </div>
+        `
+    };
 }
 
 export { getModalLayout };

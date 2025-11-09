@@ -769,13 +769,6 @@ function initAbsensiPage() {
         fabContainer.addEventListener('click', handleFabClick, { signal: listenerSignal });
     }
 
-    on('ui.modal.showAttendanceFilter', (onApplyCallback) => {
-        emit('ui.modal.showAttendanceFilterModal', onApplyCallback);
-    }, { signal: listenerSignal });
-    on('ui.modal.showAttendanceSort', (onApplyCallback) => {
-        emit('ui.modal.showAttendanceSortModal', onApplyCallback);
-    }, { signal: listenerSignal });
-    
     renderAbsensiView(initialView, { skipData: false });
 
     const globalSelectionBar = document.getElementById('selection-bar');
@@ -800,8 +793,6 @@ function initAbsensiPage() {
 
         off('app.unload.absensi', cleanupAbsensi);
         off('ui.absensi.renderContent', renderAbsensiPageContent);
-        off('ui.modal.showAttendanceFilter');
-        off('ui.modal.showAttendanceSort');
         off('ui.absensi.renderManualForm');
         off('ui.absensi.updateFooter');
     };
@@ -829,4 +820,3 @@ function handleFabClick(e) {
 }
 
 export { initAbsensiPage };
-

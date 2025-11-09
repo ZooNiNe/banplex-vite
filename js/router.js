@@ -14,10 +14,71 @@ import {
 } from './ui/components/modal.js';
 import { emit, on } from './state/eventBus.js';
 
+const ROUTES = [
+    { path: '/dashboard', page: 'dashboard', title: 'Dashboard', authRequired: true },
+    { path: '/auth', page: 'auth', title: 'Masuk', authRequired: false },
+];
+const ROUTE_BY_PAGE = ROUTES.reduce((acc, route) => {
+    acc[route.page] = route;
+    return acc;
+}, {});
+
+const ROUTE_BY_PATH = ROUTES.reduce((acc, route) => {
+    acc[route.path] = route;
+    acc[`#${route.page}`] = route;
+    return acc;
+}, {});
+
+function getCurrentUser() {
+    try {
+        const globalState = typeof window !== 'undefined' ? window.appState : null;
+        if (globalState && typeof globalState.getUser === 'function') {
+            return globalState.getUser();
+        }
+    } catch (_) {}
+    return appState.currentUser;
+}
+
+function requiresAuth(route) {
+    if (!route) return true;
+    return route.authRequired !== false;
+}
+
+function ensureRouteAccess(route) {
+    if (!requiresAuth(route)) return true;
+    const user = getCurrentUser();
+    if (!user) {
+        if (route?.page !== 'auth') {
+            navigate('/auth');
+        }
+        return false;
+    }
+    if (route?.adminRequired === true && !(window.appState?.isPrivileged?.())) {
+        try {
+            window.router?.navigateTo?.('/dashboard');
+        } catch (_) {
+            navigate('/dashboard');
+        }
+        return false;
+    }
+    return true;
+}
+
+function resolveRoute(target) {
+    if (!target) return null;
+    if (typeof target === 'object' && target.page) return target;
+    if (ROUTE_BY_PAGE[target]) return ROUTE_BY_PAGE[target];
+    if (ROUTE_BY_PATH[target]) return ROUTE_BY_PATH[target];
+    const normalized = typeof target === 'string' ? target.replace(/^#/, '') : target;
+    return ROUTE_BY_PAGE[normalized] || { page: normalized };
+}
+
 let popstateController = null;
 
 function navigate(nav) {
-  handleNavigation(nav);
+  const route = resolveRoute(nav);
+  if (!ensureRouteAccess(route)) return;
+  handleNavigation(route?.page || nav, { route });
 }
 
 function cleanupPopstateListener() {
@@ -119,6 +180,10 @@ function handlePopstateEvent(e) {
     // 4. Jika tidak ada overlay, baru tangani navigasi halaman
     const state = e.state || {};
     const targetPage = state.page || 'dashboard';
+    const targetRoute = resolveRoute(targetPage);
+    if (!ensureRouteAccess(targetRoute)) {
+        return;
+    }
 
     // Logika khusus saat meninggalkan halaman absensi
     if (appState.activePage === 'absensi' && targetPage !== 'absensi') {
@@ -140,8 +205,8 @@ function handlePopstateEvent(e) {
     // Panggil logika render ulang secara langsung, JANGAN panggil handleNavigation.
     // handleNavigation adalah untuk *membuat* navigasi baru (dan pushState).
     // Kita *merespon* state yang sudah diubah oleh browser.
-    if (appState.activePage !== targetPage) { 
-        console.log(`[Popstate] Navigasi halaman: ${appState.activePage} -> ${targetPage}`);
+        if (appState.activePage !== targetPage) { 
+            console.log(`[Popstate] Navigasi halaman: ${appState.activePage} -> ${targetPage}`);
         
         // --- AWAL BLOK YANG DIPINDAHKAN DARI 'proceedNavigation' ---
         const oldPage = appState.activePage;
@@ -180,14 +245,11 @@ function initRouter() {
         console.log("[Router] Router sudah diinisialisasi, membersihkan listener lama.");
         cleanupPopstateListener();
     }
-    // cleanupPopstateListener(); // Hapus pemanggilan ganda dari sini
 
     window.__banplex_history_init = true;
 
     try {
         if ('replaceState' in history) {
-            // Ganti state saat ini dengan halaman yang aktif
-            // PERBAIKAN: Ini sekarang menjadi "base state" untuk sesi BARU
             console.log(`[Router] Mengatur base history state ke: ${appState.activePage}`);
             history.replaceState({ page: appState.activePage }, '', window.location.href);
         }
@@ -198,12 +260,14 @@ function initRouter() {
     
     window.addEventListener('popstate', handlePopstateEvent, { signal });
 
-    // Hapus listener 'app.unload' lama jika ada, karena 'auth.loggedOut' lebih spesifik
-    // on('app.unload', cleanupPopstateListener); // Ganti ini
 }
 
-// PERBAIKAN: Ganti listener 'auth.loggedOut'
-// on('auth.loggedOut', cleanupPopstateListener); // <-- Hapus ini
 on('auth.loggedOut', resetHistoryOnLogout); // <-- Gunakan fungsi reset yang baru
+
+if (typeof window !== 'undefined') {
+    window.router = Object.assign({}, window.router || {}, {
+        navigateTo: navigate,
+    });
+}
 
 export { renderPageContent, navigate, initRouter };

@@ -171,6 +171,86 @@ export async function loadDataForPage(pageId) {
             const notDeletedTransaction = (t) => t.where('isDeleted').notEqual(1).and(item => item.syncState !== 'pending_delete');
             const keepValidDate = (arr, field) => Array.isArray(arr) ? arr.filter(item => !!item[field]) : [];
 
+            const ensureFileStorageSetup = () => {
+                if (!appState.fileStorage) {
+                    appState.fileStorage = {
+                        list: [],
+                        filters: {
+                            search: '',
+                            gender: 'all',
+                            jenjang: 'all',
+                        },
+                        isLoading: false,
+                    };
+                } else {
+                    if (!Array.isArray(appState.fileStorage.list)) {
+                        appState.fileStorage.list = [];
+                    }
+                    appState.fileStorage.filters = {
+                        search: '',
+                        gender: 'all',
+                        jenjang: 'all',
+                        ...(appState.fileStorage.filters || {}),
+                    };
+                    if (typeof appState.fileStorage.isLoading !== 'boolean') {
+                        appState.fileStorage.isLoading = false;
+                    }
+                }
+                results.fileStorage = appState.fileStorage;
+            };
+            const ensureHrdApplicantsSetup = () => {
+                if (!appState.hrdApplicants) {
+                    appState.hrdApplicants = {
+                        list: [],
+                        filters: {
+                            search: '',
+                            gender: 'all',
+                        },
+                        isLoading: false,
+                        view: {
+                            perPage: 20,
+                            currentPage: 1,
+                        },
+                        selection: {
+                            ids: new Set(),
+                        },
+                        editingRecord: null,
+                    };
+                } else {
+                    if (!Array.isArray(appState.hrdApplicants.list)) {
+                        appState.hrdApplicants.list = [];
+                    }
+                    appState.hrdApplicants.filters = {
+                        search: '',
+                        gender: 'all',
+                        ...(appState.hrdApplicants.filters || {}),
+                    };
+                    if (typeof appState.hrdApplicants.isLoading !== 'boolean') {
+                        appState.hrdApplicants.isLoading = false;
+                    }
+                    const allowedPerPage = [20, 50, 100];
+                    if (!appState.hrdApplicants.view) {
+                        appState.hrdApplicants.view = { perPage: 20, currentPage: 1 };
+                    } else {
+                        const perPage = Number(appState.hrdApplicants.view.perPage) || 20;
+                        const currentPage = Number(appState.hrdApplicants.view.currentPage) || 1;
+                        appState.hrdApplicants.view = {
+                            perPage: allowedPerPage.includes(perPage) ? perPage : 20,
+                            currentPage: currentPage > 0 ? currentPage : 1,
+                        };
+                    }
+                    const selection = appState.hrdApplicants.selection || { ids: new Set() };
+                    if (!(selection.ids instanceof Set)) {
+                        selection.ids = new Set(Array.isArray(selection.ids) ? selection.ids : []);
+                    }
+                    appState.hrdApplicants.selection = selection;
+                    if (appState.hrdApplicants.editingRecord && typeof appState.hrdApplicants.editingRecord !== 'object') {
+                        appState.hrdApplicants.editingRecord = null;
+                    }
+                }
+                results.hrdApplicants = appState.hrdApplicants;
+            };
+
             const need = {
                 dashboard: async () => {
                     results.projects = await notDeletedMaster(localDB.projects).toArray();
@@ -249,11 +329,23 @@ export async function loadDataForPage(pageId) {
                 recycle_bin: async () => {},
                 log_aktivitas: async () => {},
                 simulasi: async () => {
-                     results.bills = await keepValidDate(await notDeletedTransaction(localDB.bills).toArray(), 'dueDate');
-                     results.expenses = keepValidDate(await notDeletedTransaction(localDB.expenses).toArray(), 'date');
-                     results.fundingSources = await notDeletedTransaction(localDB.funding_sources).toArray();
-                     results.suppliers = await notDeletedMaster(localDB.suppliers).toArray();
-                     results.fundingCreditors = await notDeletedMaster(localDB.funding_creditors).toArray();
+                      results.bills = await keepValidDate(await notDeletedTransaction(localDB.bills).toArray(), 'dueDate');
+                      results.expenses = keepValidDate(await notDeletedTransaction(localDB.expenses).toArray(), 'date');
+                      results.fundingSources = await notDeletedTransaction(localDB.funding_sources).toArray();
+                      results.suppliers = await notDeletedMaster(localDB.suppliers).toArray();
+                      results.fundingCreditors = await notDeletedMaster(localDB.funding_creditors).toArray();
+                },
+                file_storage: async () => {
+                    ensureFileStorageSetup();
+                },
+                file_storage_form: async () => {
+                    ensureFileStorageSetup();
+                },
+                hrd_applicants: async () => {
+                    ensureHrdApplicantsSetup();
+                },
+                hrd_applicants_form: async () => {
+                    ensureHrdApplicantsSetup();
                 },
             };
 

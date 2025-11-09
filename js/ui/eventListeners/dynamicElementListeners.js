@@ -79,12 +79,12 @@ export function attachMenuActionListeners(menuElement) {
             'download-attachment-confirm'
         ]);
 
-        if (panelOpeningActions.has(actionType)) {
+        if (panelOpeningActions.has(action)) {
             setTimeout(() => {
-                emit(`ui.action.${actionType}`, dataset);
-            }, 100); 
+                emit(`ui.action.${action}`, dataset);
+            }, 100);
         } else {
-            emit(`ui.action.${actionType}`, dataset);
+            emit(`ui.action.${action}`, dataset);
         }
 
     }, { capture: true, signal: controller.signal });

@@ -2,6 +2,7 @@ import { appState } from '../../state/appState.js';
 import { $, $$ } from '../../utils/dom.js';
 import { emit, on } from '../../state/eventBus.js';
 import { getEmptyStateHTML } from '../components/emptyState.js';
+import { getItemActions, displayBottomSheetActions } from '../actionMenuUtils.js';
 import { createUnifiedCard } from '../components/cards.js';
 import { formatDate, fmtIDR } from '../../utils/formatters.js';
 
@@ -201,8 +202,27 @@ function openSearchPage({ target }) {
         if (action === 'close-global-search') {
             closeSearchPage();
         } else if (action === 'open-search-result') {
-            // Only close the global search overlay; do not open any detail directly
+            // Close the overlay, then open the actions bottom sheet for the item
+            const id = actionTarget.dataset.id;
+            const type = actionTarget.dataset.type; // 'bill' or 'expense'
+            const expenseId = actionTarget.dataset.expenseId;
             closeSearchPage();
+            setTimeout(() => {
+                try {
+                    const context = {
+                        id,
+                        itemId: id,
+                        type,
+                        expenseId,
+                        pageContext: 'tagihan',
+                        target: document.body
+                    };
+                    const actions = getItemActions(context) || [];
+                    if (actions.length > 0) {
+                        displayBottomSheetActions(actions, context, document.body);
+                    }
+                } catch(_) {}
+            }, 220);
         }
     });
 }

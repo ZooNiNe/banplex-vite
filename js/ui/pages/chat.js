@@ -1,7 +1,7 @@
 import { appState } from "../../state/appState.js";
 import { $, $$ } from "../../utils/dom.js";
 import { toast, hideToast } from "../components/toast.js";
-import { getJSDate, generateUUID, getUnreadCommentCount } from "../../utils/helpers.js";
+import { getJSDate, generateUUID, getUnreadCommentCount, setLastCommentViewTimestamp } from "../../utils/helpers.js";
 import { _getSkeletonLoaderHTML, createListSkeletonHTML } from "../components/skeleton.js";
 import { getEmptyStateHTML, getEndOfListPlaceholderHTML } from "../components/emptyState.js";
 import { transitionContent } from "../../utils/dom.js";
@@ -172,11 +172,27 @@ function upsertCommentInUI(commentData, changeType, list, replyToId = null) {
 
         if (changeType === 'removed' || commentData.isDeleted) {
             if (existing) {
-                const replyContainer = existing.nextElementSibling;
-                if (replyContainer && replyContainer.classList.contains('comment-replies')) {
-                    replyContainer.remove();
-                }
-                existing.remove();
+                const childRepliesWrapper = existing.nextElementSibling && existing.nextElementSibling.classList?.contains('comment-replies')
+                    ? existing.nextElementSibling
+                    : null;
+                const parentRepliesWrapper = existing.closest('.comment-replies');
+
+                const removeCommentElement = () => {
+                    if (existing.parentNode) {
+                        existing.remove();
+                    }
+                    if (childRepliesWrapper && childRepliesWrapper.parentNode && !childRepliesWrapper.querySelector('.msg-group')) {
+                        childRepliesWrapper.remove();
+                    }
+                    if (parentRepliesWrapper && parentRepliesWrapper.parentNode && !parentRepliesWrapper.querySelector('.msg-group')) {
+                        parentRepliesWrapper.remove();
+                    }
+                };
+
+                existing.classList.remove('msg-anim-sent', 'msg-anim-received');
+                existing.classList.add('item-exiting');
+                existing.addEventListener('animationend', removeCommentElement, { once: true });
+                setTimeout(removeCommentElement, 500);
             }
             return;
         }
@@ -303,16 +319,6 @@ function upsertCommentInUI(commentData, changeType, list, replyToId = null) {
 
     } catch (e) {
         console.error("[upsertCommentInUI] Error besar:", e);
-    }
-}
-
-function _setLastCommentViewTimestamp(parentId) {
-    if (!parentId) return;
-    try {
-      const key = `comment_view_ts_${parentId}`;
-      localStorage.setItem(key, Date.now().toString());
-      emit('ui.dashboard.updateCommentsBadge');
-    } catch (e) {
     }
 }
 
@@ -541,7 +547,7 @@ async function renderCommentsPage(parentId, parentType, append = false, modalEl)
 }
 
 
-export function _initChatViewInteractions(parentId, signal, containerElement) {
+export function _initChatViewInteractions(parentId, parentType, signal, containerElement) {
     if (!containerElement) {
         return;
     }
@@ -562,14 +568,23 @@ export function _initChatViewInteractions(parentId, signal, containerElement) {
     }
 
     setTimeout(() => { thread.scrollTop = 0; }, 100);
-    try { _setLastCommentViewTimestamp(parentId); } catch (_) {}
+    try { setLastCommentViewTimestamp(parentId, { parentType }); } catch (_) {}
 
     const updateComposerState = () => {
-        const val = textarea.value.trim();
+        const rawValue = textarea.value;
+        const trimmedValue = rawValue.trim();
         textarea.style.height = 'auto';
         textarea.style.height = `${textarea.scrollHeight}px`;
         const isEditing = sendBtn.dataset.action === 'post-edit-comment';
-        sendBtn.disabled = !val && !isEditing;
+
+        if (isEditing) {
+            const editPreview = composer.querySelector('#edit-preview-text');
+            if (editPreview) {
+                editPreview.textContent = rawValue;
+            }
+        }
+
+        sendBtn.disabled = !trimmedValue && !isEditing;
     };
 
     textarea.addEventListener('input', updateComposerState, { signal });
@@ -613,6 +628,65 @@ export function _initChatViewInteractions(parentId, signal, containerElement) {
         if (selectedSet.has(id)) { selectedSet.delete(id); groupEl.classList.remove('selected'); }
         else { selectedSet.add(id); groupEl.classList.add('selected'); }
         updateSelectionToolbar();
+    }
+
+    const startEditingComment = (commentIdFromAction) => {
+        if (!commentIdFromAction) return false;
+        const comment = (appState.comments || []).find(c => c.id === commentIdFromAction);
+        if (!comment) {
+            console.warn('[Chat] Edit comment requested but ID tidak ditemukan di appState:', commentIdFromAction);
+            return false;
+        }
+
+        const replyBar = composer.querySelector('#reply-bar');
+        if (replyBar) replyBar.classList.add('hidden');
+
+        const oldEditBar = composer.querySelector('#edit-bar');
+        if (oldEditBar) oldEditBar.remove();
+
+        let bar = composer.querySelector('#edit-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'edit-bar';
+            bar.className = 'reply-bar is-editing';
+            bar.innerHTML = `
+                <div class="rb-strip"></div>
+                <div class="rb-content">
+                    <div class="rb-title">Mengedit</div>
+                    <div class="rb-text" id="edit-preview-text"></div>
+                </div>
+                <button class="btn-icon" data-action="cancel-edit" title="Batal">${createIcon('x', 18)}</button>
+            `;
+            composer.querySelector('.composer-capsule').prepend(bar);
+        }
+
+        const editPreviewText = bar.querySelector('#edit-preview-text');
+        if (editPreviewText) {
+            editPreviewText.textContent = comment.content || '';
+        }
+
+        textarea.value = comment.content || '';
+        textarea.focus();
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+        sendBtn.dataset.action = 'post-edit-comment';
+        sendBtn.dataset.editId = commentIdFromAction;
+        delete sendBtn.dataset.replyToId;
+        sendBtn.disabled = false;
+
+        return true;
+    };
+
+    const globalEditActionHandler = (dataset = {}) => {
+        const targetId = dataset.msgId || dataset.itemId || dataset.commentId || dataset.id;
+        if (!targetId) return;
+        startEditingComment(targetId);
+    };
+    on('ui.action.edit-comment', globalEditActionHandler);
+    if (signal?.addEventListener) {
+        signal.addEventListener('abort', () => off('ui.action.edit-comment', globalEditActionHandler), { once: true });
+    } else {
+        busUnsubs.push(() => off('ui.action.edit-comment', globalEditActionHandler));
     }
 
     thread.addEventListener('click', (e) => {
@@ -847,38 +921,7 @@ export function _initChatViewInteractions(parentId, signal, containerElement) {
             
             case 'edit-comment':
                 {
-                    if (!msgId) break;
-                    const comment = (appState.comments || []).find(c => c.id === msgId);
-                    if (!comment) break;
-                    
-                    const replyBar = composer.querySelector('#reply-bar');
-                    if (replyBar) replyBar.classList.add('hidden');
-                    
-                    const oldEditBar = composer.querySelector('#edit-bar');
-                    if (oldEditBar) oldEditBar.remove();
-
-                    const bar = document.createElement('div');
-                    bar.id = 'edit-bar';
-                    bar.className = 'reply-bar is-editing';
-                    bar.innerHTML = `
-                        <div class="rb-strip"></div>
-                        <div class="rb-content">
-                            <div class="rb-title">Mengedit</div>
-                            <div class="rb-text" id="edit-preview-text">${(comment.content || '').slice(0, 120).replace(/</g, '&lt;')}...</div>
-                        </div>
-                        <button class="btn-icon" data-action="cancel-edit" title="Batal">${createIcon('x', 18)}</button>
-                    `;
-                    composer.querySelector('.composer-capsule').prepend(bar);
-                    
-                    textarea.value = comment.content || '';
-                    textarea.focus();
-                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                    
-                    sendBtn.dataset.action = 'post-edit-comment';
-                    sendBtn.dataset.editId = msgId;
-                    delete sendBtn.dataset.replyToId;
-                    sendBtn.disabled = false;
-                    
+                    startEditingComment(msgId);
                     break;
                 }
             
@@ -1045,7 +1088,7 @@ export async function initChatPage() {
     }
 
     const contentPanel = container.querySelector('.content-panel');
-    _initChatViewInteractions(parentId, signal, contentPanel); 
+    _initChatViewInteractions(parentId, parentType, signal, contentPanel); 
     
     setCommentsScope(parentId, parentType);
 
@@ -1160,7 +1203,7 @@ export async function openCommentsBottomSheet(dataset) {
         toast('error', 'Gagal membuat modal komentar.');
         return;
     }
-    
+
     const detailLink = modalEl.querySelector('.context-action-link[data-action]');
     if (detailLink) {
         detailLink.addEventListener('click', (e) => {
@@ -1182,7 +1225,7 @@ export async function openCommentsBottomSheet(dataset) {
     }
 
     setCommentsScope(parentId, parentType);
-    _initChatViewInteractions(parentId, modalEl.__controller.signal, modalEl); 
+    _initChatViewInteractions(parentId, parentType, modalEl.__controller.signal, modalEl); 
     
     renderCommentsPage(parentId, parentType, false, modalEl);
 

@@ -1,7 +1,7 @@
 import { appState } from "../../state/appState.js";
 import { fmtIDR, formatDate } from "../../utils/formatters.js";
 import { getJSDate, getUnreadCommentCount } from "../../utils/helpers.js";
-import { emit } from "../../state/eventBus.js";
+import { on } from "../../state/eventBus.js";
 
 function createIcon(iconName, size = 16, classes = '') {
     const icons = {
@@ -138,7 +138,7 @@ export function createUnifiedCard({
         
         actionsDisplayHTML = `
             <div class="wa-card-v2__actions">
-                <button class="btn-icon card-more-action" data-action="${actionName}" title="Opsi Lainnya" data-item-id="${itemId}" ${allDataAttributes}>
+                <button class="btn-icon card-more-action" data-action="${actionName}" title="Opsi Lainnya" data-item-id="${itemId}" data-unread-count="${unreadCount}" ${allDataAttributes}>
                     ${createIcon('more-vertical', 20)}
                     ${badgeHTML} 
                 </button>
@@ -701,6 +701,15 @@ export function _getRekapGajiListHTML(items) {
         });
     }).join('');
 }
+
+on('ui.comments.threadViewed', ({ parentId }) => {
+    if (!parentId) return;
+    const buttons = document.querySelectorAll(`.card-more-action[data-parent-id="${parentId}"]`);
+    buttons.forEach(btn => {
+        btn.dataset.unreadCount = '0';
+        btn.querySelector('.notification-badge')?.remove();
+    });
+});
 
 export function _getLogAktivitasListHTML(items) {
      const getIconForAction = (action) => {

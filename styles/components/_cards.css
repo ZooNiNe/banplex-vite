@@ -467,9 +467,6 @@ body.selection-active .meta-badge span {
         max-width: 150px;
     }
 }
-#worker-wages-summary-list .item-main-content .item-sub-content .role-summary{
-  margin-top: 0rem;
-}
 #worker-wages-summary-list .item-main-content strong{
   font-size: .7rem;
 }
@@ -485,4 +482,117 @@ body.selection-active .meta-badge span {
 #worker-wages-summary-list .item-actions{
   padding-right: .5rem;
   gap: 0rem;
+}
+
+/* --- Admin Panel Cards --- */
+.admin-panel-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.admin-panel-header .header-title {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.admin-panel-header .header-title h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text);
+}
+
+.admin-panel-header .header-title p {
+  margin: 0.15rem 0 0;
+  color: var(--text-dim);
+}
+
+.admin-panel-header .header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-data-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 0.65rem;
+  border: 1px solid transparent;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+
+.admin-data-card:active {
+  transform: translateY(1px);
+}
+
+.admin-data-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 20%, transparent);
+  box-shadow: var(--shadow-md);
+}
+
+.admin-data-card .card-text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.admin-data-card .card-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.admin-data-card .card-subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.card-status-badge {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--surface-muted);
+  color: var(--text-dim);
+}
+
+.card-status-badge.status-aktif {
+  background: color-mix(in srgb, var(--success) 12%, #fff);
+  color: var(--success);
+}
+
+.card-status-badge.status-pending {
+  background: color-mix(in srgb, var(--warn) 12%, #fff);
+  color: var(--warn);
+}
+
+.card-status-badge.status-nonaktif {
+  background: color-mix(in srgb, var(--danger) 12%, #fff);
+  color: var(--danger);
+}
+
+.admin-data-card .btn-more {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-data-card .btn-more svg {
+  pointer-events: none;
 }

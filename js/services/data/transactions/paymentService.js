@@ -211,6 +211,13 @@ export async function handleProcessPayment(formElement) {
     let localAttachmentId = null;
     const amountFormatted = fmtIDR(amountToPay);
 
+    // Ensure idempotent client payment id for this form session
+    let clientPaymentId = formElement.dataset.paymentId;
+    if (!clientPaymentId) {
+        try { clientPaymentId = crypto.randomUUID(); } catch(_) { clientPaymentId = `loan-pay-${id}-${Date.now()}`; }
+        formElement.dataset.paymentId = clientPaymentId;
+    }
+
     createModal('confirmPayBill', {
         message: `Anda akan membayar cicilan pinjaman sebesar <strong>${amountFormatted}</strong>. Lanjutkan?`,
         onConfirm: async () => {

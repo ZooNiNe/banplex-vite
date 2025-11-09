@@ -68,9 +68,19 @@ async function handleOpenLoanPaymentHistoryModal(dataset = {}) {
     }))
   ].sort((a, b) => getJSDate(a.date) - getJSDate(b.date));
 
+  function formatFullTimestamp(d) {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mmm = d.toLocaleString('id-ID', { month: 'short' });
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${dd}/${mmm}/${yyyy} ${hh}:${mm}:${ss}`;
+  }
+
   const list = entries.map(p => {
     const date = getJSDate(p.date || new Date());
-    const dateStr = date.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+    const titleStr = formatFullTimestamp(date);
 
     let subtitle = 'Tersimpan di server';
     if (p._source === 'pending') subtitle = 'Lokal (Menunggu sinkronisasi)';
@@ -90,22 +100,24 @@ async function handleOpenLoanPaymentHistoryModal(dataset = {}) {
     return `
       <div class="detail-list-item-card payment-history-item">
           <div class="item-main">
-              <strong class="item-title">${dateStr}</strong>
+              <strong class="item-title">${titleStr}</strong>
               <span class="item-subtitle">${subtitle}</span>
           </div>
           <div class="item-secondary">
               <strong class="item-amount">${fmtIDR(p.amount || 0)}</strong>
-              ${(p.attachmentUrl || p.localAttachmentId) ? `
-                <button class="btn-icon" data-action="view-payment-attachment" data-url="${p.attachmentUrl || ''}" data-local-id="${p.localAttachmentId || ''}" title="Lihat Lampiran">
-                    ${createIcon('attachment')}
+              <div class="item-actions">
+                ${(p.attachmentUrl || p.localAttachmentId) ? `
+                  <button class="btn-icon" data-action="view-payment-attachment" data-url="${p.attachmentUrl || ''}" data-local-id="${p.localAttachmentId || ''}" title="Lihat Lampiran">
+                      ${createIcon('attachment')}
+                  </button>
+                ` : ''}
+                <button class="btn-icon btn-icon-danger" data-action="delete-loan-payment" data-loan-id="${loanId}" ${p._source === 'pending' ? `data-pending-id="${p.id}" data-source="pending"` : `data-payment-id="${p.id}" data-source="server"`} data-amount="${p.amount || 0}" title="Hapus Pembayaran">
+                    ${createIcon('delete')}
                 </button>
-              ` : ''}
-              <button class="btn-icon btn-icon-danger" data-action="delete-loan-payment" data-loan-id="${loanId}" ${p._source === 'pending' ? `data-pending-id="${p.id}" data-source="pending"` : `data-payment-id="${p.id}" data-source="server"`} data-amount="${p.amount || 0}" title="Hapus Pembayaran">
-                  ${createIcon('delete')}
-              </button>
-              <button class="btn-icon" data-action="cetak-kwitansi-pembayaran" data-kwitansi='${JSON.stringify(kwitansiData)}' title="Cetak Kwitansi">
-                  ${createIcon('print')}
-              </button>
+                <button class="btn-icon" data-action="cetak-kwitansi-pembayaran" data-kwitansi='${JSON.stringify(kwitansiData)}' title="Cetak Kwitansi">
+                    ${createIcon('print')}
+                </button>
+              </div>
           </div>
       </div>`;
   }).join('');
@@ -120,8 +132,10 @@ async function handleOpenLoanPaymentHistoryModal(dataset = {}) {
         ${emptyStateHTML}
       </div>`;
 
-  // PERBAIKAN: Tambahkan isUtility: true
-  createModal('dataDetail', { title: 'Riwayat Pembayaran Pinjaman', content, isUtility: true });
+  // Tampilkan sebagai bottom sheet di mobile; dialog standar di desktop
+  const isMobile = window.matchMedia('(max-width: 599px)').matches;
+  const modalType = isMobile ? 'dataBottomSheet' : 'dataDetail';
+  createModal(modalType, { title: 'Riwayat Pembayaran Pinjaman', content, isUtility: true });
 }
 
 export { handleOpenLoanPaymentHistoryModal };

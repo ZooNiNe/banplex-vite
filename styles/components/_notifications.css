@@ -232,7 +232,7 @@ body.pending-mode #update-notification.show {
 .top-notification-bar.show { transform: translateY(0); opacity: 1; }
 .top-notification-inner {
   margin: .5rem auto;
-  max-width: 540px;
+  max-width: 420px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -253,5 +253,5 @@ body.pending-mode #update-notification.show {
 }
 .notif-text { flex: 1; min-width: 0; }
 .notif-title { font-size: .95rem; font-weight: 700; color: var(--text); line-height: 1.2; }
-.notif-desc { font-size: .8rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.notif-close { background: transparent; border: none; color: var(--text-dim); font-size: 1.25rem; line-height: 1; padding: .25rem; cursor: pointer; }
+.notif-desc { font-size: .7rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notif-close { display: none;}
