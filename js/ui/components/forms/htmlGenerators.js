@@ -95,7 +95,7 @@ export function getFormPengeluaranHTML(type, categoryOptions, categoryMasterType
         </div>`;
 
     const formContent = `
-        <form id="${formId}" class="desktop-form-layout" ${formActionAttrs} data-async="${!isEdit}">
+        <form id="${formId}" class="desktop-form-layout" ${formActionAttrs} data-async="${!isEdit}" data-attachment-required="true">
             <div class="form-grid-2col">
                 ${createMasterDataSelect('expense-project', 'Proyek', projectOptions, selectedProjectId, 'projects', true, false)}
                 ${createMasterDataSelect('expense-category', categoryLabel, categoryOptions, selectedCategoryId, categoryMasterType, true)}
@@ -414,7 +414,7 @@ export function getFormFakturMaterialHTML(itemData = null, options = {}) {
     `;
 
     const formContent = `
-        <form id="${formId}" class="desktop-form-layout" ${formActionAttrs} data-async="${!isEdit}">
+        <form id="${formId}" class="desktop-form-layout" ${formActionAttrs} data-async="${!isEdit}" data-attachment-required="true">
             ${formTypeToggleHTML}
             <div class="form-grid-2col">
                 ${createMasterDataSelect('project-id', 'Proyek', projectOptions, selectedProjectId, 'projects', true, false)}

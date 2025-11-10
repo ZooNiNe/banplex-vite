@@ -125,31 +125,32 @@ function initializeFormSpecificListeners() {
                     const isMobile = window.matchMedia('(max-width: 599px)').matches;
 
                     const savingToast = toast('syncing', 'Menyimpan...');
-                    const result = await updateFunction(form); // Coba update
-                    if (savingToast && typeof savingToast.close === 'function') savingToast.close();
+                    try {
+                        const result = await updateFunction(form); // Coba update
+                        if (savingToast && typeof savingToast.close === 'function') savingToast.close();
 
-                    if (result.success) {
-                        toast('success', isConversion ? 'Surat Jalan berhasil diubah menjadi Tagihan!' : 'Perubahan berhasil disimpan!');
-                        resetFormDirty();
+                        if (result.success) {
+                            toast('success', isConversion ? 'Surat Jalan berhasil diubah menjadi Tagihan!' : 'Perubahan berhasil disimpan!');
+                            resetFormDirty();
 
-                        // PERUBAIKAN: Panggil history.back() untuk menutup panel
-                        // Ini akan memicu 'popstate' listener di router.js
-                        if (panel || isMobile) {
-                            history.back();
+                            if (panel || isMobile) {
+                                history.back();
+                            }
+
+                            const navTarget = (result.itemType === 'termin' || result.itemType === 'pinjaman') ? 'pemasukan' : 'tagihan';
+                            if (appState.activePage === navTarget) {
+                                emit('ui.page.render');
+                            }
+                            return true;
+                        } else {
+                            toast('error', 'Gagal menyimpan. Coba lagi.');
+                            return false;
                         }
-                        
-                        // Navigasi tidak lagi diperlukan di sini, 'popstate' akan
-                        // menangani pembaruan halaman jika panel adalah level terakhir.
-                        // Cukup refresh halaman saat ini jika kita kembali ke sana.
-                        const navTarget = (result.itemType === 'termin' || result.itemType === 'pinjaman') ? 'pemasukan' : 'tagihan';
-                        if (appState.activePage === navTarget) {
-                            emit('ui.page.render'); 
-                        }
-
-                    } else {
-                        toast('error', 'Gagal menyimpan. Coba lagi.');
+                    } catch (err) {
+                        if (savingToast && typeof savingToast.close === 'function') savingToast.close();
+                        toast('error', `Terjadi kesalahan: ${err.message || 'Coba lagi.'}`);
+                        return false;
                     }
-                    return result.success; // Kembalikan status untuk modalEventListeners
                 }
             });
             return;
@@ -164,6 +165,15 @@ function initializeFormSpecificListeners() {
 
             if (!validateForm(form)) {
                  return;
+            }
+
+            if (form.dataset.attachmentRequired === 'true') {
+                const syncedUrlsInput = form.querySelector('input[name="syncedAttachmentUrls"]');
+                const urls = syncedUrlsInput ? JSON.parse(syncedUrlsInput.value || '[]') : [];
+                if (urls.length === 0) {
+                    toast('error', 'Lampiran wajib diunggah untuk pengeluaran ini.');
+                    return;
+                }
             }
 
             if (!appState.currentUser || !appState.currentUser.uid) {
@@ -198,19 +208,17 @@ function initializeFormSpecificListeners() {
                     if (loadingBtn) loadingBtn.disabled = true;
                     let success = false;
                     try {
-                        // handleAddPengeluaran akan menampilkan panel sukses
-                        // Panel sukses (non-utility) akan push history baru
                         await handleAddPengeluaran(form, type, statusOverride);
                         success = true;
                         resetFormDirty();
                         if (form._clearDraft) form._clearDraft();
                     } catch (err) {
-                        // Jika gagal, kita tetap di panel form
-                        toast('error', err.message || 'Gagal menyimpan, coba lagi.');
+                        toast('error', `Gagal menyimpan: ${err.message || 'Coba lagi.'}`);
+                        success = false;
                     } finally {
                         if (loadingBtn) loadingBtn.disabled = false;
                     }
-                    return success; // Kembalikan status
+                    return success;
                 }
             });
             return;
@@ -279,33 +287,26 @@ function initializeFormSpecificListeners() {
                  message: `Anda yakin ingin menyimpan ${type === 'termin' ? 'Termin' : 'Pinjaman'}: <strong>${description || '(Deskripsi Gagal Dibuat)'}</strong>?`,
                  isUtility: true, // Tandai sebagai utility
                  onConfirm: async () => {
-                    // *** PERUBAHAN KRUSIAL DI SINI ***
-                    // Kita harus menutup modal konfirmasi (utility) secara manual
-                    // sebelum handleAddPemasukan menampilkan panel sukses (non-utility)
                     if (confirmModal) {
-                        closeModalImmediate(confirmModal); // Gunakan immediate
+                        closeModalImmediate(confirmModal);
                     }
-                    // *** AKHIR PERUBAHAN ***
 
-                     const loadingBtn = form.querySelector('[type="submit"], .btn-primary');
-                     if (loadingBtn) loadingBtn.disabled = true;
-                     let success = false;
-                     try {
-                         // Fungsi ini akan menampilkan panel sukses (non-utility)
-                         await handleAddPemasukan(formDataObject, type);
-                         success = true;
-                         resetFormDirty();
-                         try {
-                             form.reset();
-                             if (form._clearDraft) form._clearDraft();
-                         } catch (resetErr) {}
-                     } catch (err) {
-                         toast('error', err instanceof Error ? err.message : 'Gagal menyimpan, coba lagi.');
-                     } finally {
-                         if (loadingBtn) loadingBtn.disabled = false;
-                     }
-                     return success; // Kembalikan status
-                 }
+                    const loadingBtn = form.querySelector('[type="submit"], .btn-primary');
+                    if (loadingBtn) loadingBtn.disabled = true;
+                    let success = false;
+                    try {
+                        await handleAddPemasukan(formDataObject, type);
+                        success = true;
+                        resetFormDirty();
+                        if (form._clearDraft) form._clearDraft();
+                    } catch (err) {
+                        toast('error', `Gagal menyimpan: ${err.message || 'Coba lagi.'}`);
+                        success = false;
+                    } finally {
+                        if (loadingBtn) loadingBtn.disabled = false;
+                    }
+                    return success;
+                }
              });
             return;
         }

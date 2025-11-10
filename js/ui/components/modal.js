@@ -142,7 +142,12 @@ export function createModal(type, data = {}) {
 
     const { layoutClass, contentHTML } = getModalLayout(type, data);
     modalEl.className = `modal-bg ${layoutClass}`;
-    modalEl.innerHTML = contentHTML;
+    if (data.isBottomSheet) {
+        modalEl.classList.add('modal-bottom-sheet');
+        modalEl.innerHTML = `<div class="bottom-sheet-drag-handle"></div>${contentHTML}`;
+    } else {
+        modalEl.innerHTML = contentHTML;
+    }
 
     // Tandai modal sebagai 'utility' jika flag-nya ada
     if (data.isUtility) {

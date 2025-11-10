@@ -86,11 +86,14 @@ export function _createAttachmentManagerHTML(itemData = {}, options = {}) {
     `;
 }
 
-export async function handleAttachmentUpload(file, contextForm, inputName, isSingle = false) {
-    const container = contextForm.querySelector(`#${isSingle ? 'new-payment-attachment-container' : 'new-attachment-container'}`);
+export async function handleAttachmentUpload(file, form, inputName, isSingle = false) {
+    const container = form.querySelector(`#${isSingle ? 'new-payment-attachment-container' : 'new-attachment-container'}`);
     const placeholder = container?.querySelector('.placeholder');
-    const syncedUrlsInput = contextForm.querySelector('input[name="syncedAttachmentUrls"]');
-    const singleUrlInput = isSingle ? contextForm.querySelector(`input[name="${inputName}_url"]`) : null;
+    const syncedUrlsInput = form.querySelector('input[name="syncedAttachmentUrls"]');
+    const singleUrlInput = isSingle ? form.querySelector(`input[name="${inputName}_url"]`) : null;
+    const saveButton = form.querySelector('button[type="submit"]');
+
+    if (saveButton) saveButton.disabled = true;
 
     if (!container || (!placeholder && !isSingle)) {
         console.error("Container atau placeholder lampiran tidak ditemukan.");
@@ -151,6 +154,7 @@ export async function handleAttachmentUpload(file, contextForm, inputName, isSin
             `;
             overlay.style.pointerEvents = 'auto';
         }
+        if (saveButton) saveButton.disabled = false;
     };
 
     const url = await _uploadFileToCloudinary(file, { onProgress, onError });
@@ -170,16 +174,18 @@ export async function handleAttachmentUpload(file, contextForm, inputName, isSin
         previewEl.innerHTML = `
              <div class="attachment-manager-overlay">
                  <button type="button" class="btn-icon" data-action="view-attachment" data-src="${url}" title="Lihat">${createIcon('visibility')}</button>
-                 <button type="button" class="btn-icon" data-action="replace-attachment" data-expense-id="${contextForm.dataset.id || ''}" data-old-url="${url}" data-target="${inputName}" title="Ganti">${createIcon('swap_horiz')}</button>
+                 <button type="button" class="btn-icon" data-action="replace-attachment" data-expense-id="${form.dataset.id || ''}" data-old-url="${url}" data-target="${inputName}" title="Ganti">${createIcon('swap_horiz')}</button>
                  <button type="button" class="btn-icon btn-icon-danger" data-action="${isSingle ? 'remove-payment-attachment' : 'delete-temp-attachment'}" title="Hapus">${createIcon('delete')}</button>
              </div>
              <img src="${url}" class="attachment-preview-thumb" alt="Lampiran" loading="lazy" decoding="async">
              <strong>${file.name}</strong>`;
         toast('success', `${file.name} berhasil diunggah.`);
          import('../modal.js').then(({ markFormDirty }) => markFormDirty(true));
+        if (saveButton) saveButton.disabled = false;
     } else {
-        const fileInput = contextForm.querySelector(`input[name="${inputName}"]`);
+        const fileInput = form.querySelector(`input[name="${inputName}"]`);
         if (fileInput) fileInput.value = '';
+        if (saveButton) saveButton.disabled = false;
     }
 }
 

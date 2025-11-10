@@ -8,7 +8,7 @@ import { liveQueryMulti } from '../../state/liveQuery.js';
 import { fetchAndCacheData } from '../../services/data/fetch.js';
 import { projectsCol, fundingCreditorsCol } from '../../config/firebase.js';
 import { fmtIDR, parseFormattedNumber } from '../../utils/formatters.js';
-import { attachFormDraftPersistence } from '../../utils/formPersistence.js';
+import { forceSaveFormDraft, attachFormDraftPersistence } from '../../utils/formPersistence.js';
 
 let pageEventListenerController = null;
 let unsubscribeLiveQuery = null;
@@ -268,6 +268,15 @@ export async function initPemasukanFormPage() {
     await renderPemasukanFormContent(contentContainer, activeTab);
 
     const cleanup = () => {
+        try {
+            const form = document.querySelector('#pemasukan-form, #edit-item-form');
+            if (form) {
+                forceSaveFormDraft(form);
+            }
+        } catch (e) {
+            console.warn('Gagal menyimpan draf form pemasukan secara paksa:', e);
+        }
+
         if (pageEventListenerController) pageEventListenerController.abort();
         if (unsubscribeLiveQuery) unsubscribeLiveQuery.unsubscribe();
         pageEventListenerController = null;

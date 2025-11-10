@@ -15,7 +15,8 @@ function createIcon(iconName, size = 18, classes = '') {
 }
 
 
-async function _showBillsFilterModal(onApply) {
+async function _showBillsFilterModal(onApply, options = {}) {
+  const { useBottomSheet = false } = options;
   const allBillsEver = await localDB.bills.toArray();
   const allExpenses = await localDB.expenses.where('isDeleted').notEqual(1).toArray();
   const allSuppliers = await localDB.suppliers.toArray();
@@ -46,14 +47,18 @@ async function _showBillsFilterModal(onApply) {
 
   const content = `
         <form id="bills-filter-form">
+            ${createMasterDataSelect('filter-supplier-id', 'Filter Berdasarkan Supplier', supplierOptions, appState.billsFilter.supplierId, null, false)}
+            ${createMasterDataSelect('filter-project-id', 'Filter Berdasarkan Proyek', projectOptions, appState.billsFilter.projectId, null, false)}
             <div class="form-group">
-                <label>Cari</label>
-                <input type="search" id="search-term" placeholder="Ketik kata kunci..." value="${appState.billsFilter.searchTerm || ''}" autocomplete="off">
-            </div>
-            ${createMasterDataSelect('filter-project-id', 'Filter Berdasarkan Proyek', projectOptions, appState.billsFilter.projectId, 'projects')}
-            ${createMasterDataSelect('filter-supplier-id', 'Filter Berdasarkan Supplier', supplierOptions, appState.billsFilter.supplierId, 'suppliers')}
-            ${createMasterDataSelect('search-status', 'Status', statusOptions, appState.billsFilter.status || 'all')}
-            <div class="rekap-filters" style="padding:0; margin-top:1rem;">
+                 <label for="filter-expense-category">Kategori Pengeluaran</label>
+                 <select id="filter-expense-category" name="expenseCategory">
+                     <option value="all">Semua Kategori</option>
+                     <option value="operasional" ${appState.billsFilter.expenseCategory === 'operasional' ? 'selected' : ''}>Operasional</option>
+                     <option value="material" ${appState.billsFilter.expenseCategory === 'material' ? 'selected' : ''}>Material</option>
+                     <option value="lainnya" ${appState.billsFilter.expenseCategory === 'lainnya' ? 'selected' : ''}>Lainnya</option>
+                 </select>
+             </div>
+             <div class="rekap-filters date-grid-single">
                 <div class="form-group"><label>Dari Tanggal</label><input type="date" id="search-start-date" value="${appState.billsFilter.dateStart || ''}"></div>
                 <div class="form-group"><label>Sampai Tanggal</label><input type="date" id="search-end-date" value="${appState.billsFilter.dateEnd || ''}"></div>
             </div>
@@ -62,37 +67,37 @@ async function _showBillsFilterModal(onApply) {
 
   const footer = `
         <button type="button" id="reset-filter-btn" class="btn btn-secondary">Reset</button>
-        <button type="submit" class="btn btn-primary" form="bills-filter-form">Terapkan</button>
+        <button type="submit" class="btn btn-primary" form="bills-filter-form">Terapkan Filter</button>
     `;
 
-  // PERBAIKAN: Tambahkan isUtility: true
-  const modalEl = createModal('formView', { title: 'Filter Tagihan', content, footer, isUtility: true });
+  const modalEl = createModal('formView', {
+      title: 'Filter Tagihan',
+      content,
+      footer,
+      isBottomSheet: useBottomSheet
+  });
   if (!modalEl) return;
 
   initCustomSelects(modalEl);
 
   modalEl.querySelector('#bills-filter-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    appState.billsFilter.searchTerm = modalEl.querySelector('#search-term').value.trim();
     appState.billsFilter.projectId = modalEl.querySelector('#filter-project-id').value;
     appState.billsFilter.supplierId = modalEl.querySelector('#filter-supplier-id').value;
-    appState.billsFilter.status = modalEl.querySelector('#search-status').value || 'all';
+    appState.billsFilter.expenseCategory = modalEl.querySelector('#filter-expense-category').value;
     appState.billsFilter.dateStart = modalEl.querySelector('#search-start-date').value || '';
     appState.billsFilter.dateEnd = modalEl.querySelector('#search-end-date').value || '';
     if (typeof onApply === 'function') onApply();
-    // PERBAIKAN: Gunakan closeModalImmediate
     closeModalImmediate(modalEl);
   });
 
   modalEl.querySelector('.modal-footer #reset-filter-btn').addEventListener('click', () => {
-    appState.billsFilter.searchTerm = '';
     appState.billsFilter.projectId = 'all';
     appState.billsFilter.supplierId = 'all';
-    appState.billsFilter.status = 'all';
+    appState.billsFilter.expenseCategory = 'all';
     appState.billsFilter.dateStart = '';
     appState.billsFilter.dateEnd = '';
     if (typeof onApply === 'function') onApply();
-    // PERBAIKAN: Gunakan closeModalImmediate
     closeModalImmediate(modalEl);
   });
 }

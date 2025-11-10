@@ -301,6 +301,26 @@ body.laporan-layout-cards .dashboard-grid-layout { grid-template-columns: 1fr; }
   padding: .75rem;
 }
 
+.layout-toggle {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    background: var(--surface);
+    border-radius: 99px;
+    padding: 0.25rem;
+}
+.layout-toggle svg {
+    padding: 0.25rem;
+    cursor: pointer;
+    color: var(--text-dim);
+}
+.layout-toggle svg.active {
+    background: var(--primary);
+    color: white;
+    border-radius: 99px;
+}
+
 /* Space between chart canvases and their companion tables */
 .page--laporan .card-body .table-like { margin-top: .75rem; }
 
