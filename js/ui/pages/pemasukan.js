@@ -7,7 +7,7 @@ import { createTabsHTML } from '../components/tabs.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
 import { _getSinglePemasukanHTML } from '../components/cards.js';
-import { getEmptyStateHTML, getEndOfListPlaceholderHTML } from '../components/emptyState.js';
+import { getEmptyStateHTML, getEndOfListPlaceholderHTML, getDetailPlaceholderHTML } from '../components/emptyState.js';
 import { getJSDate } from '../../utils/helpers.js';
 import { formatDate, fmtIDR } from '../../utils/formatters.js';
 import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
@@ -451,6 +451,9 @@ function initPemasukanPage() {
                 <div id="status-filters-container">${statusFiltersHTML}</div>
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content" data-infinite-scroll="true"></div>
+        </div>
+        <div id="detail-panel" class="detail-panel">
+            ${getDetailPlaceholderHTML('pemasukan')}
         </div>
     `;
 

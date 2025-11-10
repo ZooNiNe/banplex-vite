@@ -52,6 +52,33 @@
     background-color: #1e293b;
     border-top-color: var(--line);
 }
+
+/* --- Detail Panel --- */
+.detail-panel {
+    display: none; /* Sembunyi di mobile secara default */
+    background-color: var(--surface-muted);
+    border-left: 1px solid var(--line);
+    flex-shrink: 0;
+    width: 380px;
+    overflow-y: auto;
+    height: 100%;
+    padding: 1.5rem;
+}
+
+@media (min-width: 900px) {
+    .page-container--has-panel {
+        display: flex;
+    }
+    .detail-panel {
+        display: block; /* Tampil di desktop */
+    }
+}
+
+@media (min-width: 1200px) {
+    .detail-panel {
+        width: 420px;
+    }
+}
 /* Aturan grid untuk tombol di footer (diambil dari modals.css) */
 .panel-footer:has(.btn:only-child) {
     grid-template-columns: 1fr;

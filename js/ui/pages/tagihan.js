@@ -4,7 +4,7 @@ import { createPageToolbarHTML } from '../components/toolbar.js';
 import { createTabsHTML } from '../components/tabs.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { _getBillsListHTML } from '../components/cards.js';
-import { getEmptyStateHTML, getEndOfListPlaceholderHTML } from '../components/emptyState.js';
+import { getEmptyStateHTML, getEndOfListPlaceholderHTML, getDetailPlaceholderHTML } from '../components/emptyState.js';
 import { getJSDate } from '../../utils/helpers.js';
 import { parseFormattedNumber, formatDate, fmtIDR } from '../../utils/formatters.js';
 import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
@@ -485,6 +485,9 @@ function initTagihanPage() {
                 ${categoryFiltersHTML}
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content"></div>
+        </div>
+        <div id="detail-panel" class="detail-panel">
+            ${getDetailPlaceholderHTML('tagihan')}
         </div>
     `;
 

@@ -2,7 +2,7 @@ import { appState } from '../../state/appState.js';
 import { $ } from '../../utils/dom.js';
 import { createPageToolbarHTML } from '../components/toolbar.js';
 import { createUnifiedCard } from '../components/cards.js';
-import { getEmptyStateHTML, getEndOfListPlaceholderHTML } from '../components/emptyState.js';
+import { getEmptyStateHTML, getEndOfListPlaceholderHTML, getDetailPlaceholderHTML } from '../components/emptyState.js';
 import { formatDate } from '../../utils/formatters.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
@@ -387,6 +387,9 @@ function initRecycleBinPage() {
                 ${categoryFiltersHTMLContainer}
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content"></div>
+        </div>
+        <div id="detail-panel" class="detail-panel">
+            ${getDetailPlaceholderHTML('recycle_bin')}
         </div>
     `;
 

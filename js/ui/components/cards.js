@@ -407,47 +407,91 @@ export function _createSalaryBillDetailContentHTML(bill, payments) {
 }
 
 export function _createDetailContentHTML(item, type) {
-    let details = [];
-    if (type === 'termin') {
-        const project = appState.projects?.find(p => p.id === item.projectId);
-        details = [
-            { label: 'Jumlah', value: fmtIDR(item.amount) },
-            { label: 'Tanggal', value: getJSDate(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) },
-            { label: 'Proyek', value: project?.projectName || 'Tidak Diketahui' }
-        ];
-    } else if (type === 'pinjaman') {
-        const creditor = appState.fundingCreditors?.find(c => c.id === item.creditorId);
-        const total = item.totalRepaymentAmount || item.totalAmount || 0;
-        const paid = item.paidAmount || 0;
-        const remaining = Math.max(0, total - paid);
-        details = [
-            { label: 'Kreditur', value: creditor?.creditorName || 'Tidak Diketahui' },
-            { label: 'Total Pinjaman', value: fmtIDR(item.totalAmount || 0) },
-            ...(item.interestType === 'interest' ? [
-                 { label: 'Bunga', value: `${item.rate || 0}% selama ${item.tenor || 0} bln` },
-                 { label: 'Total Pengembalian', value: fmtIDR(item.totalRepaymentAmount || 0) },
-            ] : []),
-            { label: 'Sudah Dibayar', value: fmtIDR(paid) },
-            { label: 'Sisa Tagihan', value: fmtIDR(remaining) },
-            { label: 'Tanggal', value: getJSDate(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) },
-            { label: 'Status', value: `<span class="status-badge status-badge--${item.status === 'paid' ? 'positive' : 'warn'}">${item.status === 'paid' ? 'Lunas' : 'Belum Lunas'}</span>` },
-        ];
-    } else {
-        return '<div class="card card-pad"><p>Detail tidak tersedia.</p></div>';
+        let summaryHTML = '';
+        let detailsHTML = '';
+        let details = [];
+
+        if (type === 'termin') {
+            const project = appState.projects?.find(p => p.id === item.projectId);
+            summaryHTML = `
+                <div class="detail-summary-grid">
+                    <div class="summary-item">
+                        <span class="label">Jumlah Termin</span>
+                        <strong class="value">${fmtIDR(item.amount)}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Proyek</span>
+                        <strong class="value">${project?.projectName || 'Tidak Diketahui'}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Tanggal</span>
+                        <strong class="value">${formatDate(item.date)}</strong>
+                    </div>
+                </div>`;
+           
+            detailsHTML = '';
+
+        } else if (type === 'pinjaman') {
+            const creditor = appState.fundingCreditors?.find(c => c.id === item.creditorId);
+            const total = item.totalRepaymentAmount || item.totalAmount || 0;
+            const paid = item.paidAmount || 0;
+            const remaining = Math.max(0, total - paid);
+            const status = item.status || 'unpaid';
+
+            summaryHTML = `
+                <div class="detail-summary-grid">
+                    <div class="summary-item">
+                        <span class="label">Total Pinjaman</span>
+                        <strong class="value">${fmtIDR(item.totalAmount || 0)}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Sudah Dibayar</span>
+                        <strong class="value positive">${fmtIDR(paid)}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Sisa Tagihan</span>
+                        <strong class="value ${remaining > 0 ? 'negative' : ''}">${fmtIDR(remaining)}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Status</span>
+                        <strong class="value">
+                            <span class="status-badge status-badge--${status === 'paid' ? 'positive' : 'warn'}">
+                                ${status === 'paid' ? 'Lunas' : 'Belum Lunas'}
+                            </span>
+                        </strong>
+                    </div>
+                </div>`;
+           
+            details = [
+                { label: 'Kreditur', value: creditor?.creditorName || 'Tidak Diketahui' },
+                { label: 'Tanggal Pinjaman', value: formatDate(item.date) },
+            ];
+
+            if (item.interestType === 'interest') {
+                details.push({ label: 'Bunga', value: `${item.rate || 0}% selama ${item.tenor || 0} bln` });
+                details.push({ label: 'Total Pengembalian', value: fmtIDR(item.totalRepaymentAmount || 0) });
+            }
+           
+            detailsHTML = `
+                <div class="detail-section">
+                    <h5 class="detail-section-title">Informasi Pinjaman</h5>
+                    <dl class="detail-list">${details.map(d => `<div><dt>${d.label}</dt><dd>${d.value}</dd></div>`).join('')}</dl>
+                </div>`;
+
+        } else {
+            return '<div class="card card-pad"><p>Detail tidak tersedia.</p></div>';
+        }
+
+        const notes = item?.notes;
+        const notesHTML = notes ? `
+            <div class="card card-pad notes-card">
+                <h5 class="detail-section-title notes-title">${createIcon('sticky-note', 16)} <span>Catatan</span></h5>
+                <p class="notes-text">${notes}</p>
+            </div>
+        ` : '';
+
+        return `<div class="card card-pad">${summaryHTML}${detailsHTML}</div>${notesHTML}`;
     }
-
-    const detailsHTML = `<dl class="detail-list">${details.map(d => `<div><dt>${d.label}</dt><dd>${d.value}</dd></div>`).join('')}</dl>`;
-
-    const notes = item?.notes;
-    const notesHTML = notes ? `
-        <div class="card card-pad" style="margin-top: 1rem;">
-            <h5 class="detail-section-title" style="margin-top: 0;">${createIcon('sticky-note', 16)} Catatan</h5>
-            <p style="white-space: pre-wrap; line-height: 1.6; color: var(--text-dim);">${notes}</p>
-        </div>
-    ` : '';
-
-    return `<div class="card card-pad">${detailsHTML}</div>${notesHTML}`;
-}
 
 
 export function _getBillsListHTML(items) {
