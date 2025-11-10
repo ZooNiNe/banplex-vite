@@ -2,6 +2,7 @@ import { appState } from "../../../state/appState.js";
 import { localDB } from "../../../services/localDbService.js";
 // PERBAIKAN: Impor closeModalImmediate
 import { createModal, closeModal, closeModalImmediate, handleDetailPaneBack } from "../../components/modal.js";
+import { createSnackbar } from "../../components/snackbar.js";
 import { createMasterDataSelect, initCustomSelects } from "../../components/forms/index.js";
 
 function createIcon(iconName, size = 18, classes = '') {
@@ -16,6 +17,11 @@ function createIcon(iconName, size = 18, classes = '') {
 
 
 async function _showBillsFilterModal(onApply) {
+  // FIX: Check if the bills table exists before calling toArray() on it.
+  if (!localDB.bills) {
+    console.error("Error: localDB.bills is undefined, cannot open bill filter modal.");
+    return;
+  }
   const allBillsEver = await localDB.bills.toArray();
   const allExpenses = await localDB.expenses.where('isDeleted').notEqual(1).toArray();
   const allSuppliers = await localDB.suppliers.toArray();
@@ -82,6 +88,7 @@ async function _showBillsFilterModal(onApply) {
     if (typeof onApply === 'function') onApply();
     // PERBAIKAN: Gunakan closeModalImmediate
     closeModalImmediate(modalEl);
+    createSnackbar("Filter applied successfully.");
   });
 
   modalEl.querySelector('.modal-footer #reset-filter-btn').addEventListener('click', () => {
@@ -94,6 +101,7 @@ async function _showBillsFilterModal(onApply) {
     if (typeof onApply === 'function') onApply();
     // PERBAIKAN: Gunakan closeModalImmediate
     closeModalImmediate(modalEl);
+    createSnackbar("Filter reset successfully.");
   });
 }
 
@@ -143,6 +151,7 @@ function _showBillsSortModal(onApply) {
     if (typeof onApply === 'function') onApply();
     // PERBAIKAN: Gunakan closeModalImmediate
     closeModalImmediate(modalEl);
+    createSnackbar("Sort applied successfully.");
   });
 }
 

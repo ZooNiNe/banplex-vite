@@ -12,7 +12,8 @@ import { getJSDate } from '../../utils/helpers.js';
 import { formatDate, fmtIDR } from '../../utils/formatters.js';
 import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
 import { createListSkeletonHTML } from '../components/skeleton.js';
-import { createModal, closeModal } from '../components/modal.js';
+import { createModal, closeModal, closeModalImmediate } from '../components/modal.js';
+import { createSnackbar } from '../components/snackbar.js';
 import { ensureMasterDataFresh } from '../../services/data/ensureMasters.js';
 
 const ITEMS_PER_PAGE = 15;
@@ -363,7 +364,8 @@ function _showPemasukanSortModal(onApply) {
       appState.pemasukanFilter.sortBy = form.querySelector('input[name="sortBy"]:checked').value;
       appState.pemasukanFilter.sortDirection = form.querySelector('input[name="sortDir"]:checked').value;
       if (typeof onApply === 'function') onApply();
-      closeModal(modalEl);
+      closeModalImmediate(modalEl);
+      createSnackbar("Sort applied successfully.");
     });
 }
 

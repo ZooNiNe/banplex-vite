@@ -26,6 +26,7 @@
 @import "components/_buttons.css";
 @import "components/_cards.css";
 @import "components/_forms.css";
+@import "components/snackbar.css";
 @import "components/_badges.css";
 @import "components/_menus.css";
 @import "components/_lists.css";

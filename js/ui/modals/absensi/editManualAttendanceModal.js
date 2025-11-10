@@ -5,6 +5,7 @@ import { createModal, closeModal, showDetailPane, closeModalImmediate } from "..
 import { createMasterDataSelect, initCustomSelects, formatNumberInput } from "../../components/forms/index.js";
 import { emit } from "../../../state/eventBus.js";
 import { toast } from "../../components/toast.js";
+import { createSnackbar } from "../../components/snackbar.js";
 import { getJSDate, getLocalDayBounds, parseLocalDate } from "../../../utils/helpers.js";
 
 // ... (State lokal dan fungsi createIcon tidak berubah) ...
@@ -469,7 +470,7 @@ export async function _showAttendanceFilterModal(onApply) {
 
     const content = `
         <form id="attendance-filter-form">
-            ${createMasterDataSelect('filter-profession-id', 'Filter Berdasarkan Profesi', professionOptions, professionId, 'professions')}
+            ${createMasterDataSelect('filter-profession-id', 'Filter Berdasarkan Profesi', professionOptions, professionId)}
         </form>
     `;
 
@@ -484,7 +485,7 @@ export async function _showAttendanceFilterModal(onApply) {
         content, 
         footer, 
         isUtility: true,
-        layoutClass: isMobile ? 'is-bottom-sheet' : 'is-simple-dialog' // Responsif
+        layoutClass: `attendance-filter-modal ${isMobile ? 'is-bottom-sheet' : 'is-simple-dialog'}` // Responsif
     });
     if (!modalEl) return;
 
@@ -496,6 +497,7 @@ export async function _showAttendanceFilterModal(onApply) {
         appState.attendanceFilter.professionId = modalEl.querySelector('#filter-profession-id').value;
         if (typeof onApply === 'function') onApply();
         closeModalImmediate(modalEl);
+        createSnackbar("Filter applied successfully.");
     });
 
     modalEl.querySelector('#reset-filter-btn').addEventListener('click', () => {
@@ -503,6 +505,7 @@ export async function _showAttendanceFilterModal(onApply) {
         appState.attendanceFilter.professionId = 'all';
         if (typeof onApply === 'function') onApply();
         closeModalImmediate(modalEl);
+        createSnackbar("Filter reset successfully.");
     });
 }
 
@@ -555,5 +558,6 @@ export function _showAttendanceSortModal(onApply) {
         appState.attendanceFilter.sortDirection = form.querySelector('input[name="sortDir"]:checked').value;
         if (typeof onApply === 'function') onApply();
         closeModalImmediate(modalEl);
+        createSnackbar("Sort applied successfully.");
     });
 }

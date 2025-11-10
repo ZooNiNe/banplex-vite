@@ -139,158 +139,26 @@ export async function handleCheckOut(recordId) {
     }
 }
 
-export async function handleUpdateAttendance(form) {
-    const recordId = form.dataset.id;
-    const recordType = form.dataset.type;
-    const record = appState.attendanceRecords.find(r => r.id === recordId);
-    if (!record) {
-        toast('error', 'Data absensi asli tidak ditemukan.');
+export async function handleOpenAttendanceEditor(context) {
+    const { date, workerId } = context;
+    if (!date || !workerId) {
+        toast('error', 'Konteks untuk update absensi tidak valid.');
         return;
     }
 
-    const attendanceDate = getJSDate(record.date);
-    if (isNaN(attendanceDate.getTime())) {
-        toast('error', 'Tanggal absensi tidak valid.');
-        return;
-    }
-    const { startOfDay, endOfDay } = getLocalDayBounds(attendanceDate.toISOString().slice(0, 10));
-
-    const existingOtherRecord = await localDB.attendance_records
-        .where('workerId').equals(record.workerId)
-        .and(r => r.id !== recordId && r.date >= startOfDay && r.date <= endOfDay && r.isDeleted !== 1)
-        .first();
-
-    if (existingOtherRecord) {
-        toast('error', `${record.workerName} sudah memiliki absensi lain pada tanggal ${attendanceDate.toLocaleDateString('id-ID')}.`);
+    const worker = appState.workers.find(w => w.id === workerId);
+    if (!worker) {
+        toast('error', `Pekerja dengan ID ${workerId} tidak ditemukan.`);
         return;
     }
 
-    let bill = null;
-    let paymentForWorker = null;
-    if (record.billId) {
-        bill = appState.bills.find(b => b.id === record.billId) || await localDB.bills.get(record.billId);
-        if (bill?.status === 'paid') {
-            toast('error', 'Tidak dapat mengedit absensi. Rekap gaji terkait sudah lunas.');
-            return;
-        }
-        if (bill) {
-            paymentForWorker = await localDB.pending_payments
-                .where({ billId: record.billId, workerId: record.workerId })
-                .first();
-            if (paymentForWorker) {
-                toast('error', 'Tidak dapat mengedit absensi. Sudah ada pembayaran individual untuk pekerja ini di rekap terkait.');
-                return;
-            }
-        }
-    }
-
-    toast('syncing', 'Memperbarui absensi...');
     try {
-        const dataToUpdate = {};
-        let newTotalPay = record.totalPay;
-        if (recordType === 'manual') {
-            const newStatus = form.elements.status.value;
-            const newProjectId = form.elements['edit-attendance-project'].value;
-            const newJobRole = form.elements['edit-attendance-role'].value;
-            const customWage = parseFormattedNumber(form.elements.customWage.value);
-            let baseWage = 0;
-            if (customWage > 0) {
-                baseWage = customWage;
-            } else if (newProjectId && newJobRole) {
-                const worker = appState.workers.find(w => w.id === record.workerId);
-                baseWage = worker?.projectWages?.[newProjectId]?.[newJobRole] || 0;
-            }
-            if (newStatus === 'full_day') newTotalPay = baseWage;
-            else if (newStatus === 'half_day') newTotalPay = baseWage / 2;
-            else newTotalPay = 0;
-            dataToUpdate.attendanceStatus = newStatus;
-            dataToUpdate.totalPay = newTotalPay;
-            dataToUpdate.projectId = newProjectId;
-            dataToUpdate.jobRole = newJobRole;
-            dataToUpdate.customWage = customWage > 0 ? customWage : null;
-            dataToUpdate.dailyWage = customWage > 0 ? 0 : baseWage;
-        } else {
-            const date = getJSDate(record.date);
-            const [inH, inM] = form.elements.checkIn.value.split(':');
-            const newCheckIn = new Date(date);
-            newCheckIn.setHours(inH, inM);
-            dataToUpdate.checkIn = Timestamp.fromDate(newCheckIn);
-            if (form.elements.checkOut.value) {
-                const [outH, outM] = form.elements.checkOut.value.split(':');
-                const newCheckOut = new Date(date);
-                newCheckOut.setHours(outH, outM);
-                if (newCheckOut < newCheckIn) {
-                    toast('error', 'Jam keluar tidak boleh lebih awal dari jam masuk.');
-                    return;
-                }
-                const hours = (newCheckOut - newCheckIn) / 3600000;
-                const normalHours = Math.min(hours, 8);
-                const overtimeHours = Math.max(0, hours - 8);
-                const hourlyWage = record.hourlyWage || 0;
-                const normalPay = normalHours * hourlyWage;
-                const overtimePay = overtimeHours * hourlyWage * 1.5;
-                newTotalPay = normalPay + overtimePay;
-                dataToUpdate.checkOut = Timestamp.fromDate(newCheckOut);
-                dataToUpdate.workHours = hours;
-                dataToUpdate.normalHours = normalHours;
-                dataToUpdate.overtimeHours = overtimeHours;
-                dataToUpdate.totalPay = newTotalPay;
-                dataToUpdate.status = 'completed';
-            } else {
-                newTotalPay = 0;
-                dataToUpdate.checkOut = null;
-                dataToUpdate.workHours = 0;
-                dataToUpdate.totalPay = newTotalPay;
-                dataToUpdate.status = 'checked_in';
-            }
-        }
-
-        const deltaPay = newTotalPay - (record.totalPay || 0);
-
-        if (bill && deltaPay !== 0) {
-            await localDB.transaction('rw', localDB.attendance_records, localDB.bills, localDB.outbox, async () => {
-                await localDB.attendance_records.update(recordId, { ...dataToUpdate, syncState: 'pending_update', updatedAt: new Date() });
-                await queueOutbox({ table: 'attendance_records', docId: recordId, op: 'upsert', payload: { id: recordId, ...dataToUpdate }, priority: 6 });
-                
-                const newBillAmount = (bill.amount || 0) + deltaPay;
-                const workerDetails = bill.workerDetails.map(w => {
-                    if (w.id === record.workerId || w.workerId === record.workerId) {
-                        return { ...w, amount: (w.amount || 0) + deltaPay };
-                    }
-                    return w;
-                });
-                const billUpdate = { amount: newBillAmount, workerDetails, syncState: 'pending_update', updatedAt: new Date() };
-                await localDB.bills.update(bill.id, billUpdate);
-                await queueOutbox({ table: 'bills', docId: bill.id, op: 'upsert', payload: { id: bill.id, ...billUpdate }, priority: 6 });
-            });
-        } else {
-            await localDB.attendance_records.update(recordId, { ...dataToUpdate, syncState: 'pending_update', updatedAt: new Date() });
-            await queueOutbox({ table: 'attendance_records', docId: recordId, op: 'upsert', payload: { id: recordId, ...dataToUpdate }, priority: 6 });
-        }
-
-        await _logActivity('Mengedit Absensi', { recordId, ...dataToUpdate });
-        await toast('success', 'Absensi berhasil diperbarui.');
-
-        emit('ui.modal.closeAll');
-
-        await loadAllLocalDataToState();
-
-        const detailJurnalTerbuka = appState.detailPaneHistory.some(h => h.title?.includes('Jurnal Harian'));
-        if (detailJurnalTerbuka) {
-            appState.detailPaneHistory = [];
-            emit('jurnal.viewHarian', getJSDate(record.date).toISOString().slice(0, 10));
-        } else {
-            emit('ui.page.render');
-        }
-
-        requestSync({ silent: true });
-
-    } catch (error) {
-        toast('error', 'Gagal memperbarui absensi.');
-        console.error(error);
+        emit('ui.modal.openManualAttendance', { workerId });
+    } catch (e) {
+        console.error("Gagal memanggil modal edit absensi:", e);
+        toast('error', 'Gagal membuka panel editor absensi.');
     }
 }
-
 
 function _showPostSaveAttendanceDialog(summary) {
     const { totalPay, workerCount, dateStr, productiveEntries } = summary;
@@ -334,15 +202,15 @@ function _showPostSaveAttendanceDialog(summary) {
         title: 'Absensi Tersimpan', 
         content: modalContent, 
         footer: footer, 
-        isUtility: true // Mencegah konfirmasi "tutup" jika form-dirty
+        isUtility: true
     });
 
     const navigateBtn = modal.querySelector('[data-action="close-modal-and-navigate"]');
 
     if (navigateBtn) {
         navigateBtn.addEventListener('click', () => {
-            closeModal(modal); // Tutup modal ini
-            emit('ui.navigate', 'jurnal'); // Navigasi ke jurnal
+            closeModal(modal);
+            emit('ui.navigate', 'jurnal');
         });
     }
 
@@ -467,8 +335,23 @@ async function _executeSaveAttendance(dateStr) {
                 skippedCount++;
                 continue;
             }
-            
+
             const entries = Array.isArray(data) ? data : [data];
+            const firstProductiveEntry = entries.find(e => e.status !== 'absent');
+
+            if (firstProductiveEntry) {
+                const { projectId, role } = firstProductiveEntry;
+                const wage = worker.projectWages?.[projectId]?.[role] || 0;
+
+                if (!projectId || !role || wage <= 0) {
+                    emit('ui.modal.create', 'infoSheet', {
+                        title: 'Validasi Gagal',
+                        message: `<p>Pekerja <strong>${worker.workerName}</strong> belum memiliki Proyek dan Upah yang valid. Silakan atur terlebih dahulu di halaman Absensi melalui menu 'Edit Proyek & Peran'.</p>`,
+                        modalClass: 'modal-small'
+                    });
+                    return { success: false, skipped: pending.size, summary: null };
+                }
+            }
             
             const oldRecords = existingRecordsByWorker.get(workerId) || [];
             oldRecords.forEach(r => dbIdsToSoftDelete.add(r.id));
@@ -608,7 +491,7 @@ async function _executeSaveAttendance(dateStr) {
     } catch (error) {
         console.error("Gagal menyimpan absensi manual (v3):", error);
         toast('error', `Gagal menyimpan absensi: ${error.message}`);
-        return { success: false, skipped: entries ? entries.length : 0, summary: null }; // <--- Pastikan summary: null ada di sini
+        return { success: false, skipped: entries ? entries.length : 0, summary: null };
     }
 }
 
@@ -706,201 +589,6 @@ export async function handleDeleteSingleAttendance(recordId) {
             }
         }
     });
-}
-
-export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
-    try {
-        const project = (appState.projects || []).find(p => p.id === projectId);
-        if (!project) {
-            toast('error', 'Proyek tidak ditemukan.');
-            return;
-        }
-
-        const date = parseLocalDate(dateStr);
-        const { startOfDay, endOfDay } = getLocalDayBounds(dateStr);
-
-        const workers = (appState.workers || []).filter(w => w.status === 'active' && !w.isDeleted && w.projectWages && w.projectWages[projectId]);
-
-        const existingRecordsOnDate = (appState.attendanceRecords || [])
-            .filter(rec => {
-                const recDate = getJSDate(rec.date);
-                return recDate >= startOfDay && recDate <= endOfDay && rec.projectId === projectId && rec.isDeleted !== 1;
-            });
-        const existingRecordMap = new Map(existingRecordsOnDate.map(rec => [rec.workerId, rec]));
-
-        const rowsHTML = workers.map(w => {
-            const existingRecord = existingRecordMap.get(w.id);
-            const currentRole = existingRecord?.jobRole || w.defaultRole || Object.keys(w.projectWages?.[projectId] || {})[0] || '';
-            const wage = (w.projectWages?.[projectId] || {})[currentRole] || 0;
-            
-            const customWage = existingRecord?.customWage || 0;
-            let displayWage = wage;
-            let displayRole = currentRole;
-            if (customWage > 0) {
-                displayWage = customWage;
-                displayRole = `${currentRole} (Kustom)`;
-            }
-
-            const currentStatus = existingRecord?.attendanceStatus || 'absent'; 
-
-            return `
-                <div class="manual-assign-row" data-worker-id="${w.id}" data-base-wage="${wage}" data-role="${currentRole}" data-custom-wage="${customWage}">
-                    <div class="manual-assign-row__head">
-                        <div class="worker-info">
-                            <strong class="worker-name">${w.workerName}</strong>
-                            <span class="meta-badge worker-wage" data-pay="0">${displayRole ? `${displayRole} · ${fmtIDR(displayWage)}` : 'Peran?'}</span>
-                        </div>
-                        <div class="attendance-status-radios" data-worker-id="${w.id}">
-                            <label class="custom-checkbox-label">
-                                <input type="radio" name="status_${w.id}" value="full_day" ${currentStatus === 'full_day' ? 'checked' : ''}>
-                                <span class="custom-checkbox-visual"></span>
-                            </label>
-                            <label class="custom-checkbox-label">
-                                <input type="radio" name="status_${w.id}" value="half_day" ${currentStatus === 'half_day' ? 'checked' : ''}>
-                                <span class="custom-checkbox-visual"></span>
-                            </label>
-                            <label class="custom-checkbox-label">
-                                <input type="radio" name="status_${w.id}" value="absent" ${currentStatus === 'absent' ? 'checked' : ''}>
-                                <span class="custom-checkbox-visual"></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-        
-        const headerControlsHTML = `
-        <div class="attendance-manual-header-controls">
-            <div class="helper-text">
-                Tanggal: <strong>${date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</strong><br>
-                Proyek: <strong>${project.projectName}</strong>
-            </div>
-             <div class="check-all-controls">
-                    <span>Tandai Semua:</span>
-                    <div class="attendance-status-radios" id="check-all-radios">
-                        <label class="custom-checkbox-label"><input type="radio" name="check-all-group" data-check-all="full_day"><span class="custom-checkbox-visual"></span></label>
-                        <label class="custom-checkbox-label"><input type="radio" name="check-all-group" data-check-all="half_day"><span class="custom-checkbox-visual"></span></label>
-                        <label class="custom-checkbox-label"><input type="radio" name="check-all-group" data-check-all="absent"><span class="custom-checkbox-visual"></span></label>
-                    </div>
-                </div>
-                <div class="attendance-status-header">
-                    <span class="header-label-placeholder"></span>
-                    <div class="header-labels">
-                        <span>Hadir</span>
-                        <span>1/2 Hari</span>
-                        <span>Absen</span>
-                    </div>
-                </div>
-            </div>`;
-
-        const bodyHTML = `
-            <div class="scrollable-content" style="max-height: 60vh;"> ${rowsHTML.length > 0 ? rowsHTML : getEmptyStateHTML({icon: 'engineering', title: 'Tidak Ada Pekerja', desc: 'Tidak ada pekerja aktif untuk proyek ini.'})}</div>
-        `;
-
-         const summaryHTML = `
-            <div class="invoice-total attendance-manual-summary" id="attendance-manual-summary">
-                <span>Total Estimasi Upah</span>
-                <strong id="manual-attendance-total">Rp 0</strong>
-            </div>`;
-
-        const headerActions = `<button class="btn btn-secondary" data-action="goto-manual-add" data-project-id="${projectId}" data-date="${dateStr}" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">${createIcon('edit', 16)} Tambah/Ubah</button>`;
-        
-        const footer = `<div class="form-footer-actions"><button class="btn btn-primary" id="save-absence-status">${createIcon('save', 18)} Simpan Perubahan</button></div>`;
-
-        showDetailPane({
-            title: 'Edit Absensi Harian',
-            content: `<div class="card card-pad">${headerControlsHTML} ${bodyHTML} ${summaryHTML}</div>`,
-            headerActions,
-            footer,
-            paneType: 'attendance-daily-editor'
-        });
-
-        const context = document.getElementById('detail-pane');
-        if (!context) return;
-
-        const updateTotal = () => {
-            let totalPay = 0;
-            context.querySelectorAll('.manual-assign-row').forEach(row => {
-                const workerId = row.dataset.workerId;
-                const status = context.querySelector(`input[name="status_${workerId}"]:checked`)?.value || 'absent';
-                const baseWage = parseFloat(row.dataset.baseWage || '0');
-                const customWage = parseFloat(row.dataset.customWage || '0');
-                const wageToUse = customWage > 0 ? customWage : baseWage;
-                
-                let pay = 0;
-                if (status === 'full_day') pay = wageToUse;
-                else if (status === 'half_day') pay = wageToUse / 2;
-                totalPay += pay;
-                const wageEl = row.querySelector('.worker-wage');
-                if (wageEl) wageEl.dataset.pay = pay;
-            });
-            const totalEl = context.querySelector('#manual-attendance-total');
-            if (totalEl) totalEl.textContent = fmtIDR(totalPay);
-        };
-
-        context.querySelectorAll('.attendance-status-radios input').forEach(radio => {
-            radio.addEventListener('change', updateTotal);
-        });
-        context.querySelectorAll('.check-all-controls input[type="radio"]').forEach(radio => {
-            radio.addEventListener('change', () => {
-                const statusToSet = radio.dataset.checkAll;
-                context.querySelectorAll('.manual-assign-row').forEach(row => {
-                    const workerId = row.dataset.workerId;
-                    const radioToCheck = context.querySelector(`input[name="status_${workerId}"][value="${statusToSet}"]`);
-                    if (radioToCheck) radioToCheck.checked = true;
-                });
-                updateTotal();
-                setTimeout(() => { radio.checked = false; }, 100);
-            });
-        });
-
-        updateTotal();
-
-        context.querySelector('#save-absence-status')?.addEventListener('click', async () => {
-            const entries = [];
-            workers.forEach(w => {
-                const statusEl = context.querySelector(`input[name="status_${w.id}"]:checked`);
-                const status = statusEl?.value || 'absent';
-                
-                const row = context.querySelector(`.manual-assign-row[data-worker-id="${w.id}"]`);
-                const role = row?.dataset.role || '';
-                const baseWage = parseFloat(row?.dataset.baseWage || '0');
-                const customWage = parseFloat(row?.dataset.customWage || '0');
-                const wageToUse = customWage > 0 ? customWage : baseWage;
-                
-                const pay = status === 'full_day' ? wageToUse : (status === 'half_day' ? wageToUse / 2 : 0);
-                
-                entries.push({ 
-                    workerId: w.id, 
-                    workerName: w.workerName, 
-                    status: status === 'full_day' ? 'Hadir' : (status === 'half_day' ? '1/2 Hari' : 'Absen'),
-                    role: role, 
-                    pay: pay 
-                });
-            });
-
-            emit('ui.modal.create', 'confirmUserAction', {
-                title: 'Konfirmasi Simpan Absensi',
-                message: `Anda akan menyimpan perubahan absensi untuk ${workers.length} pekerja pada ${date.toLocaleDateString('id-ID')}. Lanjutkan?`,
-                onConfirm: async () => {
-                    try {
-                        await handleSaveManualAttendance({ date: dateStr, projectId, entries });
-                        await loadAllLocalDataToState();
-                        closeDetailPaneImmediate();
-                        emit('ui.page.render');
-                        toast('success', 'Perubahan absensi disimpan.');
-                    } catch (e) {
-                        toast('error', `Gagal menyimpan: ${e.message}`);
-                    }
-                    return false; 
-                }
-            });
-        });
-
-    } catch (e) {
-        console.error("Error opening daily attendance editor:", e);
-        toast('error', 'Gagal membuka panel editor absensi.');
-    }
 }
 
 export async function handleSaveManualAttendance(attendanceData) {
@@ -1227,7 +915,8 @@ export async function handleOpenAttendanceSettings() {
     const activeProjects = (appState.projects || []).filter(p => p.isWageAssignable && !p.isDeleted);
     const projectOptions = activeProjects.map(p => ({ value: p.id, text: p.projectName }));
 
-    const currentDefaultProjectId = appState.defaultAttendanceProjectId || '';
+    const mainProject = activeProjects.find(p => p.projectName.toLowerCase() === 'main');
+    const currentDefaultProjectId = appState.defaultAttendanceProjectId || mainProject?.id || '';
     const currentDefaultDate = appState.defaultAttendanceDate || parseLocalDate(new Date().toISOString().slice(0, 10)).toISOString().slice(0, 10);
     
     const globalSettingsHTML = `
@@ -1279,36 +968,38 @@ export async function handleOpenAttendanceSettings() {
         form?.addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            const onConfirm = async () => {
+                try {
+                    const globalSelect = form.querySelector('#global_default_project');
+                    const newDefaultId = globalSelect?.value || '';
+                    try { localStorage.setItem('attendance.defaultProjectId', newDefaultId); } catch(_) {}
+                    appState.defaultAttendanceProjectId = newDefaultId;
+
+                    const globalDateEl = form.querySelector('#global_default_date');
+                    const newDefaultDate = globalDateEl?.value || '';
+                    try { localStorage.setItem('attendance.defaultDate', newDefaultDate); } catch(_) {}
+                    appState.defaultAttendanceDate = newDefaultDate || appState.defaultAttendanceDate;
+
+                    toast('success', 'Pengaturan absensi disimpan.');
+
+                    if (appState.activePage === 'absensi') {
+                        appState.absensi.manualListNeedsUpdate = true;
+                        emit('ui.absensi.renderManualForm');
+                    }
+                } catch (err) {
+                    console.error('Gagal menyimpan pengaturan absensi:', err);
+                    toast('error', 'Gagal menyimpan pengaturan.');
+                }
+            };
+
             emit('ui.modal.create', 'confirmUserAction', {
                 title: 'Simpan Pengaturan?',
                 message: 'Anda yakin ingin menyimpan perubahan pengaturan absensi ini?',
-                onConfirm: async () => {
-                    try {
-                        const globalSelect = form.querySelector('#global_default_project');
-                        const newDefaultId = globalSelect?.value || '';
-                        try { localStorage.setItem('attendance.defaultProjectId', newDefaultId); } catch(_) {}
-                        appState.defaultAttendanceProjectId = newDefaultId;
-                        
-                        const globalDateEl = form.querySelector('#global_default_date');
-                        const newDefaultDate = globalDateEl?.value || '';
-                        try { localStorage.setItem('attendance.defaultDate', newDefaultDate); } catch(_) {}
-                        appState.defaultAttendanceDate = newDefaultDate || appState.defaultAttendanceDate;
-                        if (window.matchMedia('(max-width: 599px)').matches) {
-                            hideMobileDetailPage();
-                        } else {
-                            closeDetailPaneImmediate();
-                        }
-                        
-                        toast('success', 'Pengaturan absensi disimpan.');
-                        
-                        if (appState.activePage === 'absensi') {
-                            appState.absensi.manualListNeedsUpdate = true;
-                            emit('ui.absensi.renderManualForm');
-                        }
-
-                    } catch (err) {
-                        console.error('Gagal menyimpan pengaturan absensi:', err);
-                        toast('error', 'Gagal menyimpan pengaturan.');
+                onConfirm: () => {
+                    onConfirm();
+                    const confirmModal = document.querySelector('#confirmUserAction-modal');
+                    if (confirmModal) {
+                        closeModalImmediate(confirmModal);
                     }
                 }
             });
@@ -1317,6 +1008,7 @@ export async function handleOpenAttendanceSettings() {
 }
 
 export async function _openWorkerDefaultsModal(workerId, workerName) {
+    resetFormDirty();
     const worker = appState.workers.find(w => w.id === workerId);
     if (!worker) {
         toast('error', 'Data pekerja tidak ditemukan.');
@@ -1419,7 +1111,6 @@ export async function _openWorkerDefaultsModal(workerId, workerName) {
                 }
 
                 toast('success', `Pengaturan untuk ${workerName} disimpan.`);
-                closeModal(modal);
                 requestSync({ silent: true });
                 
                 if (appState.activePage === 'absensi') {
@@ -1683,7 +1374,7 @@ export async function handleOpenProjectRoleModal(context) {
     } else {
         modalInstance = showDetailPane({
             title: modalTitle,
-            content: content, // Langsung teruskan 'content'
+            content: content,
             footer: footer,
             paneType: 'attendance-project-role-edit'
         });
@@ -1751,4 +1442,3 @@ export async function handleOpenProjectRoleModal(context) {
         });
     }
 }
-

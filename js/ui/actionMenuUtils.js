@@ -233,7 +233,7 @@ export function getItemActions(context) {
         if (jurnalTab === 'harian') {
             baseActions.push({ label: 'Lihat Detail Hari Ini', action: 'view-jurnal-harian', icon: 'visibility', date: context.date });
             if (!isViewer()) {
-                baseActions.push({ label: 'Edit Absensi Hari Ini', action: 'edit-attendance-day', icon: 'edit', date: context.date });
+                baseActions.push({ label: 'Edit Absensi Harian', action: 'handleOpenAttendanceEditor', icon: 'edit', date: context.date });
             }
         } else if (jurnalTab === 'per_pekerja') {
             baseActions.push({ label: 'Lihat Detail Pekerja', action: 'view-worker-recap', icon: 'visibility', workerId: context.workerId });
