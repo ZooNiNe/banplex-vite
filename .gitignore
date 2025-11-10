@@ -33,6 +33,7 @@ android/
 .env
 .env.development
 .env.development.local
+serviceAccount.json
 
 # File server pengembangan lokal (Opsional, ini sudah benar)
 dev-server.js

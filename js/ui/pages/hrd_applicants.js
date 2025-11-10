@@ -104,6 +104,8 @@ function createIcon(iconName, size = 16, classes = '') {
         refresh: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rotate-cw ${classes}"><path d="M21 2v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7L21 8"/></svg>`,
         x: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x ${classes}"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
         download: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download ${classes}"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>`,
+        'user-plus': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-plus ${classes}"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>`,
+        users: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users ${classes}"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
     };
     return icons[iconName] || '';
 }
@@ -199,6 +201,7 @@ function renderPageShell() {
             </div>
             <div class="panel-content scrollable-content has-padding">
                 <div class="form-card accent-purple file-storage-summary">
+                    ${createIcon('users', 48, 'summary-icon')}
                     <button type="button" class="summary-refresh-btn" id="hrd-applicants-refresh-btn" title="Segarkan data pelamar" aria-label="Segarkan data pelamar">
                         ${createIcon('refresh', 18)}
                     </button>
@@ -212,7 +215,10 @@ function renderPageShell() {
                             <button type="button" class="btn btn-ghost" data-action="fs-download-template" data-format="xlsx">Template XLSX</button>
                             <button type="button" class="btn btn-ghost" data-action="fs-download-template" data-format="csv">Template CSV</button>
                         </div>
-                        <button type="button" class="btn btn-primary" id="hrd-applicants-create-btn">Input Pelamar</button>
+                        <button type="button" class="btn btn-primary" id="hrd-applicants-create-btn">
+                            ${createIcon('user-plus', 16)}
+                            <span>Input Pelamar</span>
+                        </button>
                     </div>
                 </div>
                 <div class="file-storage-filters card card-pad">

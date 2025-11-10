@@ -38,7 +38,6 @@ function createIcon(iconName, size = 18, classes = '') {
  * @returns {boolean} True jika setup berhasil.
  */
 function setupModalState(context) {
-    // ... (fungsi tidak berubah) ...
     const { workerId } = context;
     const dateStr = appState.defaultAttendanceDate;
     const worker = appState.workers.find(w => w.id === workerId);
@@ -47,7 +46,6 @@ function setupModalState(context) {
         return false;
     }
 
-    // Reset state modal
     modalState = {
         workerId: workerId,
         workerName: worker.workerName,
@@ -57,31 +55,28 @@ function setupModalState(context) {
         professions: appState.professions.filter(p => !p.isDeleted)
     };
     
-    // 1. Cek data "Siap Disimpan" (pendingAttendance) dulu
     const pendingData = appState.pendingAttendance?.get(workerId);
     
     if (pendingData) {
-        modalState.entries = Array.isArray(pendingData) ? pendingData : [pendingData];
+        const entries = Array.isArray(pendingData) ? pendingData : [pendingData];
+        modalState.entries = JSON.parse(JSON.stringify(entries));
     } else {
-        // 2. Jika tidak ada, cek data "Sudah Absen" (dari DB/attendanceRecords)
         const { startOfDay, endOfDay } = getLocalDayBounds(dateStr);
         const existingRecords = (appState.attendanceRecords || [])
             .filter(rec => {
                 const recDate = getJSDate(rec.date);
-                return rec.workerId === workerId && 
-                       recDate >= startOfDay && 
-                       recDate <= endOfDay && 
-                       rec.isDeleted !== 1;
+                return rec.workerId === workerId && recDate >= startOfDay && recDate <= endOfDay && rec.isDeleted !== 1;
             });
 
         if (existingRecords.length > 0) {
             modalState.entries = existingRecords.map(rec => ({
-                id: rec.id, // ID dari database
+                id: rec.id,
                 projectId: rec.projectId,
                 role: rec.jobRole,
-                status: rec.attendanceStatus, // full_day, half_day, absent
+                status: rec.attendanceStatus,
                 pay: rec.totalPay,
-                customWage: rec.customWage || null
+                customWage: rec.customWage || null,
+                notes: rec.notes || ''
             }));
         }
     }
@@ -267,7 +262,7 @@ function attachEntryListeners(modal) {
 
         if (target.name.startsWith('project_')) {
             entry.projectId = target.value;
-            entry.role = ''; // Reset peran
+            entry.role = '';
             entry.pay = 0;
             
             const worker = appState.workers.find(w => w.id === modalState.workerId);
@@ -277,20 +272,20 @@ function attachEntryListeners(modal) {
                 text: `${role} (${fmtIDR(wageOptions[role])})`
             }));
             
-            // Set peran default untuk proyek baru
             entry.role = worker.defaultRole && wageOptions[worker.defaultRole] ? worker.defaultRole : (roleOptions[0]?.value || '');
             
             const roleContainer = row.querySelector('.role-selector');
             if (roleContainer) {
-                // PERBAIKAN (BUG 3): Tambah 'false' untuk showSearch di dropdown Peran
                 roleContainer.innerHTML = createMasterDataSelect(`role_${entryId}`, 'Peran', roleOptions, entry.role || '', null, true, false);
                 initCustomSelects(roleContainer);
                 
-                const newRoleSelect = roleContainer.querySelector(`input[name="role_${entryId}"]`);
-                newRoleSelect?.addEventListener('change', (ev) => {
-                    entry.role = ev.target.value;
-                    updatePay(row);
-                }, { once: false });
+                const newRoleSelect = roleContainer.querySelector(`[name="role_${entryId}"]`);
+                if (newRoleSelect) {
+                    newRoleSelect.addEventListener('change', (ev) => {
+                        entry.role = ev.target.value;
+                        updatePay(row);
+                    });
+                }
             }
             updatePay(row);
             
@@ -403,13 +398,12 @@ export function handleOpenManualAttendanceModal(context) {
     `;
     
     const footer = `
-        <button type="button" class="btn btn-ghost" data-action="history-back">Batal</button>
+        <button type="button" class="btn btn-ghost" data-action="close-detail-pane">Batal</button>
         <button type="button" id="save-manual-attendance-btn" class="btn btn-primary">
             ${createIcon('save')} Terapkan Perubahan
         </button>
     `;
 
-    // Buka sebagai Bottom Sheet di mobile, atau Panel di desktop
     const modal = showDetailPane({
         title: `Edit Absensi`,
         content: `<div class="scrollable-content">${content}</div>`,

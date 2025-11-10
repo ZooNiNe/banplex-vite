@@ -1,6 +1,9 @@
 let tooltipElement;
 let showTimeout;
 let hideTimeout;
+let isTooltipActive = false;
+
+const isTouchDevice = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 function createTooltip(text) {
     if (hideTimeout) clearTimeout(hideTimeout);
@@ -44,6 +47,7 @@ function positionTooltip(targetElement) {
 }
 
 export function showTooltip(targetElement) {
+    if (isTouchDevice()) return;
     const text = targetElement.dataset.tooltip;
     if (!text) return;
 
@@ -52,10 +56,11 @@ export function showTooltip(targetElement) {
     showTimeout = setTimeout(() => {
         createTooltip(text);
         positionTooltip(targetElement);
+        isTooltipActive = true;
     }, 50);
 }
 
-export function hideTooltip(delay = 200) {
+export function hideTooltip(delay = 100) {
     if (showTimeout) clearTimeout(showTimeout);
     if (hideTimeout) clearTimeout(hideTimeout);
 
@@ -67,5 +72,12 @@ export function hideTooltip(delay = 200) {
                 tooltipElement = null;
             }, { once: true });
         }
+        isTooltipActive = false;
     }, delay);
 }
+
+document.addEventListener('mousedown', () => {
+    if (isTooltipActive) {
+        hideTooltip(0);
+    }
+}, true);
