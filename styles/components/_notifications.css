@@ -232,7 +232,7 @@ body.pending-mode #update-notification.show {
 .top-notification-bar.show { transform: translateY(0); opacity: 1; }
 .top-notification-inner {
   margin: 1rem auto;
-  max-width: 420px;
+  max-width: 330px;
   background: var(--panel);
   display: flex;
   align-items: center;
