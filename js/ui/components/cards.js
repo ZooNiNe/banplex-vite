@@ -230,8 +230,7 @@ export function _getMasterDataListHTML(type, items, config) {
             headerMeta: '',
             metaBadges: badges,
             mainContentHTML: mainContent,
-            dataset: dataset,
-            moreAction: true,
+            dataset: { ...dataset, action: 'edit-item' },            moreAction: true,
             actions: [],
             selectionEnabled: selectionActive,
             isSelected: isSelected
