@@ -18,6 +18,7 @@ export const createListSkeletonHTML = (count = 5) => {
                 <div class="wa-card-v2__main">
                     <div class="wa-card-v2__header">
                         <span class="skeleton skeleton-text" style="width: 60%; height: 18px;"></span>
+                        <span class="skeleton skeleton-text" style="width: 30%; height: 14px;"></span>
                     </div>
                     <div class="wa-card-v2__body">
                         <span class="skeleton skeleton-text" style="width: 40%; height: 14px;"></span>
@@ -25,8 +26,8 @@ export const createListSkeletonHTML = (count = 5) => {
                     </div>
                 </div>
                 <div class="wa-card-v2__meta">
-                    <span class="skeleton skeleton-text" style="width: 70px; height: 14px;"></span>
                     <span class="skeleton skeleton-text" style="width: 100px; height: 18px;"></span>
+                    <span class="skeleton skeleton-text" style="width: 70px; height: 14px;"></span>
                 </div>
             </div>
         </div>

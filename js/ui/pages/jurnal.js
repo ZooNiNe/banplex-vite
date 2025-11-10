@@ -1,9 +1,10 @@
+
 import { appState } from '../../state/appState.js';
 import { $ } from '../../utils/dom.js';
 import { createPageToolbarHTML } from '../components/toolbar.js';
 import { createTabsHTML } from '../components/tabs.js';
 import { createUnifiedCard, _getJurnalHarianListHTML, _getRekapGajiListHTML, _getJurnalPerPekerjaListHTML } from '../components/cards.js';
-import { getEmptyStateHTML, getEndOfListPlaceholderHTML } from '../components/emptyState.js';
+import { getEmptyStateHTML, getEndOfListPlaceholderHTML, getDetailPlaceholderHTML } from '../components/emptyState.js';
 import { formatDate, fmtIDR } from '../../utils/formatters.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
@@ -460,7 +461,9 @@ function initJurnalPage() {
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content"></div>
         </div>
-    `;
+        <div id="detail-panel" class="detail-panel">
+            ${getDetailPlaceholderHTML('jurnal')}
+        </div>`;
     const tabsContainer = container.querySelector('#jurnal-tabs');
     if (tabsContainer) {
         tabsContainer.addEventListener('click', (e) => {

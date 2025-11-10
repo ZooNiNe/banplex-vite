@@ -41,12 +41,12 @@ function renderPengaturanContent() {
             { label: 'Manajemen Pengguna', action: 'manage-users', icon: 'group', role: ['Owner'] },
         ]},
         { title: 'Data', items: [
-            { label: 'Kelola Master Data', action: 'navigate', nav: 'master_data', icon: 'database', role: ['Owner', 'Editor'] }
+            { label: 'Kelola Master Data', action: 'navigate', nav: 'master_data', icon: 'database', role: ['Owner', 'Editor'] },
+            { label: 'Log Aktivitas', action: 'navigate', nav: 'log_aktivitas', icon: 'history', role: ['Owner', 'Editor', 'Viewer'] },
+            { label: 'Keranjang Sampah', action: 'navigate', nav: 'recycle_bin', icon: 'trash', role: ['Owner', 'Editor'] }
         ]},
         { title: 'Utilitas', items: [
             { label: 'Tools Aplikasi', action: 'open-tools-grid', icon: 'hard_hat', role: ['Owner', 'Editor'] },
-            { label: 'Log Aktivitas', action: 'navigate', nav: 'log_aktivitas', icon: 'history', role: ['Owner', 'Editor', 'Viewer'] },
-            { label: 'Keranjang Sampah', action: 'navigate', nav: 'recycle_bin', icon: 'trash', role: ['Owner', 'Editor'] }
         ]},
         { title: '', items: [
             { label: 'Keluar', action: 'auth-action', icon: 'logout', role: ['Owner', 'Editor', 'Viewer'] }

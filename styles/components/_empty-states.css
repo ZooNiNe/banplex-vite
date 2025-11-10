@@ -224,3 +224,46 @@
   font-size: 0.85rem;
   line-height: 1.5;
 }
+
+/* --- Detail Panel Placeholder --- */
+.detail-placeholder-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: var(--text-dim);
+}
+
+.detail-placeholder-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--panel);
+    border: 1px solid var(--line);
+    margin-bottom: 1rem;
+    color: var(--primary);
+}
+.detail-placeholder-icon .lucide {
+    width: 32px;
+    height: 32px;
+    opacity: 0.8;
+}
+
+.detail-placeholder-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 0.5rem;
+}
+
+.detail-placeholder-text {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    max-width: 320px;
+    margin: 0;
+}

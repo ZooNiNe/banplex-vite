@@ -9,10 +9,10 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 1rem;
-  background: var(--surface-muted);
-  padding: 1rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
+  padding: 0;
+}
+.detail-summary-grid.three-col {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 
 .summary-item {

@@ -66,3 +66,47 @@ export function getEndOfListPlaceholderHTML() {
         </div>
     `;
 }
+
+export function getDetailPlaceholderHTML(page) {
+    let icon = 'info';
+    let title = 'Informasi Kontekstual';
+    let text = 'Pilih item dari daftar untuk melihat detailnya di sini.';
+
+    switch (page) {
+        case 'tagihan':
+            icon = 'receipt_long';
+            title = 'Detail Tagihan';
+            text = 'Pilih sebuah tagihan dari daftar di sebelah kiri untuk melihat rincian lengkapnya, termasuk item, jumlah, dan status pembayaran.';
+            break;
+        case 'pemasukan':
+            icon = 'account_balance_wallet';
+            title = 'Detail Pemasukan';
+            text = 'Pilih item termin atau pinjaman dari daftar untuk menampilkan detailnya di sini.';
+            break;
+        case 'jurnal':
+            icon = 'event_note';
+            title = 'Detail Jurnal';
+            text = 'Pilih tanggal atau pekerja dari daftar untuk melihat detail jurnal dan absensi.';
+            break;
+        case 'master_data':
+            icon = 'database';
+            title = 'Pengelolaan Master Data';
+            text = 'Pilih item dari daftar (misalnya: suplier, proyek) untuk melihat atau mengubah datanya. Anda juga dapat menambahkan data baru melalui tombol di pojok kanan atas.';
+            break;
+        case 'recycle_bin':
+            icon = 'recycling';
+            title = 'Keranjang Sampah';
+            text = 'Item yang dihapus akan ditampilkan di sini. Anda dapat memulihkannya atau menghapusnya secara permanen.';
+            break;
+        default:
+            break;
+    }
+
+    return `
+        <div class="detail-placeholder-wrapper">
+            <div class="detail-placeholder-icon">${createIcon(icon, 40)}</div>
+            <h4 class="detail-placeholder-title">${title}</h4>
+            <p class="detail-placeholder-text">${text}</p>
+        </div>
+    `;
+}

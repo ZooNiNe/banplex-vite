@@ -1,3 +1,4 @@
+
 import { appState } from '../../state/appState.js';
 import { $, $$ } from '../../utils/dom.js';
 import { createPageToolbarHTML } from '../components/toolbar.js';
@@ -19,7 +20,7 @@ import {
     createMasterDataListSkeletonHTML, 
     _getSkeletonLoaderHTML 
 } from '../components/skeleton.js';
-import { getEmptyStateHTML } from '../components/emptyState.js';
+import { getEmptyStateHTML, getDetailPlaceholderHTML } from '../components/emptyState.js';
 import { isViewer } from '../../utils/helpers.js';
 import { masterDataConfig, TEAM_ID } from '../../config/constants.js';
 import { db, projectsCol, suppliersCol, workersCol, materialsCol, staffCol, professionsCol, opCatsCol, matCatsCol, otherCatsCol, fundingCreditorsCol } from '../../config/firebase.js';
@@ -383,6 +384,9 @@ export async function initMasterDataPage() {
             <div id="sub-page-content" class="panel-body scrollable-content">
                 ${_getSkeletonLoaderHTML('page')}
             </div>
+        </div>
+        <div id="detail-panel" class="detail-panel">
+            ${getDetailPlaceholderHTML('master_data')}
         </div>
     `;
 
