@@ -171,31 +171,26 @@ function upsertCommentInUI(commentData, changeType, list, replyToId = null) {
         }
 
         if (changeType === 'removed' || commentData.isDeleted) {
-            if (existing) {
-                const childRepliesWrapper = existing.nextElementSibling && existing.nextElementSibling.classList?.contains('comment-replies')
-                    ? existing.nextElementSibling
-                    : null;
-                const parentRepliesWrapper = existing.closest('.comment-replies');
+        if (existing) {
+            const el = existing;
+            el.style.transition = 'opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease 0.1s';
+            el.style.opacity = '0';
+            el.style.transform = 'scale(0.95)';
+            el.style.maxHeight = '0px';
 
-                const removeCommentElement = () => {
-                    if (existing.parentNode) {
-                        existing.remove();
-                    }
-                    if (childRepliesWrapper && childRepliesWrapper.parentNode && !childRepliesWrapper.querySelector('.msg-group')) {
-                        childRepliesWrapper.remove();
-                    }
-                    if (parentRepliesWrapper && parentRepliesWrapper.parentNode && !parentRepliesWrapper.querySelector('.msg-group')) {
-                        parentRepliesWrapper.remove();
-                    }
-                };
+            const onTransitionEnd = () => {
+                if (el.parentNode) {
+                    el.remove();
+                }
+            };
 
-                existing.classList.remove('msg-anim-sent', 'msg-anim-received');
-                existing.classList.add('item-exiting');
-                existing.addEventListener('animationend', removeCommentElement, { once: true });
-                setTimeout(removeCommentElement, 500);
-            }
-            return;
+            el.addEventListener('transitionend', onTransitionEnd, { once: true });
+            setTimeout(() => {
+                if (el.parentNode) el.remove();
+            }, 450);
         }
+        return;
+    }
         
         const currentUid = appState.currentUser?.uid || 'user-guest';
         

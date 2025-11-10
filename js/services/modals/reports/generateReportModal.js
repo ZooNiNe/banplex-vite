@@ -21,7 +21,8 @@ async function handleGenerateReportModal() {
     { value: 'upah_pekerja', text: 'Laporan Rinci Upah Pekerja (PDF)' },
     { value: 'material_supplier', text: 'Laporan Rinci Material (PDF)' },
     { value: 'material_usage_per_project', text: 'Pemakaian Material per Proyek (PDF)' },
-    { value: 'rekapan', text: 'Laporan Rekapan Transaksi (PDF)' }
+    { value: 'rekapan', text: 'Laporan Rekapan Transaksi (PDF)' },
+    { value: 'recipient_data', text: 'Laporan Data Penerima (PDF)' }
   ];
   const validReportTypes = new Set(reportTypeOptions.map(o => o.value));
 
@@ -83,9 +84,9 @@ async function handleGenerateReportModal() {
       await fetchAndCacheData('projects', projectsCol, 'projectName');
       const projectOptions = [{ value: 'all', text: 'Semua Proyek' }, ...appState.projects.map(p => ({ value: p.id, text: p.projectName }))];
       filtersHTML += createMasterDataSelect('report-project-id', 'Filter Proyek', projectOptions, 'all');
-    } else if (reportType === 'material_supplier') {
+} else if (reportType === 'material_supplier' || reportType === 'recipient_data') {
       await fetchAndCacheData('suppliers', suppliersCol, 'supplierName');
-      const supplierOptions = [{ value: 'all', text: 'Semua Supplier' }, ...appState.suppliers.filter(s => s.category === 'Material').map(s => ({ value: s.id, text: s.supplierName }))];
+      const supplierOptions = [{ value: 'all', text: 'Semua Supplier' }, ...appState.suppliers.map(s => ({ value: s.id, text: s.supplierName }))];
       filtersHTML += createMasterDataSelect('report-supplier-id', 'Filter Supplier', supplierOptions, 'all');
     } else if (reportType === 'material_usage_per_project') {
       await fetchAndCacheData('projects', projectsCol, 'projectName');

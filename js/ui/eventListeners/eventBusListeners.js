@@ -160,8 +160,14 @@ export function initializeEventBusListeners() {
     on('ui.action.restore-item', (dataset) => _handleRestoreItems([{ id: dataset.itemId, table: dataset.table }]));
     on('ui.action.delete-permanent-item', (dataset) => _handleDeletePermanentItems([{ id: dataset.itemId, table: dataset.table }]));
     on('ui.action.activate-selection-mode', (dataset) => _activateSelectionMode(dataset.pageContext || appState.activePage));
-    on('ui.action.open-filter-modal', () => emit('ui.modal.showBillsFilter', () => emit('ui.tagihan.renderContent')));
-    on('ui.action.open-sort-modal', () => emit('ui.modal.showBillsSort', () => emit('ui.tagihan.renderContent')));
+    on('ui.action.open-filter-modal', () => {
+        const isMobile = window.matchMedia('(max-width: 599px)').matches;
+        emit('ui.modal.showBillsFilter', () => emit('ui.tagihan.renderContent'), { useBottomSheet: isMobile });
+    });
+    on('ui.action.open-sort-modal', () => {
+        const isMobile = window.matchMedia('(max-width: 599px)').matches;
+        emit('ui.modal.showBillsSort', () => emit('ui.tagihan.renderContent'), { useBottomSheet: isMobile });
+    });
     on('ui.action.edit-item', (dataset) => handleOpenEditItem(dataset.itemId, dataset.type));
     on('ui.action.pay-loan', (dataset) => emit('ui.modal.openPayment', {id: dataset.itemId, type: 'pinjaman'}));
     on('ui.action.open-loan-payment-history', (dataset) => emit('ui.modal.openLoanPaymentHistory', { id: dataset.itemId }));
@@ -646,6 +652,25 @@ export function initializeEventBusListeners() {
         } catch(_) {}
         emit('ui.absensi.renderManualForm');
     });
+
+on('ui.action.re-input', (dataset) => {
+    const { formPage, formType } = dataset;
+    if (!formPage) return;
+
+    const formId = (formPage === 'pengeluaran')
+        ? (formType === 'material' ? 'material-invoice-form' : 'pengeluaran-form')
+        : 'pemasukan-form';
+
+    const key = `form_draft:${formId}:${formType}`;
+    try {
+        localStorage.removeItem(key);
+    } catch (e) {
+        console.warn(`Gagal membersihkan draf form: ${key}`, e);
+    }
+
+    // PERBAIKAN: Gunakan handleNavigation yang sudah ada
+    handleNavigation(formPage);
+});
 
     on('ui.comments.openNewCommentModal', async () => {
         const { openNewCommentSelector } = await import('../pages/chat.js');

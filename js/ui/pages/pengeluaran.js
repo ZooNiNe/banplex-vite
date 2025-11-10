@@ -3,7 +3,7 @@ import { $ } from '../../utils/dom.js';
 import { createPageToolbarHTML } from '../components/toolbar.js';
 import { createTabsHTML } from '../components/tabs.js';
 import { getFormPengeluaranHTML, getFormFakturMaterialHTML, attachPengeluaranFormListeners, initCustomSelects } from '../components/forms/index.js'; // Import initCustomSelects
-import { attachFormDraftPersistence } from '../../utils/formPersistence.js';
+import { forceSaveFormDraft, attachFormDraftPersistence } from '../../utils/formPersistence.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
 import { fetchAndCacheData } from '../../services/data/fetch.js';
@@ -231,15 +231,23 @@ function initPengeluaranPage() {
         });
     } catch (_) {}
 }
-on('app.unload.pengeluaran', () => { 
-    // [PERBAIKAN] Hapus juga listener 'masterData.updated' saat unload
+on('app.unload.pengeluaran', () => {
+    try {
+        const form = document.querySelector('#pengeluaran-form, #material-invoice-form');
+        if (form) {
+            forceSaveFormDraft(form);
+        }
+    } catch (e) {
+        console.warn('Gagal menyimpan draf form pengeluaran secara paksa:', e);
+    }
+
     off('masterData.updated', renderPengeluaranContent);
-    try { 
-        if (initPengeluaranPage._live) { 
-            initPengeluaranPage._live.unsubscribe?.(); 
-            initPengeluaranPage._live = null; 
-        } 
-    } catch(_) {} 
+    try {
+        if (initPengeluaranPage._live) {
+            initPengeluaranPage._live.unsubscribe?.();
+            initPengeluaranPage._live = null;
+        }
+    } catch (_) {}
 });
 
 export { initPengeluaranPage };

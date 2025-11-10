@@ -108,7 +108,7 @@ async function generatePdfReport(config) {
   
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({
-            orientation: 'portrait',
+            orientation: config.orientation || 'portrait',
             unit: 'mm',
             format: 'a4'
         });
@@ -384,6 +384,36 @@ async function _prepareRekapanDataForPdf() {
     };
 }
 
+async function _prepareRecipientDataForPdf() {
+    const supplierId = $('#report-supplier-id')?.value || 'all';
+
+    let suppliers = appState.suppliers || [];
+    if (supplierId !== 'all') {
+        suppliers = suppliers.filter(s => s.id === supplierId);
+    }
+
+    if (suppliers.length === 0) return null;
+
+    const bodyRows = suppliers.map(s => [
+        s.supplierName,
+        s.category || '-',
+        s.contactPerson || '-',
+        s.contactNumber || '-',
+        s.address || '-'
+    ]);
+
+    return {
+        title: 'Laporan Data Penerima',
+        subtitle: `Supplier: ${supplierId !== 'all' ? suppliers[0].supplierName : 'Semua Supplier'}`,
+        filename: `Laporan-Penerima-${new Date().toISOString().slice(0, 10)}.pdf`,
+        sections: [{
+            headers: ["Nama", "Kategori", "Kontak Person", "Kontak Nomor", "Alamat"],
+            body: bodyRows
+        }],
+        orientation: 'landscape'
+    };
+}
+
 async function _prepareAnalisisBebanDataForPdf() {
     await Promise.all([
         fetchAndCacheData('projects', projectsCol, 'projectName'),
@@ -490,6 +520,9 @@ export async function handleDownloadReport(format, reportType) {
             break;
         case 'material_usage_per_project':
             reportConfig = await _prepareMaterialUsageDataForPdf();
+            break;
+        case 'recipient_data':
+            reportConfig = await _prepareRecipientDataForPdf();
             break;
         default:
             toast('error', 'Tipe laporan ini belum didukung.');

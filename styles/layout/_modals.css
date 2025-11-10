@@ -735,3 +735,35 @@ background-color: var(--panel);
   margin-top: 1.5rem;
 }
 
+/* --- Responsive Bottom Sheet --- */
+.modal-bottom-sheet {
+    align-items: flex-end;
+    padding: 0;
+}
+.modal-bottom-sheet .modal-content {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 1.25rem 1.25rem 0 0;
+    transform: translateY(100%);
+    transition: transform 0.3s ease-out;
+    max-height: 85vh;
+}
+.modal-bottom-sheet.show .modal-content {
+    transform: translateY(0);
+}
+.bottom-sheet-drag-handle {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    background-color: var(--line);
+    border-radius: 2px;
+}
+.modal-bottom-sheet .modal-header h4 {
+    padding-top: 1.25rem;
+}
+.modal-bottom-sheet .modal-close-btn {
+    display: none;
+}

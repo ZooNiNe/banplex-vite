@@ -319,7 +319,8 @@ function loadMorePemasukan() {
         renderPemasukanContent(true);
     }, 500);
 }
-function _showPemasukanSortModal(onApply) {
+function _showPemasukanSortModal(onApply, options = {}) {
+    const { useBottomSheet = false } = options;
     const { sortBy = 'date', sortDirection = 'desc' } = appState.pemasukanFilter || {};
     const content = `
         <form id="pemasukan-sort-form">
@@ -350,7 +351,7 @@ function _showPemasukanSortModal(onApply) {
       title: 'Urutkan Pemasukan',
       content,
       footer,
-      isUtility: true
+      isBottomSheet: useBottomSheet
     });
     if (!modalEl) return;
 
@@ -538,7 +539,7 @@ function initPemasukanPage() {
     
     on('ui.pemasukan.renderContent', () => renderPemasukanContent(false), { signal: listenerSignal });
     on('request-more-data', loadMorePemasukan, { signal: listenerSignal });
-    on('ui.modal.showPemasukanSort', (onApply) => _showPemasukanSortModal(onApply), { signal: listenerSignal });
+    on('ui.modal.showPemasukanSort', (onApply, options) => _showPemasukanSortModal(onApply, options), { signal: listenerSignal });
 }
 
 export { initPemasukanPage };

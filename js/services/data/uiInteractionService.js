@@ -489,7 +489,7 @@ export function showSuccessPreviewPanel(itemData, type) {
     const originalFormPage = isPemasukan ? 'pemasukan_form' : 'pengeluaran';
 
     firstButtonHTML = `
-        <button class="btn btn-secondary" data-action="detail-pane-back" data-original-page="${originalFormPage}">
+        <button class="btn btn-secondary" data-action="re-input" data-form-page="${originalFormPage}" data-form-type="${type}">
             ${createIcon('arrow-left')}
             <span>Input Lagi</span>
         </button>

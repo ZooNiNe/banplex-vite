@@ -44,6 +44,10 @@ export const clickActions = {
         } catch(_) {}
         emit('ui.absensi.renderManualForm');
     },
+
+    're-input': (context, event) => {
+        emit('ui.action.re-input', context.dataset);
+    },
     'close-detail-pane-and-navigate': (ctx) => {
         closeDetailPaneImmediate();
         hideMobileDetailPage();
@@ -73,11 +77,30 @@ export const clickActions = {
     'open-global-search': (ctx) => { emit('ui.search.open', { target: ctx.target }); },
     'open-comments-search': () => { emit('ui.comments.openSearch'); },
     'open-new-comment-modal': () => { emit('ui.comments.openNewCommentModal'); },
-    'open-filter-modal': () => { emit('ui.modal.showBillsFilter', () => emit('ui.tagihan.renderContent')); },
-    'open-sort-modal': () => { emit('ui.modal.showBillsSort', () => emit('ui.tagihan.renderContent')); },
-    'open-sort-modal-pemasukan': () => { emit('ui.modal.showPemasukanSort', () => emit('ui.pemasukan.renderContent')); },    'open-attendance-filter-modal': () => { emit('ui.modal.showAttendanceFilter', () => emit('ui.absensi.renderContent')); },
-    'open-stock-sort-modal': () => { emit('ui.modal.showStockSort', () => emit('ui.stok.renderContent')); },
-    'open-attendance-sort-modal': () => { emit('ui.modal.showAttendanceSort', () => emit('ui.absensi.renderContent')); },
+    'open-filter-modal': () => {
+        const isMobile = window.matchMedia('(max-width: 599px)').matches;
+        emit('ui.modal.showBillsFilter', () => emit('ui.tagihan.renderContent'), { useBottomSheet: isMobile });
+    },
+    'open-sort-modal': () => {
+        const isMobile = window.matchMedia('(max-width: 599px)').matches;
+        emit('ui.modal.showBillsSort', () => emit('ui.tagihan.renderContent'), { useBottomSheet: isMobile });
+    },
+    'open-sort-modal-pemasukan': () => {
+        const isMobile = window.matchMedia('(max-width: 599px)').matches;
+        emit('ui.modal.showPemasukanSort', () => emit('ui.pemasukan.renderContent'), { useBottomSheet: isMobile });
+    },
+    'open-attendance-filter-modal': () => {
+        const isMobile = window.matchMedia('(max-width: 599px)').matches;
+        emit('ui.modal.showAttendanceFilter', () => emit('ui.absensi.renderContent'), { useBottomSheet: isMobile });
+    },
+    'open-stock-sort-modal': () => {
+        const isMobile = window.matchMedia('(max-width: 599px)').matches;
+        emit('ui.modal.showStockSort', () => emit('ui.stok.renderContent'), { useBottomSheet: isMobile });
+    },
+    'open-attendance-sort-modal': () => {
+        const isMobile = window.matchMedia('(max-width: 599px)').matches;
+        emit('ui.modal.showAttendanceSort', () => emit('ui.absensi.renderContent'), { useBottomSheet: isMobile });
+    },
     'open-pemasukan-detail': (ctx) => { handleOpenPemasukanDetail({ dataset: { id: ctx.itemId, type: ctx.type } }); },
     'pay-loan': (ctx) => { emit('ui.modal.openPayment', {id: ctx.itemId, type: 'pinjaman'}); },
     'open-loan-payment-history': (ctx) => { emit('ui.modal.openLoanPaymentHistory', { id: ctx.itemId }); },
