@@ -735,3 +735,11 @@ background-color: var(--panel);
   margin-top: 1.5rem;
 }
 
+/* Custom styles for the attendance filter modal */
+.attendance-filter-modal .modal-body {
+  overflow: visible !important;
+}
+
+.attendance-filter-modal .form-group .custom-select-container {
+  z-index: 2101 !important;
+}

@@ -1,6 +1,7 @@
 // PERBAIKAN: Impor closeModalImmediate
 import { createModal, closeModal, closeModalImmediate } from "../../components/modal.js";
 import { appState } from "../../../state/appState.js";
+import { createSnackbar } from "../../components/snackbar.js";
 
 function createIcon(iconName, size = 16, classes = '') {
   const icons = {
@@ -56,5 +57,6 @@ export function showStockSortModal(onApply) {
     if (typeof onApply === 'function') onApply(selected);
     // PERBAIKAN: Gunakan closeModalImmediate
     closeModalImmediate(modalEl);
+    createSnackbar("Sort applied successfully.");
   });
 }

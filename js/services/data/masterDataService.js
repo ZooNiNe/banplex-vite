@@ -194,7 +194,27 @@ export async function handleAddMasterItem(form) {
                         }
                     } catch(e) { console.error('Gagal parsing data upah');}
                 });
+
+                if (Object.keys(projectWages).length === 0) {
+                    emit('ui.modal.create', 'infoSheet', {
+                        title: 'Validasi Gagal',
+                        message: '<p>Setidaknya satu pengaturan upah per proyek harus ditambahkan sebelum menyimpan pekerja baru.</p>',
+                        modalClass: 'modal-small'
+                    });
+                    if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+                    return;
+                }
                 dataToAdd.projectWages = projectWages;
+
+                // Auto-set default project and role for new workers
+                const firstProjectIdWithWage = Object.keys(projectWages)[0];
+                if (firstProjectIdWithWage) {
+                    dataToAdd.defaultProjectId = firstProjectIdWithWage;
+                    const firstRole = Object.keys(projectWages[firstProjectIdWithWage])[0];
+                    if (firstRole) {
+                        dataToAdd.defaultRole = firstRole;
+                    }
+                }
             }
 
             const collectionRef = COLLECTIONS[type];
