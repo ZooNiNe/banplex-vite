@@ -19,6 +19,7 @@ async function _showBillsFilterModal(onApply) {
   const allBillsEver = await localDB.bills.toArray();
   const allExpenses = await localDB.expenses.where('isDeleted').notEqual(1).toArray();
   const allSuppliers = await localDB.suppliers.toArray();
+  const allExpenseCategories = await localDB.expenseCategories.toArray();
 
   const expenseMap = new Map(allExpenses.map(e => [e.id, e]));
 
@@ -37,58 +38,61 @@ async function _showBillsFilterModal(onApply) {
       .filter(s => relevantSupplierIds.has(s.id))
       .map(s => ({ value: s.id, text: s.supplierName }))
   ];
-  const statusOptions = [
-    { value: 'all', text: 'Semua Status' },
-    { value: 'unpaid', text: 'Belum Lunas' },
-    { value: 'paid', text: 'Lunas' },
-    { value: 'delivery_order', text: 'Delivery Order' },
+
+  const expenseCategoryOptions = [
+    { value: 'all', text: 'Semua Kategori' },
+    ...allExpenseCategories.map(c => ({ value: c.id, text: c.name }))
   ];
 
   const content = `
-        <form id="bills-filter-form">
+    <form id="bills-filter-form" class="modal-form">
+        ${createMasterDataSelect('filter-supplier-id', 'Filter Berdasarkan Supplier', supplierOptions, appState.billsFilter.supplierId, 'suppliers', false)}
+        ${createMasterDataSelect('filter-project-id', 'Filter Berdasarkan Proyek', projectOptions, appState.billsFilter.projectId, 'projects', false)}
+        ${createMasterDataSelect('filter-expense-category-id', 'Kategori Pengeluaran', expenseCategoryOptions, appState.billsFilter.expenseCategoryId, 'expense-categories', false)}
+
+        <div class="form-grid">
             <div class="form-group">
-                <label>Cari</label>
-                <input type="search" id="search-term" placeholder="Ketik kata kunci..." value="${appState.billsFilter.searchTerm || ''}" autocomplete="off">
+                <label for="search-start-date">Dari Tanggal</label>
+                <input type="date" id="search-start-date" value="${appState.billsFilter.dateStart || ''}">
             </div>
-            ${createMasterDataSelect('filter-project-id', 'Filter Berdasarkan Proyek', projectOptions, appState.billsFilter.projectId, 'projects')}
-            ${createMasterDataSelect('filter-supplier-id', 'Filter Berdasarkan Supplier', supplierOptions, appState.billsFilter.supplierId, 'suppliers')}
-            ${createMasterDataSelect('search-status', 'Status', statusOptions, appState.billsFilter.status || 'all')}
-            <div class="rekap-filters" style="padding:0; margin-top:1rem;">
-                <div class="form-group"><label>Dari Tanggal</label><input type="date" id="search-start-date" value="${appState.billsFilter.dateStart || ''}"></div>
-                <div class="form-group"><label>Sampai Tanggal</label><input type="date" id="search-end-date" value="${appState.billsFilter.dateEnd || ''}"></div>
+            <div class="form-group">
+                <label for="search-end-date">Sampai Tanggal</label>
+                <input type="date" id="search-end-date" value="${appState.billsFilter.dateEnd || ''}">
             </div>
-        </form>
-    `;
+        </div>
+    </form>
+`;
 
   const footer = `
         <button type="button" id="reset-filter-btn" class="btn btn-secondary">Reset</button>
         <button type="submit" class="btn btn-primary" form="bills-filter-form">Terapkan</button>
     `;
 
-  // PERBAIKAN: Tambahkan isUtility: true
-  const modalEl = createModal('formView', { title: 'Filter Tagihan', content, footer, isUtility: true });
+  const modalEl = createModal('formView', {
+    title: 'Filter Tagihan',
+    content,
+    footer,
+    isBottomSheet: true
+  });
   if (!modalEl) return;
 
   initCustomSelects(modalEl);
 
   modalEl.querySelector('#bills-filter-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    appState.billsFilter.searchTerm = modalEl.querySelector('#search-term').value.trim();
     appState.billsFilter.projectId = modalEl.querySelector('#filter-project-id').value;
     appState.billsFilter.supplierId = modalEl.querySelector('#filter-supplier-id').value;
-    appState.billsFilter.status = modalEl.querySelector('#search-status').value || 'all';
+    appState.billsFilter.expenseCategoryId = modalEl.querySelector('#filter-expense-category-id').value;
     appState.billsFilter.dateStart = modalEl.querySelector('#search-start-date').value || '';
     appState.billsFilter.dateEnd = modalEl.querySelector('#search-end-date').value || '';
     if (typeof onApply === 'function') onApply();
-    // PERBAIKAN: Gunakan closeModalImmediate
     closeModalImmediate(modalEl);
   });
 
   modalEl.querySelector('.modal-footer #reset-filter-btn').addEventListener('click', () => {
-    appState.billsFilter.searchTerm = '';
     appState.billsFilter.projectId = 'all';
     appState.billsFilter.supplierId = 'all';
-    appState.billsFilter.status = 'all';
+    appState.billsFilter.expenseCategoryId = 'all';
     appState.billsFilter.dateStart = '';
     appState.billsFilter.dateEnd = '';
     if (typeof onApply === 'function') onApply();
@@ -124,12 +128,11 @@ function _showBillsSortModal(onApply) {
 
   const footer = `<button type="submit" class="btn btn-primary" form="bills-sort-form">Terapkan</button>`;
 
-  // PERBAIKAN: Tambahkan isUtility: true
   const modalEl = createModal('formView', {
     title: 'Urutkan Tagihan',
     content,
     footer,
-    isUtility: true
+    isBottomSheet: true
   });
   if (!modalEl) return;
 

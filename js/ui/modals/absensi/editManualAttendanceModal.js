@@ -478,13 +478,11 @@ export async function _showAttendanceFilterModal(onApply) {
         <button type="submit" class="btn btn-primary" form="attendance-filter-form">Terapkan</button>
     `;
 
-    const isMobile = window.matchMedia('(max-width: 599px)').matches;
     const modalEl = createModal('formView', { 
         title: 'Filter Pekerja', 
         content, 
         footer, 
-        isUtility: true,
-        layoutClass: isMobile ? 'is-bottom-sheet' : 'is-simple-dialog' // Responsif
+        isBottomSheet: true
     });
     if (!modalEl) return;
 
@@ -535,13 +533,11 @@ export function _showAttendanceSortModal(onApply) {
 
     const footer = `<button type="submit" class="btn btn-primary" form="attendance-sort-form">Terapkan</button>`;
 
-    const isMobile = window.matchMedia('(max-width: 599px)').matches;
     const modalEl = createModal('formView', {
         title: 'Urutkan Daftar Pekerja',
         content,
         footer,
-        isUtility: true,
-        layoutClass: isMobile ? 'is-bottom-sheet' : 'is-simple-dialog' // Responsif
+        isBottomSheet: true
     });
     if (!modalEl) return;
 

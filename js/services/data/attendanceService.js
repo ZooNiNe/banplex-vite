@@ -412,20 +412,24 @@ export async function handleSaveAllPendingAttendance() {
         onConfirm: async () => {
             const loadingToast = toast('syncing', 'Menyimpan absensi...');
             try {
-                const { success, skipped, saved, summary } = await _executeSaveAttendance(dateStr);
+                const { success, skipped, skippedNames, saved, summary } = await _executeSaveAttendance(dateStr);
                 
                 if(loadingToast?.close) loadingToast.close();
 
                 if (success) {
                     appState.pendingAttendance.clear();
-                    _showPostSaveAttendanceDialog(summary);
+                    if (summary) _showPostSaveAttendanceDialog(summary);
+
+                    if (skipped > 0) {
+                        const names = skippedNames.join(', ');
+                        toast('warn', `${skipped} pekerja dilewati karena data upah tidak lengkap: ${names}.`, 8000);
+                    }
                     
                     appState.absensi.manualListNeedsUpdate = true;
                     emit('ui.absensi.renderManualForm');
                     emit('ui.absensi.updateFooter');
                 } else {
-                    if (skipped > 0) toast('warn', `Sebagian absensi disimpan. ${skipped} pekerja dilewati.`);
-                    else toast('error', 'Gagal menyimpan absensi.');
+                    toast('error', 'Gagal menyimpan absensi.');
                 }
             } catch (error) {
                 if(loadingToast?.close) loadingToast.close();
@@ -447,6 +451,7 @@ async function _executeSaveAttendance(dateStr) {
     const recordsToSave = [];
     const dbIdsToSoftDelete = new Set();
     let skippedCount = 0;
+    const skippedNames = new Set();
 
     try {
         const existingRecords = await localDB.attendance_records
@@ -465,6 +470,7 @@ async function _executeSaveAttendance(dateStr) {
             const worker = allWorkers.find(w => w.id === workerId);
             if (!worker) {
                 skippedCount++;
+                skippedNames.add(`Pekerja (ID: ${workerId})`);
                 continue;
             }
             
@@ -503,17 +509,24 @@ async function _executeSaveAttendance(dateStr) {
                 const worker = allWorkers.find(w => w.id === workerId);
                 if (!worker) {
                     skippedCount++;
+                    skippedNames.add(`Pekerja (ID: ${workerId})`);
                     continue;
                 }
 
-                const wages = (worker.projectWages || {})[projectId] || {};
-                const role = worker.defaultRole || Object.keys(wages)[0] || '';
-                const pay = wages[role] || 0;
-
-                if (!role || pay <= 0) {
+                const wages = (worker.projectWages || {})[projectId];
+                if (!wages || Object.keys(wages).length === 0) {
                     skippedCount++;
-                    continue; 
+                    skippedNames.add(worker.workerName);
+                    continue;
                 }
+
+                const role = worker.defaultRole || Object.keys(wages)[0];
+                if (!role || !wages[role] || wages[role] <= 0) {
+                    skippedCount++;
+                    skippedNames.add(worker.workerName);
+                    continue;
+                }
+                const pay = wages[role] || 0;
 
                 const oldRecords = existingRecordsByWorker.get(workerId) || [];
                 oldRecords.forEach(r => dbIdsToSoftDelete.add(r.id));
@@ -592,9 +605,10 @@ async function _executeSaveAttendance(dateStr) {
         const allProjectIds = new Set(productiveEntries.map(r => r.projectId));
         const singleProjectId = allProjectIds.size === 1 ? [...allProjectIds][0] : null;
 
-        return { 
-            success: true, 
-            skipped: skippedCount, 
+        return {
+            success: true,
+            skipped: skippedCount,
+            skippedNames: Array.from(skippedNames),
             saved: recordsToSave.length,
             summary: {
                 totalPay,
@@ -608,7 +622,7 @@ async function _executeSaveAttendance(dateStr) {
     } catch (error) {
         console.error("Gagal menyimpan absensi manual (v3):", error);
         toast('error', `Gagal menyimpan absensi: ${error.message}`);
-        return { success: false, skipped: entries ? entries.length : 0, summary: null }; // <--- Pastikan summary: null ada di sini
+        return { success: false, skipped: entries ? entries.length : 0, skippedNames: [], summary: null };
     }
 }
 
@@ -719,7 +733,13 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
         const date = parseLocalDate(dateStr);
         const { startOfDay, endOfDay } = getLocalDayBounds(dateStr);
 
-        const workers = (appState.workers || []).filter(w => w.status === 'active' && !w.isDeleted && w.projectWages && w.projectWages[projectId]);
+        const allWorkersInProject = (appState.workers || []).filter(w => w.status === 'active' && !w.isDeleted && w.projectWages && w.projectWages[projectId]);
+        const workers = allWorkersInProject.filter(w => w.projectWages[projectId] && Object.keys(w.projectWages[projectId]).length > 0);
+        const workersLackingWages = allWorkersInProject.filter(w => !workers.some(ww => ww.id === w.id));
+
+        if (workersLackingWages.length > 0) {
+            _showWageWarningModal(workersLackingWages.map(w => w.workerName));
+        }
 
         const existingRecordsOnDate = (appState.attendanceRecords || [])
             .filter(rec => {
@@ -857,50 +877,45 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
         updateTotal();
 
         context.querySelector('#save-absence-status')?.addEventListener('click', async () => {
-            const entries = [];
-            workers.forEach(w => {
-                const statusEl = context.querySelector(`input[name="status_${w.id}"]:checked`);
-                const status = statusEl?.value || 'absent';
-                
-                const row = context.querySelector(`.manual-assign-row[data-worker-id="${w.id}"]`);
-                const role = row?.dataset.role || '';
-                const baseWage = parseFloat(row?.dataset.baseWage || '0');
-                const customWage = parseFloat(row?.dataset.customWage || '0');
-                const wageToUse = customWage > 0 ? customWage : baseWage;
-                
-                const pay = status === 'full_day' ? wageToUse : (status === 'half_day' ? wageToUse / 2 : 0);
-                
-                entries.push({ 
-                    workerId: w.id, 
-                    workerName: w.workerName, 
-                    status: status === 'full_day' ? 'Hadir' : (status === 'half_day' ? '1/2 Hari' : 'Absen'),
-                    role: role, 
-                    pay: pay 
-                });
-            });
-
-            emit('ui.modal.create', 'confirmUserAction', {
-                title: 'Konfirmasi Simpan Absensi',
-                message: `Anda akan menyimpan perubahan absensi untuk ${workers.length} pekerja pada ${date.toLocaleDateString('id-ID')}. Lanjutkan?`,
-                onConfirm: async () => {
-                    try {
-                        await handleSaveManualAttendance({ date: dateStr, projectId, entries });
-                        await loadAllLocalDataToState();
-                        closeDetailPaneImmediate();
-                        emit('ui.page.render');
-                        toast('success', 'Perubahan absensi disimpan.');
-                    } catch (e) {
-                        toast('error', `Gagal menyimpan: ${e.message}`);
-                    }
-                    return false; 
-                }
-            });
+            const form = context.querySelector('#save-absence-status');
+            handleUpdateAttendance(form);
         });
 
     } catch (e) {
         console.error("Error opening daily attendance editor:", e);
         toast('error', 'Gagal membuka panel editor absensi.');
     }
+}
+
+function _showWageWarningModal(skippedNames) {
+    const isSingle = skippedNames.length === 1;
+    const title = isSingle ? `Atur Upah untuk ${skippedNames[0]}` : `Atur Upah Pekerja`;
+    const workerList = skippedNames.map(name => `<li><strong>${name}</strong></li>`).join('');
+
+    const message = `
+        <p class="confirm-modal-text" style="text-align: left;">
+            Untuk dapat mengatur absensi, setiap pekerja harus memiliki setidaknya satu pengaturan upah di satu proyek.
+        </p>
+        <p class="confirm-modal-text" style="text-align: left;">
+            Pekerja berikut belum memiliki pengaturan upah:
+        </p>
+        <ul style="text-align: left; margin-left: 1.5rem; margin-bottom: 1rem;">
+            ${workerList}
+        </ul>
+        <p class="confirm-modal-text" style="text-align: left;">
+            Anda bisa mengatur upah melalui menu <strong>Master Data → Pekerja</strong>, lalu pilih pekerja dan edit upah di proyek yang sesuai.
+        </p>
+    `;
+
+    emit('ui.modal.create', 'confirmUserAction', {
+        title: title,
+        message: message,
+        confirmLabel: 'Buka Master Data',
+        cancelLabel: 'Tutup',
+        onConfirm: () => {
+            emit('ui.navigate', 'master_data', { subPage: 'workers' });
+        }
+    });
 }
 
 export async function handleSaveManualAttendance(attendanceData) {
@@ -1156,24 +1171,28 @@ export async function openManualAbsenceStatusPanel(selectedWorkerIds = []) {
                         if (entries.length === 0) {
                             
                             const defaultProjectId = worker.defaultProjectId || appState.manualAttendanceSelectedProjectId || appState.defaultAttendanceProjectId;
-                            const wages = (worker.projectWages || {})[defaultProjectId] || {};
-                            const role = worker.defaultRole || Object.keys(wages)[0] || '';
-                            
-                            
-                            if (!defaultProjectId || !role) {
-                                 skippedCount++;
-                                 skippedNames.push(worker.workerName);
-                                 continue;
+                            if (!defaultProjectId) {
+                                skippedCount++;
+                                skippedNames.push(worker.workerName);
+                                continue;
                             }
-                            
-                            const pay = (wages[role] || 0) * (newStatus === 'full_day' ? 1 : 0.5);
-                            
-                            if (pay <= 0 && newStatus !== 'absent') {
+
+                            const wages = (worker.projectWages || {})[defaultProjectId];
+                            if (!wages || Object.keys(wages).length === 0) {
+                                skippedCount++;
+                                skippedNames.push(worker.workerName);
+                                continue;
+                            }
+
+                            const role = worker.defaultRole || Object.keys(wages)[0];
+                            if (!role || !wages[role] || wages[role] <= 0) {
                                 skippedCount++;
                                 skippedNames.push(worker.workerName);
                                 continue;
                             }
                             
+                            const pay = (wages[role] || 0) * (newStatus === 'full_day' ? 1 : 0.5);
+
                             appState.pendingAttendance.set(workerId, {
                                 status: newStatus,
                                 pay: pay,
@@ -1279,39 +1298,45 @@ export async function handleOpenAttendanceSettings() {
         form?.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            emit('ui.modal.create', 'confirmUserAction', {
-                title: 'Simpan Pengaturan?',
-                message: 'Anda yakin ingin menyimpan perubahan pengaturan absensi ini?',
-                onConfirm: async () => {
-                    try {
-                        const globalSelect = form.querySelector('#global_default_project');
-                        const newDefaultId = globalSelect?.value || '';
-                        try { localStorage.setItem('attendance.defaultProjectId', newDefaultId); } catch(_) {}
-                        appState.defaultAttendanceProjectId = newDefaultId;
-                        
-                        const globalDateEl = form.querySelector('#global_default_date');
-                        const newDefaultDate = globalDateEl?.value || '';
-                        try { localStorage.setItem('attendance.defaultDate', newDefaultDate); } catch(_) {}
-                        appState.defaultAttendanceDate = newDefaultDate || appState.defaultAttendanceDate;
-                        if (window.matchMedia('(max-width: 599px)').matches) {
-                            hideMobileDetailPage();
-                        } else {
-                            closeDetailPaneImmediate();
-                        }
-                        
-                        toast('success', 'Pengaturan absensi disimpan.');
-                        
-                        if (appState.activePage === 'absensi') {
-                            appState.absensi.manualListNeedsUpdate = true;
-                            emit('ui.absensi.renderManualForm');
-                        }
+            const saveSettings = async () => {
+                try {
+                    const globalSelect = form.querySelector('#global_default_project');
+                    const newDefaultId = globalSelect?.value || '';
+                    try { localStorage.setItem('attendance.defaultProjectId', newDefaultId); } catch(_) {}
+                    appState.defaultAttendanceProjectId = newDefaultId;
 
-                    } catch (err) {
-                        console.error('Gagal menyimpan pengaturan absensi:', err);
-                        toast('error', 'Gagal menyimpan pengaturan.');
+                    const globalDateEl = form.querySelector('#global_default_date');
+                    const newDefaultDate = globalDateEl?.value || '';
+                    try { localStorage.setItem('attendance.defaultDate', newDefaultDate); } catch(_) {}
+                    appState.defaultAttendanceDate = newDefaultDate || appState.defaultAttendanceDate;
+
+                    resetFormDirty();
+                    if (window.matchMedia('(max-width: 599px)').matches) {
+                        hideMobileDetailPage();
+                    } else {
+                        closeDetailPane();
                     }
+
+                    toast('success', 'Pengaturan absensi disimpan.');
+
+                    if (appState.activePage === 'absensi') {
+                        appState.absensi.manualListNeedsUpdate = true;
+                        emit('ui.absensi.renderManualForm');
+                    }
+
+                } catch (err) {
+                    console.error('Gagal menyimpan pengaturan absensi:', err);
+                    toast('error', 'Gagal menyimpan pengaturan.');
                 }
-            });
+            };
+
+            if (checkFormDirty()) {
+                emit('ui.modal.create', 'confirmDirtyForm', {
+                    onConfirm: saveSettings,
+                });
+            } else {
+                saveSettings();
+            }
         });
     }
 }
@@ -1322,6 +1347,52 @@ export async function _openWorkerDefaultsModal(workerId, workerName) {
         toast('error', 'Data pekerja tidak ditemukan.');
         return;
     }
+
+    const hasAnyWage = worker.projectWages && Object.values(worker.projectWages).some(p => Object.keys(p).length > 0);
+
+    if (!hasAnyWage) {
+        const activeProjects = appState.projects.filter(p => p.isWageAssignable && !p.isDeleted);
+        if (activeProjects.length > 0) {
+            emit('ui.modal.create', 'confirmUserAction', {
+                title: `Atur Upah Awal untuk ${workerName}?`,
+                message: `${workerName} belum memiliki pengaturan upah di proyek manapun. Atur upah awal di proyek "${activeProjects[0].projectName}" dengan peran "Pekerja"? Anda bisa mengubahnya nanti.`,
+                onConfirm: async () => {
+                    const projectId = activeProjects[0].id;
+                    const role = 'Pekerja';
+                    const payload = {
+                        projectWages: {
+                            ...worker.projectWages,
+                            [projectId]: { [role]: 0 }
+                        },
+                        defaultProjectId: projectId,
+                        defaultRole: role,
+                        syncState: 'pending_update',
+                        updatedAt: new Date()
+                    };
+                    try {
+                        await localDB.transaction('rw', localDB.workers, localDB.outbox, async () => {
+                            await localDB.workers.update(workerId, payload);
+                            await queueOutbox({
+                                table: 'workers',
+                                docId: workerId,
+                                op: 'upsert',
+                                payload: { id: workerId, ...payload },
+                                priority: 4
+                            });
+                        });
+                        Object.assign(worker, payload);
+                        toast('success', `Pengaturan upah awal untuk ${workerName} telah dibuat.`);
+                        requestSync({ silent: true });
+                        _openWorkerDefaultsModal(workerId, workerName);
+                    } catch (err) {
+                        toast('error', 'Gagal mengatur upah awal.');
+                    }
+                }
+            });
+            return;
+        }
+    }
+
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
     const currentProjectId = worker.defaultProjectId || appState.defaultAttendanceProjectId || '';
     const projectOptions = appState.projects

@@ -350,7 +350,7 @@ function _showPemasukanSortModal(onApply) {
       title: 'Urutkan Pemasukan',
       content,
       footer,
-      isUtility: true
+      isBottomSheet: true
     });
     if (!modalEl) return;
 

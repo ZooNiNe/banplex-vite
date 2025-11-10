@@ -189,11 +189,17 @@ export async function handleAddMasterItem(form) {
                     const projectId = itemEl.dataset.projectId;
                     try {
                         const wages = JSON.parse(itemEl.dataset.wages);
-                        if (projectId && wages) {
+                        if (projectId && wages && Object.keys(wages).length > 0) {
                             projectWages[projectId] = wages;
                         }
                     } catch(e) { console.error('Gagal parsing data upah');}
                 });
+
+                if (Object.keys(projectWages).length === 0) {
+                    toast('error', 'Pekerja harus memiliki setidaknya satu pengaturan upah di satu proyek.');
+                    if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+                    return;
+                }
                 dataToAdd.projectWages = projectWages;
             }
 

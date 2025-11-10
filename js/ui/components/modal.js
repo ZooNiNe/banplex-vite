@@ -144,6 +144,10 @@ export function createModal(type, data = {}) {
     modalEl.className = `modal-bg ${layoutClass}`;
     modalEl.innerHTML = contentHTML;
 
+    if (data.isBottomSheet && window.matchMedia('(max-width: 599px)').matches) {
+        modalEl.classList.add('is-bottom-sheet');
+    }
+
     // Tandai modal sebagai 'utility' jika flag-nya ada
     if (data.isUtility) {
          modalEl.dataset.utilityModal = 'true';
