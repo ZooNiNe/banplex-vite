@@ -780,7 +780,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
                     <div class="manual-assign-row__head">
                         <div class="worker-info">
                             <strong class="worker-name">${w.workerName}</strong>
-                            <span class="meta-badge worker-wage" data-pay="0">${displayRole ? `${displayRole} · ${fmtIDR(displayWage)}` : 'Peran?'}</span>
+                            <span class="worker-wage" data-pay="0">${displayRole ? `${displayRole} · ${fmtIDR(displayWage)}` : 'Peran?'}</span>
                         </div>
                         <div class="attendance-status-radios" data-worker-id="${workerId}">
                             <label class="custom-checkbox-label">
@@ -838,8 +838,8 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
         const headerActions = `<button class="btn btn-secondary" data-action="goto-manual-add" data-project-id="${projectId}" data-date="${dateStr}" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">${createIcon('edit', 16)} Tambah/Ubah</button>`;
         
         const footer = `
-        <button type="button" class="btn btn-ghost" id="cancel-daily-attendance">Batal</button>
-        <button class="btn btn-primary" id="save-absence-status">${createIcon('save', 18)} Simpan Perubahan</button>`;
+        <button type="button" class="btn btn-danger" id="cancel-daily-attendance">Batal</button>
+        <button class="btn btn-primary" id="save-absence-status">${createIcon('save', 18)} Simpan</button>`;
 
         showDetailPane({
             title: 'Edit Absensi Harian',

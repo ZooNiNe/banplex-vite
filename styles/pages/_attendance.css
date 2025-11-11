@@ -158,16 +158,16 @@
 .worker-info {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  flex-shrink: 0;
+  flex-grow: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .worker-name {
   font-size: 1.05rem;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .worker-wage {
@@ -354,12 +354,6 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 1rem;
-}
-
-.manual-assign-row .worker-info {
-    flex-grow: 1;
-    min-width: 0;
 }
 
 .manual-assign-row .worker-name {
@@ -437,19 +431,13 @@
 .attendance-manual-header-controls {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    margin: -1rem -1rem -1rem;
-    padding: 1rem 1rem 0.5rem 1rem;
 }
 
 .check-all-controls {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 0.5rem;
-    border-top: 1px solid var(--line);
-    padding: 0.75rem 0.75rem;
-    margin-top: 0.5rem;
+    margin-top: 0.75rem;
 }
 
 .check-all-controls span {
@@ -485,10 +473,8 @@
 
 .attendance-status-header {
     display: flex;
-    padding: 0 .75rem;
     justify-content: space-between;
     align-items: center;
-    gap: 1rem;
     margin-top: 0.5rem;
 }
 .header-label-placeholder {

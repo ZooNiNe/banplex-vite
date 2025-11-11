@@ -337,11 +337,6 @@
  .dense-list-item .item-amount.negative { color: var(--danger); }
  .dense-list-item .item-amount.warn { color: var(--warn); }
 
-
- #detail-pane > div.mobile-detail-content > div > div:nth-child(2) > div > div{
-  padding: 1rem;
- }
-
  .jurnal-pekerja-list {
    display: flex;
    flex-direction: column;
