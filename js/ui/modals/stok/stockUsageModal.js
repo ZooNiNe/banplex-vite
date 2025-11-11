@@ -92,11 +92,11 @@ export async function handleOpenStockUsageModal(context) {
         ? localState.projects.map(p => {
             const qty = localState.quantities.get(p.id) || 0;
             return `
-            <div class="project-stock-row" data-project-id="${p.id}" style="display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.5rem 0;">
-                <span class="project-name" style="flex:1; min-width:0;">${p.projectName}</span>
-                <div class="stepper" style="display:inline-grid; grid-template-columns: 40px minmax(64px, 88px) 40px; align-items:center; justify-items:center; gap:.35rem;">
+            <div class="project-stock-row" data-project-id="${p.id}">
+                <span class="project-name">${p.projectName}</span>
+                <div class="stepper">
                     <button type="button" data-action="dec-qty" class="btn-icon btn-icon-danger" aria-label="Kurangi">${createIcon('minus')}</button>
-                    <input type="number" value="${qty}" min="0" max="${localState.currentStock}" class="qty-input" inputmode="numeric" style="width:100%; text-align:center; height:38px; border:1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text);">
+                    <input type="number" value="${qty}" min="0" max="${localState.currentStock}" class="qty-input" inputmode="numeric">
                     <button type="button" data-action="inc-qty" class="btn-icon btn-icon-success" aria-label="Tambah">${createIcon('plus')}</button>
                 </div>
             </div>`;
@@ -105,42 +105,37 @@ export async function handleOpenStockUsageModal(context) {
 
     const content = `
         <form id="stock-usage-form">
-            <div class="card card-pad" style="margin-bottom: 1rem;">
-                <div class="detail-summary-grid" style="grid-template-columns: 1fr 1fr 1fr; background-color: var(--panel); padding-top: 0;">
+                <div class="detail-summary-grid stock-usage">
                     <div class="summary-item">
-                        <span class="label">Stok Tersedia</span>
+                        <span class="label">Tersedia</span>
                         <strong class="value" id="stock-usage-available">${localState.currentStock} ${material.unit || ''}</strong>
                     </div>
                     <div class="summary-item">
-                        <span class="label">Total Keluar</span>
+                        <span class="label">Keluar</span>
                         <strong class="value" id="stock-usage-total">0</strong>
                     </div>
                     <div class="summary-item">
-                        <span class="label">Sisa Stok</span>
+                        <span class="label">Sisa</span>
                         <strong class="value" id="stock-usage-remaining">${localState.currentStock}</strong>
                     </div>
                 </div>
-            </div>
             
-            <div class="card card-pad">
                 <div class="form-group">
                     <label for="stock-usage-date">Tanggal Penyaluran</label>
                     <input type="date" id="stock-usage-date" name="date" value="${localState.date}" required>
                 </div>
-
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-top:1.5rem;">
-                    <h5 class="detail-section-title" style="margin: 0;">Alokasi ke Proyek</h5>
-                    <span style="font-size:.85rem; color: var(--text-dim);">Pilih jumlah per proyek</span>
+                    <div class="detail-section-title">
+                    <span>Alokasi ke Proyek</span>
+                    <span>Pilih jumlah per proyek</span>
                 </div>
                 <div class="project-stock-list" id="project-stock-list">
                     ${projectListHTML}
                 </div>
-            </div>
         </form>
     `;
 
     const footer = `
-            <button type="button" class="btn btn-ghost" data-action="history-back">Batal</button>
+            <button type="button" class="btn btn-danger" data-action="history-back">Batal</button>
             <button type="button" id="save-stock-usage-btn" class="btn btn-primary" disabled>
                 ${createIcon('save')} Simpan
             </button>

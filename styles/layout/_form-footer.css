@@ -22,13 +22,11 @@
 
 /* Gaya tombol Cancel/Secondary */
 .form-footer-actions .btn:first-child:not(.btn-primary) {
-  background-color: transparent;
   border-color: var(--line);
   color: var(--text-fab);
   box-shadow: none;
 }
 .form-footer-actions .btn:first-child:not(.btn-primary):hover {
-    background-color: var(--surface-muted);
     color: var(--text);
 }
 
@@ -52,7 +50,6 @@
   position: sticky;
   bottom: 0;
   padding: 1rem;
-  background: linear-gradient(to top, var(--bg-start) 75%, transparent);
   margin: 1.5rem -1rem -1rem -1rem;
   border-top: 1px solid var(--line);
   display: flex;
@@ -60,20 +57,6 @@
   gap: 0.75rem;
   grid-template-columns: unset;
 }
-
-.dark-theme #edit-attendance-form .form-footer-actions {
-    background: linear-gradient(to top, var(--bg-end) 75%, transparent);
-}
-
-
-.detail-view-active #edit-attendance-form .form-footer-actions {
-  background: var(--bg-start);
-}
-
-.dark-theme .detail-view-active #edit-attendance-form .form-footer-actions {
-    background: var(--bg-end);
-}
-
 
 body.is-offline #edit-item-form .form-footer-actions::before,
 body.is-offline #edit-master-form .form-footer-actions::before {

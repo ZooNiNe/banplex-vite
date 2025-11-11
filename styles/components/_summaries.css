@@ -27,8 +27,8 @@
 }
 
 .summary-item .value {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
   line-height: 1.2;
 }
 .summary-item .value.positive { color: var(--success); }
@@ -199,11 +199,11 @@
 
 /* --- Payment Modal Header --- */
 .payment-modal-header {
-  padding: 1.25rem 1.5rem;
+  padding: 1.25rem;
   text-align: center;
   background-color: var(--surface-muted);
   border-bottom: 1px solid var(--line);
-  margin: -0.8rem -1.25rem 1.5rem -1.25rem;
+  margin-bottom: 1rem;
 }
 .payment-modal-header .label {
   font-size: 0.9rem;

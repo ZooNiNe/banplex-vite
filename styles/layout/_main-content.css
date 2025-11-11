@@ -170,7 +170,7 @@ body.detail-view-active .detail-pane {
   min-height: 0;
   transition: transform 0.4s ease, opacity 0.4s ease, filter 0.4s ease;
   padding: 1rem;
-  padding-bottom: calc( 0px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc( 1rem + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 0rem;
@@ -185,9 +185,8 @@ body.detail-view-active .detail-pane {
 .detail-pane-footer,
 .modal-footer {
     flex-shrink: 0;
-    padding: .5rem 1rem;
-    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
-    background-color: var(--panel);
+    padding: .85rem;
+    padding-bottom: calc(.85rem + env(safe-area-inset-bottom, 0px));
     display: grid;
     gap: 0.75rem;
     box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
@@ -211,9 +210,6 @@ body.detail-view-active .detail-pane {
 .modal-footer .btn {
     width: 100%;
     justify-content: center;
-}
-.dark-theme .detail-pane-footer{
-    background-color: var(--panel);
 }
 
 

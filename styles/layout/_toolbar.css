@@ -11,9 +11,6 @@
 .toolbar.sticky-toolbar {
     position: sticky;
     top: 0;
-    background: color-mix(in srgb, var(--panel) 90%, transparent);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     border-bottom: none;
     padding: 0.75rem 0;
     margin: 0;
@@ -28,13 +25,6 @@
     border-bottom: none;
     padding: 1rem var(--spacing);
     margin-bottom: -1rem;
-}
-
-
-.dark-theme .toolbar.sticky-toolbar {
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
 }
 
 .toolbar-standard-actions {

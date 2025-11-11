@@ -219,3 +219,52 @@
 .autocomplete-add-btn .material-symbols-outlined {
   font-size: 20px;
 }
+
+#stock-usage-form .detail-summary-grid.stock-usage{
+  grid-template-columns: 1fr 1fr 1fr; 
+  background-color: var(--panel-alt); 
+  padding: 1.25rem;
+  gap: 1.75rem;
+  margin-bottom: .75rem;
+}
+
+.project-stock-row{
+  display:flex; 
+  align-items:center; 
+  justify-content:space-between;
+  padding: .25rem 0rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.project-name{
+  flex:1;
+  min-width:0;
+}
+
+.stepper{
+  display:inline-grid; 
+  grid-template-columns: 40px minmax(64px, 88px) 40px; 
+  align-items:center; 
+  justify-items:center; 
+  gap:.35rem;
+}
+
+.qty-input{
+  width:100%; 
+  text-align:center;
+  height:28px; 
+  border:1px solid var(--line); 
+  border-radius: var(--radius-sm); 
+  background: var(--surface); 
+  color: var(--text);
+}
+.detail-section-title{
+ display:flex; 
+ align-items:center; 
+ justify-content:space-between;
+ margin-top:1rem;
+ color: var(--text-dim);
+ font-size: .75rem;
+ padding: 0rem 1.5rem .5rem 0rem;
+ border-bottom: 1px solid var(--line);
+}

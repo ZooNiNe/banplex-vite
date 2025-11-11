@@ -127,23 +127,12 @@
   color: var(--text);
 }
 
-.dark-theme .toolbar.sticky-toolbar {
-  background: color-mix(in srgb, var(--panel) 90%, transparent); /* Dark bg with blur */
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
 
 .dark-theme .attendance-header .btn {
   background-color: var(--surface-muted);
   border-color: var(--line);
   color: var(--text);
   box-shadow: var(--shadow-sm); /* Add glow */
-}
-
-.dark-theme .form-footer-actions {
-  background-color: var(--panel); /* Match panel */
-  box-shadow: 0 -2px 5px rgba(0,0,0,0.1), 0 0 10px -3px rgba(96, 165, 250, 0.1); /* Glow effect */
-  border-top-color: var(--line);
 }
 
 .dark-theme input:not([type="hidden"]):not([readonly]):not(.custom-select-search),
@@ -183,12 +172,6 @@
 
 .dark-theme input[type="date"] {
   color-scheme: dark;
-}
-
-.dark-theme .detail-pane-footer {
-    background-color: var(--panel-alt); /* Match panel */
-    border-top-color: var(--line);
-    box-shadow: 0 -2px 5px rgba(0,0,0,0.1), 0 0 10px -3px rgba(96, 165, 250, 0.1); /* Glow effect */
 }
 
 .dark-theme .custom-select-wrapper.active .custom-select-options {
