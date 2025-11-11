@@ -325,7 +325,8 @@ export async function openDailyProjectPickerForEdit(dateStr) {
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
     const modal = createModal('dataDetail', { 
         title: 'Pilih Proyek untuk Diedit', 
-        content 
+        content,
+        isUtility: true
     });
 
     if (isMobile) {
