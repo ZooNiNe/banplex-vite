@@ -928,7 +928,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
                             await handleSaveManualAttendance({ date: dateStr, projectId, entries });
                             await loadAllLocalDataToState();
                             
-                            controller.abort(); 
+                            controller.abort();
 
                             if (window.matchMedia('(max-width: 599px)').matches) {
                                 hideMobileDetailPage();
@@ -956,7 +956,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
         }, { signal: controller.signal });
 
         context.querySelector('#cancel-daily-attendance')?.addEventListener('click', () => {
-            controller.abort(); 
+            controller.abort();
             if (window.matchMedia('(max-width: 599px)').matches) {
                 hideMobileDetailPage();
             } else {
@@ -968,7 +968,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
     } catch (e) {
         console.error("Error opening daily attendance editor:", e);
         toast('error', 'Gagal membuka panel editor absensi.');
-        
+
         controller.abort();
     }
 }
