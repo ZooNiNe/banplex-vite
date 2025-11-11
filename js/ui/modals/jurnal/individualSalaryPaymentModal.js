@@ -91,6 +91,13 @@ export function openIndividualSalaryPaymentModal(dataset) {
     });
 
     if (paymentPane) {
+        const controller = paymentPane.__controller;
+        if (!controller) {
+            console.warn('Pane controller not found for individualSalaryPaymentModal');
+            return;
+        }
+        const { signal } = controller;
+
         emit('ui.detailPane.formReady', { context: paymentPane });
         _attachSingleFileUploadListener(paymentPane, 'paymentAttachment', '#new-payment-attachment-container');
         
@@ -105,7 +112,7 @@ export function openIndividualSalaryPaymentModal(dataset) {
                 const newRemaining = originalRemaining - amountToPay;
                 animateNumber(remainingAmountEl, newRemaining);
                 remainingLabelEl.textContent = "Sisa Setelah Bayar";
-            });
+            }, { signal });
         }
         emit('ui.forms.init', paymentPane);
     }

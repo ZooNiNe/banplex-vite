@@ -711,12 +711,7 @@ export async function handleDeleteSingleAttendance(recordId) {
 // attendanceService.js (Sudah bersih, tanpa console.warn)
 
 export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
-    if (typeof closeModal === 'function') {
-        closeModal();
-    } else {
-        console.warn('Fungsi closeModal() tidak ditemukan. Modal mungkin tetap terbuka.');
-    }
-    const controller = new AbortController();
+    // KONTROLLER DIHAPUS DARI SINI
     try {
         const project = (appState.projects || []).find(p => p.id === projectId);
         if (!project) {
@@ -852,6 +847,13 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
         const context = document.getElementById('detail-pane');
         if (!context) return;
 
+        const controller = context.__controller;
+        if (!controller) {
+            console.warn('Pane controller not found for openDailyAttendanceEditorPanel');
+            return;
+        }
+        const { signal } = controller;
+
         const updateTotal = () => {
             let totalPay = 0;
             context.querySelectorAll('.manual-assign-row').forEach(row => {
@@ -873,7 +875,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
         };
 
         context.querySelectorAll('.attendance-status-radios input').forEach(radio => {
-            radio.addEventListener('change', updateTotal, { signal: controller.signal });
+            radio.addEventListener('change', updateTotal, { signal });
         });
         context.querySelectorAll('.check-all-controls input[type="radio"]').forEach(radio => {
             radio.addEventListener('change', () => {
@@ -885,7 +887,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
                 });
                 updateTotal();
                 setTimeout(() => { radio.checked = false; }, 100);
-            }, { signal: controller.signal });
+            }, { signal });
         });
 
         updateTotal();
@@ -928,8 +930,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
                             await handleSaveManualAttendance({ date: dateStr, projectId, entries });
                             await loadAllLocalDataToState();
                             
-                            controller.abort(); 
-
+                            // Tidak perlu abort manual, closeDetailPane akan melakukannya
                             if (window.matchMedia('(max-width: 599px)').matches) {
                                 hideMobileDetailPage();
                             } else {
@@ -953,23 +954,21 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
                 console.error("Error preparing attendance data:", e);
                 toast('error', `Gagal memproses data: ${e.message}`);
             }
-        }, { signal: controller.signal });
+        }, { signal });
 
         context.querySelector('#cancel-daily-attendance')?.addEventListener('click', () => {
-            controller.abort(); 
+            // Tidak perlu abort manual
             if (window.matchMedia('(max-width: 599px)').matches) {
                 hideMobileDetailPage();
             } else {
                 closeDetailPaneImmediate();
             }
-        }, { signal: controller.signal });
+        }, { signal });
 
 
     } catch (e) {
         console.error("Error opening daily attendance editor:", e);
         toast('error', 'Gagal membuka panel editor absensi.');
-        
-        controller.abort();
     }
 }
 
