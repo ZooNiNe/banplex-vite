@@ -281,7 +281,7 @@ export async function handleDeleteSalaryBill(billId) {
                 toast('success', 'Rekap gaji berhasil dibatalkan.');
                 
                 await loadAllLocalDataToState();
-                emit('ui.animate.removeItem', `bill-${billId}`); // Memicu animasi hapus
+                emit('ui.animate.removeItem', `bill-${billId}`);
 
             } catch (error) {
                 console.error('Error deleting salary bill:', error);
@@ -291,13 +291,7 @@ export async function handleDeleteSalaryBill(billId) {
     });
 }
 
-/**
- * (Tetap Dipertahankan)
- * Membuka modal untuk mengedit absensi harian dari jurnal.
- */
 export async function openDailyProjectPickerForEdit(dateStr) {
-    // ... (Logika fungsi ini tetap sama seperti di file js/services/data/jurnalService.js) ...
-    // [Anda bisa salin-tempel kode lengkapnya dari file yang diunggah]
     const { startOfDay, endOfDay } = getLocalDayBounds(dateStr);
     const records = (appState.attendanceRecords || []).filter(rec => {
         const recDate = getJSDate(rec.date);
@@ -328,11 +322,21 @@ export async function openDailyProjectPickerForEdit(dateStr) {
             `).join('')}
         </div>`;
     
-    const modal = createModal('dataDetail', { title: 'Pilih Proyek untuk Diedit', content });
+    const isMobile = window.matchMedia('(max-width: 599px)').matches;
+    const modal = createModal('dataDetail', { 
+        title: 'Pilih Proyek untuk Diedit', 
+        content 
+    });
+
+    if (isMobile) {
+        modal.classList.add('is-bottom-sheet');
+    }
 
     modal.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action="select-project-for-edit"]');
         if (btn) {
+            e.stopPropagation(); 
+
             const { projectId, dateStr } = btn.dataset;
             closeModal(modal);
             emit('ui.jurnal.openDailyEditorPanel', { dateStr, projectId });
