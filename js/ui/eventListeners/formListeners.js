@@ -1,16 +1,12 @@
 import { emit, on } from "../../state/eventBus.js";
-import { attachClientValidation, validateForm } from '../../utils/validation.js';
 import { toProperCase } from "../../utils/helpers.js";
 import { submitFormAsync, fallbackLocalFormHandler, serializeForm } from "../../utils/formPersistence.js"; // Impor serializeForm
 import { handleAddMasterItem, handleUpdateMasterItem } from "../../services/data/masterDataService.js";
-// PERBAIKAN: Impor hideMobileDetailPageImmediate
 import { createModal, closeModal, resetFormDirty, markFormDirty, closeDetailPane, closeDetailPaneImmediate, hideMobileDetailPage, hideMobileDetailPageImmediate } from "../components/modal.js";
 import { handleUpdatePemasukan, handleAddPemasukan } from "../../services/data/transactions/pemasukanService.js";
 import { handleUpdatePengeluaran, handleAddPengeluaran } from "../../services/data/transactions/pengeluaranService.js";
-import { handleDeleteAttachment, handleReplaceAttachment } from "../../services/data/transactions/attachmentService.js";
 import { toast } from "../components/toast.js";
 import { appState } from "../../state/appState.js";
-import { openWorkerWageDetailModal, formatNumberInput } from "../components/forms/index.js";
 
 let formSubmitController = null;
 

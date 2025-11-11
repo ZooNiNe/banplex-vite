@@ -433,14 +433,17 @@ function initDashboardPage() {
     if (!container) return; 
 
     container.innerHTML = `
-        ${createPageToolbarHTML({
-            title: 'Dashboard',
-            isTransparent: true,
-            actions: [
-                { icon: 'bell', label: 'Aktivitas', action: 'navigate', nav: 'log_aktivitas', id: 'open-activity-log' }
-            ]
-        })}
-        <div id="sub-page-content" class="scrollable-content has-padding"></div>
+        <div class="content-panel transparent-panel">
+            <div class="panel-header">
+                ${createPageToolbarHTML({
+                    title: 'Dashboard',
+                    actions: [
+                        { icon: 'bell', label: 'Aktivitas', action: 'navigate', nav: 'log_aktivitas', id: 'open-activity-log' }
+                    ]
+                })}
+            </div>
+            <div id="sub-page-content" class="panel-body scrollable-content"></div>
+        </div>
     `;
 
     const dashboardContent = $('#sub-page-content');
@@ -450,10 +453,9 @@ function initDashboardPage() {
     }
 
     initPullToRefresh({
-        triggerElement: '.toolbar',
-        scrollElement: dashboardContent,   // 2. Cek scroll di konten
-        indicatorContainer: '#ptr-indicator-container', // 3. Indikator di luar
-        pushDownElement: '#page-container', // 4. Dorong seluruh halaman
+        triggerElement: '.panel-header',
+        scrollElement: dashboardContent, 
+        indicatorContainer: '#ptr-indicator-container',
         onRefresh: async () => {
             showLoadingModal('Memperbarui data...');
             try {
@@ -468,7 +470,7 @@ function initDashboardPage() {
             }
         }
     });
-
+    
     setTimeout(() => { try { updateActivityLogBadge(); startActivityLogRealtimeBadge(); renderCommentsBadge(); } catch(_) {} }, 0);
     
     try {

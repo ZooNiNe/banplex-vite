@@ -175,6 +175,14 @@
   font-weight: 700;
   color: var(--primary);
 }
+.worker-wage-summary-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); }
+.worker-wage-summary-item:last-child { border-bottom: none; }
+.summary-item-main { display: flex; flex-direction: column; gap: 0.5rem; }
+.summary-item-project-name { font-weight: 600; }
+.summary-item-role-list { display: flex; flex-direction: column; gap: 0.25rem; padding-left: 0.5rem; }
+.role-wage-pair { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.9em; }
+.role-wage-pair span:first-child { color: var(--text-secondary); }
+.summary-item-actions { display: flex; gap: 0.25rem; }
 
 .worker-role {
   flex-grow: 1;

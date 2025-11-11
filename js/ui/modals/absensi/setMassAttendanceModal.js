@@ -1,7 +1,6 @@
 import { appState } from "../../../state/appState.js";
 import { $ } from "../../../utils/dom.js";
 import { fmtIDR } from "../../../utils/formatters.js";
-// PERBAIKAN: Impor closeModalImmediate
 import { createModal, closeModal, closeModalImmediate } from "../../components/modal.js";
 import { createMasterDataSelect, initCustomSelects } from "../../components/forms/index.js";
 import { emit } from "../../../state/eventBus.js";
@@ -48,17 +47,21 @@ function handleOpenMassAttendanceModal() {
         </button>
     `;
 
+    const controller = new AbortController();
+
     const modal = createModal('formView', {
         title: 'Set Absensi Massal',
         content,
         footer,
-        isUtility: true // PERBAIKAN: Tandai sebagai modal utilitas
+        isUtility: true 
     });
 
     if (modal) {
-        initCustomSelects(modal);
         
         const form = modal.querySelector('#mass-attendance-form');
+        
+        initCustomSelects(modal);
+        
         const statusSelect = modal.querySelector('#mass-attendance-status');
 
         form.addEventListener('submit', (e) => {
@@ -131,14 +134,27 @@ function handleOpenMassAttendanceModal() {
                 toast('info', `${skippedCount} pekerja (${skippedNames.join(', ')}) dilewati karena tidak memiliki tarif atau default proyek/peran.`);
             }
             
-            appState.selectionMode.selectedIds.clear();
+            if (appState.selectionMode.active) {
+                appState.selectionMode.selectedIds.clear();
+                emit('ui.selection.changed'); 
+            }
 
             emit('ui.absensi.renderManualForm');
             emit('ui.absensi.updateFooter');
             
-            // PERBAIKAN: Gunakan closeModalImmediate
+            // 4. Tutup, batalkan listener, dan hancurkan modal
             closeModalImmediate(modal);
-        });
+            controller.abort();
+            if (modal) modal.remove();
+
+        }, { signal: controller.signal }); // 3. Terapkan signal ke listener
+
+
+        modal.querySelector('[data-action="history-back"]')?.addEventListener('click', () => {
+            closeModal(modal);
+            controller.abort();
+            if (modal) modal.remove();
+        }, { signal: controller.signal });
     }
 }
 

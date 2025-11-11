@@ -11,7 +11,9 @@ import {
     initCustomSelects, 
     formatNumberInput, 
     updateCustomSelectOptions,
-    attachStaffFormListeners 
+    attachStaffFormListeners,
+    _createWorkerWageSummaryItemHTML,
+    openWorkerWageDetailModal
 } from '../components/forms/index.js';
 import { _getMasterDataListHTML } from '../components/cards.js';
 import { 

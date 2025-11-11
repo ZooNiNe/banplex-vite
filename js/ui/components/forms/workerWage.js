@@ -1,8 +1,9 @@
+// [GANTI TOTAL] file js/ui/components/forms/workerWage.js
+
 import { appState } from "../../../state/appState.js";
 import { fmtIDR, parseFormattedNumber } from "../../../utils/formatters.js";
 import { emit } from "../../../state/eventBus.js";
 import { toast } from "../toast.js";
-// [PERBAIKAN] Impor createMasterDataSelect
 import { createMasterDataSelect, initCustomSelects } from "./customSelect.js";
 import { formatNumberInput } from "./inputFormatters.js";
 import { createModal, resetFormDirty } from "../modal.js";
@@ -10,15 +11,25 @@ import { toProperCase } from "../../../utils/helpers.js";
 
 function createIcon(iconName, size = 18, classes = '') {
     const icons = {
-        'trash-2': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2 ${classes}"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`, // Used for delete
-        // [BARU] Ikon untuk tombol 'Tambah' di footer
+        'trash-2': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2 ${classes}"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`,
         'plus': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus ${classes}"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`
     };
     return icons[iconName] || '';
 }
 
+/**
+ * Fungsi helper untuk membuat baris input peran/upah
+ * Dipanggil oleh 'addRow'
+ */
+function createRoleRowHTML(name = '', wage = '') {
+    const wageFormatted = wage ? new Intl.NumberFormat('id-ID').format(wage) : '';
+    return `
+        <input type="text" name="role_name" placeholder="Nama Peran (mis. Tukang)" value="${toProperCase(name)}" required data-proper-case="true">
+        <input type="text" name="role_wage" inputmode="numeric" placeholder="Nominal Upah" value="${wageFormatted}" required>
+        <button type="button" class="btn-icon btn-icon-danger" data-action="remove-role-wage-row">${createIcon('trash-2')}</button>`;
+}
+
 export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) {
-    // [TUGAS 3.1] Ini sudah benar untuk mendeteksi mobile
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
 
     const projectOptions = (appState.projects || [])
@@ -26,10 +37,13 @@ export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) 
         .map(p => ({
             value: p.id,
             text: p.projectName,
-            disabled: !!existingWages[p.id] && p.id !== projectId
+            // Nonaktifkan proyek jika sudah ada DAN kita TIDAK sedang mengeditnya
+            disabled: (p.id !== projectId) && !!existingWages[p.id]
         }));
 
-    // [TUGAS 1 & 3.3] Tambahkan parameter 'false' di akhir createMasterDataSelect untuk menyembunyikan search
+    // Ini adalah 'existingRoleData'
+    const rolesToEdit = (projectId && existingWages[projectId]) ? existingWages[projectId] : {};
+    
     const content = `
         <form id="worker-wage-form">
             ${createMasterDataSelect(
@@ -39,13 +53,20 @@ export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) 
                 projectId || '', 
                 null, 
                 true, 
-                false // <-- INI PERBAIKANNYA: showSearch = false
+                false // Sembunyikan search
             )}
-            <div class="role-wage-list"></div>
-            </form>
+            <div class="role-wage-list">
+                ${Object.keys(rolesToEdit).length > 0
+                    ? Object.entries(rolesToEdit).map(([name, wage]) => `
+                        <div class="role-wage-row">${createRoleRowHTML(name, wage)}</div>
+                      `).join('')
+                    : `<div class="role-wage-row">${createRoleRowHTML()}</div>` // Mulai dengan satu baris kosong
+                }
+            </div>
+        </form>
     `;
     
-    // [TUGAS 3.2] Pindahkan tombol "Tambah" ke footer, di samping "Simpan"
+    // Tombol "Tambah Peran" ini akan ditangani oleh 'formListeners.js'
     const footer = `
         <button type="button" class="btn btn-secondary" data-action="add-role-wage-row" style="margin-right: auto;">
             ${createIcon('plus', 18)}
@@ -54,62 +75,28 @@ export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) 
         <button type="submit" form="worker-wage-form" class="btn btn-primary">Simpan</button>
     `;
 
-    // [TUGAS 3.1] Gunakan layoutClass untuk membuatnya responsif
     const modal = createModal('dataDetail', {
         title: projectId ? 'Edit Upah Proyek' : 'Tambah Upah Proyek',
         content,
         footer,
-        // Ini akan otomatis menjadi bottom-sheet di mobile
         layoutClass: isMobile ? 'is-bottom-sheet' : 'is-simple-dialog'
     });
 
     const form = modal.querySelector('#worker-wage-form');
     const roleList = modal.querySelector('.role-wage-list');
 
-    // Fungsi addRow tetap sama
-    const addRow = (name = '', wage = '') => {
-        const row = document.createElement('div');
-        row.className = 'role-wage-row';
-        row.innerHTML = `
-            <input type="text" name="role_name" placeholder="Nama Peran (mis. Tukang)" value="${name}" required data-proper-case="true">
-            <input type="text" name="role_wage" inputmode="numeric" placeholder="Nominal Upah" value="${wage}" required>
-            <button type="button" class="btn-icon btn-icon-danger" data-action="remove-role-wage-row">${createIcon('trash-2')}</button>`;
-        roleList.appendChild(row);
-        row.querySelector('input[name="role_wage"]').addEventListener('input', formatNumberInput);
-        row.querySelector('input[name="role_name"]').addEventListener('blur', (e) => {
+    // Tambahkan listener ke elemen yang SUDAH ADA saat modal dibuka
+    roleList.querySelectorAll('.role-wage-row').forEach(row => {
+         row.querySelector('input[name="role_wage"]').addEventListener('input', formatNumberInput);
+         row.querySelector('input[name="role_name"]').addEventListener('blur', (e) => {
              e.target.value = toProperCase(e.target.value);
         });
-    };
-
-    if (projectId) {
-        const roles = existingWages[projectId] || {};
-        Object.entries(roles).forEach(([name, wage]) => {
-            addRow(name, new Intl.NumberFormat('id-ID').format(wage));
-        });
-    }
-
-    if (roleList.children.length === 0) {
-        addRow();
-    }
+         // 'data-action="remove-role-wage-row"' akan ditangani oleh formListeners.js
+    });
 
     initCustomSelects(modal);
-
-    // [TUGAS 3.2] Tambahkan listener untuk tombol "Tambah" yang baru di footer
-    const addRowBtn = modal.querySelector('[data-action="add-role-wage-row"]');
-    if (addRowBtn) {
-        // Hati-hati: Kita definisikan addRow di dalam scope ini, jadi ini aman
-        addRowBtn.addEventListener('click', () => addRow());
-    }
-
-    // [BARU] Tambahkan listener untuk hapus baris (jika belum ada listener global)
-    // Sebaiknya listener ini ditaruh di sini agar spesifik ke modal ini
-    roleList.addEventListener('click', (e) => {
-        const removeBtn = e.target.closest('[data-action="remove-role-wage-row"]');
-        if (removeBtn) {
-            removeBtn.closest('.role-wage-row').remove();
-            emit('ui.form.markDirty', true); // Tandai form kotor
-        }
-    });
+    
+    // 'data-action="add-role-wage-row"' akan ditangani oleh formListeners.js
 
     form.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -119,17 +106,36 @@ export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) 
             return;
         }
 
-        const roles = {};
+        const roles = {}; // Ini akan menampung BANYAK peran
         let isValid = true;
+        let hasDuplicate = false;
+        
         roleList.querySelectorAll('.role-wage-row').forEach(row => {
-            const name = row.querySelector('[name="role_name"]').value.trim();
-            const wage = parseFormattedNumber(row.querySelector('[name="role_wage"]').value);
+            const nameInput = row.querySelector('[name="role_name"]');
+            const wageInput = row.querySelector('[name="role_wage"]');
+            
+            const name = nameInput.value.trim();
+            const wage = parseFormattedNumber(wageInput.value);
+            
+            if (!name && (wage === 0 || isNaN(wage))) {
+                return; 
+            }
+    
             if (name && wage > 0) {
-                roles[toProperCase(name)] = wage;
+                const properName = toProperCase(name);
+                if (roles[properName]) {
+                    hasDuplicate = true;
+                }
+                roles[properName] = wage;
             } else {
                 isValid = false;
             }
         });
+
+        if (hasDuplicate) {
+            toast('error', 'Nama peran dalam satu proyek tidak boleh sama.');
+            return;
+        }
 
         if (!isValid || Object.keys(roles).length === 0) {
             toast('error', 'Pastikan semua peran memiliki nama dan upah yang valid (lebih dari 0).');
@@ -139,10 +145,10 @@ export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) 
         if (typeof onSave === 'function') {
             onSave({ projectId: selectedProjectId, roles });
         }
+        
         try { toast('success', 'Upah disimpan.'); } catch(_) {}
         
         resetFormDirty();
-        
         emit('ui.modal.close', modal);
     });
 }

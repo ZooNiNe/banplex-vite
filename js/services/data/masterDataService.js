@@ -11,7 +11,6 @@ import { isViewer, getJSDate } from "../../utils/helpers.js";
 import { _safeFirestoreWrite } from "./adminService.js";
 import { fetchAndCacheData } from "./fetch.js";
 import { parseFormattedNumber } from "../../utils/formatters.js";
-// [PERBAIKAN] Impor 'closeAllModals' dari eventBus
 import { showDetailPane, closeDetailPaneImmediate, closeModalImmediate } from "../../ui/components/modal.js";
 import { createTabsHTML } from "../../ui/components/tabs.js";
 import { getEmptyStateHTML } from "../../ui/components/emptyState.js";
@@ -185,16 +184,38 @@ export async function handleAddMasterItem(form) {
                 dataToAdd.professionId = form.elements.professionId.value;
                 dataToAdd.status = form.elements.workerStatus.value;
                 const projectWages = {};
+                
                 form.querySelectorAll('.worker-wage-summary-item').forEach(itemEl => {
                     const projectId = itemEl.dataset.projectId;
                     try {
                         const wages = JSON.parse(itemEl.dataset.wages);
                         if (projectId && wages) {
-                            projectWages[projectId] = wages;
+                            
+                            if (projectWages[projectId]) {
+                                projectWages[projectId] = { ...projectWages[projectId], ...wages };
+                            } else {
+                                projectWages[projectId] = wages;
+                            }
                         }
-                    } catch(e) { console.error('Gagal parsing data upah');}
+                    } catch(e) { console.error('Gagal parsing data upah', e);}
                 });
+                
+                if (Object.keys(projectWages).length === 0) {
+                    toast('error','minimal simpan satu pengaturan upah');
+                    if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+                    return;
+                }
+                
                 dataToAdd.projectWages = projectWages;
+                
+                const firstProjectIdWithWage = Object.keys(projectWages)[0];
+                if (firstProjectIdWithWage) {
+                    dataToAdd.defaultProjectId = firstProjectIdWithWage;
+                    const firstRole = Object.keys(projectWages[firstProjectIdWithWage])[0];
+                    if (firstRole) {
+                        dataToAdd.defaultRole = firstRole;
+                    }
+                }
             }
 
             const collectionRef = COLLECTIONS[type];
@@ -391,13 +412,24 @@ export async function handleUpdateMasterItem(form) {
                 const projectWages = {};
                 form.querySelectorAll('.worker-wage-summary-item').forEach(itemEl => {
                     const projectId = itemEl.dataset.projectId;
-                     try {
+                    try {
                         const wages = JSON.parse(itemEl.dataset.wages);
                         if (projectId && wages) {
-                            projectWages[projectId] = wages;
+                            
+                            if (projectWages[projectId]) {
+                                projectWages[projectId] = { ...projectWages[projectId], ...wages };
+                            } else {
+                                projectWages[projectId] = wages;
+                            }
                         }
-                    } catch(e) { console.error('Gagal parsing data upah');}
+                    } catch(e) { console.error('Gagal parsing data upah', e);}
                 });
+                
+                if (Object.keys(projectWages).length === 0) {
+                    toast('error','minimal simpan satu pengaturan upah');
+                    if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+                    return;
+                }
                 dataToUpdate.projectWages = projectWages;
             }
 

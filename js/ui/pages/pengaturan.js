@@ -72,7 +72,7 @@ function renderPengaturanContent() {
 function initPengaturanPage() {
     const container = $('.page-container');
     container.innerHTML = `
-        <div class="content-panel settings-panel">
+        <div class="content-panel transparent-panel">
             <div class="panel-header">
                 ${createPageToolbarHTML({ title: 'Pengaturan' })}
             </div>

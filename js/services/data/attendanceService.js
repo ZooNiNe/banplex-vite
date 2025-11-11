@@ -708,7 +708,15 @@ export async function handleDeleteSingleAttendance(recordId) {
     });
 }
 
+// attendanceService.js (Sudah bersih, tanpa console.warn)
+
 export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
+    if (typeof closeModal === 'function') {
+        closeModal();
+    } else {
+        console.warn('Fungsi closeModal() tidak ditemukan. Modal mungkin tetap terbuka.');
+    }
+    const controller = new AbortController();
     try {
         const project = (appState.projects || []).find(p => p.id === projectId);
         if (!project) {
@@ -721,46 +729,70 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
 
         const workers = (appState.workers || []).filter(w => w.status === 'active' && !w.isDeleted && w.projectWages && w.projectWages[projectId]);
 
+        const workerIdsForProject = new Set(workers.map(w => w.id));
         const existingRecordsOnDate = (appState.attendanceRecords || [])
             .filter(rec => {
                 const recDate = getJSDate(rec.date);
-                return recDate >= startOfDay && recDate <= endOfDay && rec.projectId === projectId && rec.isDeleted !== 1;
+                return recDate >= startOfDay && recDate <= endOfDay &&
+                       workerIdsForProject.has(rec.workerId) &&
+                       (rec.projectId === projectId || rec.attendanceStatus === 'absent') && 
+                       rec.isDeleted !== 1;
             });
+            
         const existingRecordMap = new Map(existingRecordsOnDate.map(rec => [rec.workerId, rec]));
 
         const rowsHTML = workers.map(w => {
-            const existingRecord = existingRecordMap.get(w.id);
-            const currentRole = existingRecord?.jobRole || w.defaultRole || Object.keys(w.projectWages?.[projectId] || {})[0] || '';
-            const wage = (w.projectWages?.[projectId] || {})[currentRole] || 0;
-            
-            const customWage = existingRecord?.customWage || 0;
-            let displayWage = wage;
+            const workerId = w.id;
+            const dbRecord = existingRecordMap.get(workerId); 
+
+            let currentStatus = 'absent';
+            let currentRole = w.defaultRole || Object.keys(w.projectWages?.[projectId] || {})[0] || '';
+            let customWage = 0;
+            let recordId = ''; 
+
+            if (dbRecord) {
+                if (dbRecord.projectId && dbRecord.projectId !== projectId) {
+                     currentStatus = 'absent';
+                } else {
+                    currentStatus = dbRecord.attendanceStatus;
+                    currentRole = dbRecord.jobRole || currentRole; 
+                    customWage = dbRecord.customWage || 0;
+                    recordId = dbRecord.id;
+                }
+            }
+
+            const baseWage = (w.projectWages?.[projectId] || {})[currentRole] || 0;
+            let displayWage = baseWage;
             let displayRole = currentRole;
             if (customWage > 0) {
                 displayWage = customWage;
                 displayRole = `${currentRole} (Kustom)`;
             }
 
-            const currentStatus = existingRecord?.attendanceStatus || 'absent'; 
-
             return `
-                <div class="manual-assign-row" data-worker-id="${w.id}" data-base-wage="${wage}" data-role="${currentRole}" data-custom-wage="${customWage}">
+                <div class="manual-assign-row" 
+                     data-worker-id="${workerId}" 
+                     data-base-wage="${baseWage}" 
+                     data-role="${currentRole}" 
+                     data-custom-wage="${customWage}"
+                     data-record-id="${recordId}"
+                >
                     <div class="manual-assign-row__head">
                         <div class="worker-info">
                             <strong class="worker-name">${w.workerName}</strong>
                             <span class="meta-badge worker-wage" data-pay="0">${displayRole ? `${displayRole} · ${fmtIDR(displayWage)}` : 'Peran?'}</span>
                         </div>
-                        <div class="attendance-status-radios" data-worker-id="${w.id}">
+                        <div class="attendance-status-radios" data-worker-id="${workerId}">
                             <label class="custom-checkbox-label">
-                                <input type="radio" name="status_${w.id}" value="full_day" ${currentStatus === 'full_day' ? 'checked' : ''}>
+                                <input type="radio" name="status_${workerId}" value="full_day" ${currentStatus === 'full_day' ? 'checked' : ''}>
                                 <span class="custom-checkbox-visual"></span>
                             </label>
                             <label class="custom-checkbox-label">
-                                <input type="radio" name="status_${w.id}" value="half_day" ${currentStatus === 'half_day' ? 'checked' : ''}>
+                                <input type="radio" name="status_${workerId}" value="half_day" ${currentStatus === 'half_day' ? 'checked' : ''}>
                                 <span class="custom-checkbox-visual"></span>
                             </label>
                             <label class="custom-checkbox-label">
-                                <input type="radio" name="status_${w.id}" value="absent" ${currentStatus === 'absent' ? 'checked' : ''}>
+                                <input type="radio" name="status_${workerId}" value="absent" ${currentStatus === 'absent' ? 'checked' : ''}>
                                 <span class="custom-checkbox-visual"></span>
                             </label>
                         </div>
@@ -794,7 +826,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
             </div>`;
 
         const bodyHTML = `
-            <div class="scrollable-content" style="max-height: 60vh;"> ${rowsHTML.length > 0 ? rowsHTML : getEmptyStateHTML({icon: 'engineering', title: 'Tidak Ada Pekerja', desc: 'Tidak ada pekerja aktif untuk proyek ini.'})}</div>
+            <div class="scrollable-content"> ${rowsHTML.length > 0 ? rowsHTML : getEmptyStateHTML({icon: 'engineering', title: 'Tidak Ada Pekerja', desc: 'Tidak ada pekerja aktif untuk proyek ini.'})}</div>
         `;
 
          const summaryHTML = `
@@ -805,7 +837,9 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
 
         const headerActions = `<button class="btn btn-secondary" data-action="goto-manual-add" data-project-id="${projectId}" data-date="${dateStr}" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">${createIcon('edit', 16)} Tambah/Ubah</button>`;
         
-        const footer = `<div class="form-footer-actions"><button class="btn btn-primary" id="save-absence-status">${createIcon('save', 18)} Simpan Perubahan</button></div>`;
+        const footer = `
+        <button type="button" class="btn btn-ghost" id="cancel-daily-attendance">Batal</button>
+        <button class="btn btn-primary" id="save-absence-status">${createIcon('save', 18)} Simpan Perubahan</button>`;
 
         showDetailPane({
             title: 'Edit Absensi Harian',
@@ -839,7 +873,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
         };
 
         context.querySelectorAll('.attendance-status-radios input').forEach(radio => {
-            radio.addEventListener('change', updateTotal);
+            radio.addEventListener('change', updateTotal, { signal: controller.signal });
         });
         context.querySelectorAll('.check-all-controls input[type="radio"]').forEach(radio => {
             radio.addEventListener('change', () => {
@@ -851,196 +885,225 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
                 });
                 updateTotal();
                 setTimeout(() => { radio.checked = false; }, 100);
-            });
+            }, { signal: controller.signal });
         });
 
         updateTotal();
 
         context.querySelector('#save-absence-status')?.addEventListener('click', async () => {
-            const entries = [];
-            workers.forEach(w => {
-                const statusEl = context.querySelector(`input[name="status_${w.id}"]:checked`);
-                const status = statusEl?.value || 'absent';
-                
-                const row = context.querySelector(`.manual-assign-row[data-worker-id="${w.id}"]`);
-                const role = row?.dataset.role || '';
-                const baseWage = parseFloat(row?.dataset.baseWage || '0');
-                const customWage = parseFloat(row?.dataset.customWage || '0');
-                const wageToUse = customWage > 0 ? customWage : baseWage;
-                
-                const pay = status === 'full_day' ? wageToUse : (status === 'half_day' ? wageToUse / 2 : 0);
-                
-                entries.push({ 
-                    workerId: w.id, 
-                    workerName: w.workerName, 
-                    status: status === 'full_day' ? 'Hadir' : (status === 'half_day' ? '1/2 Hari' : 'Absen'),
-                    role: role, 
-                    pay: pay 
-                });
-            });
+            
+            try {
+                const entries = [];
+                workers.forEach(w => {
+                    const statusEl = context.querySelector(`input[name="status_${w.id}"]:checked`);
+                    const row = context.querySelector(`.manual-assign-row[data-worker-id="${w.id}"]`);
 
-            emit('ui.modal.create', 'confirmUserAction', {
-                title: 'Konfirmasi Simpan Absensi',
-                message: `Anda akan menyimpan perubahan absensi untuk ${workers.length} pekerja pada ${date.toLocaleDateString('id-ID')}. Lanjutkan?`,
-                onConfirm: async () => {
-                    try {
-                        await handleSaveManualAttendance({ date: dateStr, projectId, entries });
-                        await loadAllLocalDataToState();
-                        closeDetailPaneImmediate();
-                        emit('ui.page.render');
-                        toast('success', 'Perubahan absensi disimpan.');
-                    } catch (e) {
-                        toast('error', `Gagal menyimpan: ${e.message}`);
+                    const status = statusEl?.value || 'absent'; 
+                    const role = row?.dataset.role || '';
+                    const baseWage = parseFloat(row?.dataset.baseWage || '0');
+                    const customWage = parseFloat(row?.dataset.customWage || '0');
+                    const wageToUse = customWage > 0 ? customWage : baseWage;
+                    const pay = status === 'full_day' ? wageToUse : (status === 'half_day' ? wageToUse / 2 : 0);
+                    
+                    const recordId = row?.dataset.recordId || null; 
+
+                    entries.push({ 
+                        id: recordId, 
+                        workerId: w.id, 
+                        workerName: w.workerName, 
+                        status: status,         
+                        role: role, 
+                        pay: pay,
+                        customWage: customWage > 0 ? customWage : null,
+                        projectId: projectId    
+                    });
+                });
+
+                emit('ui.modal.create', 'confirmUserAction', {
+                    title: 'Konfirmasi Simpan Absensi',
+                    message: `Anda akan menyimpan perubahan absensi untuk ${workers.length} pekerja pada ${date.toLocaleDateString('id-ID')}. Lanjutkan?`,
+                    onConfirm: async () => {
+                        const loadingToast = toast('syncing', 'Menyimpan perubahan...');
+                        try {
+                            await handleSaveManualAttendance({ date: dateStr, projectId, entries });
+                            await loadAllLocalDataToState();
+                            
+                            controller.abort(); 
+
+                            if (window.matchMedia('(max-width: 599px)').matches) {
+                                hideMobileDetailPage();
+                            } else {
+                                closeDetailPaneImmediate();
+                            }
+                            emit('ui.page.render');
+                            loadingToast.close();
+                            toast('success', 'Perubahan absensi disimpan.');
+                        } catch (e) {
+                            loadingToast.close();
+                            toast('error', `Gagal menyimpan: ${e.message}`);
+                        }
+                        
+                        if (typeof closeModal === 'function') {
+                            closeModal();
+                        }
                     }
-                    return false; 
-                }
-            });
-        });
+                });
+
+            } catch (e) {
+                console.error("Error preparing attendance data:", e);
+                toast('error', `Gagal memproses data: ${e.message}`);
+            }
+        }, { signal: controller.signal });
+
+        context.querySelector('#cancel-daily-attendance')?.addEventListener('click', () => {
+            controller.abort(); 
+            if (window.matchMedia('(max-width: 599px)').matches) {
+                hideMobileDetailPage();
+            } else {
+                closeDetailPaneImmediate();
+            }
+        }, { signal: controller.signal });
+
 
     } catch (e) {
         console.error("Error opening daily attendance editor:", e);
         toast('error', 'Gagal membuka panel editor absensi.');
+        
+        controller.abort();
     }
 }
 
+// ... (fungsi lain di file Anda) ...
+
 export async function handleSaveManualAttendance(attendanceData) {
-    const { date, entries } = attendanceData;
+    const { date, projectId, entries } = attendanceData;
+
+    if (!projectId) {
+        console.error('handleSaveManualAttendance dipanggil tanpa projectId.');
+        toast('error', 'Kesalahan Kritis: ID Proyek tidak terdefinisi saat menyimpan.');
+        return { success: false, skipped: entries ? entries.length : 0 };
+    }
+
     const dateObj = parseLocalDate(date);
     const { startOfDay, endOfDay } = getLocalDayBounds(date);
-    let skippedWorkers = new Set();
     let success = false;
+    let skippedWorkers = new Set(); 
 
     try {
         await localDB.transaction('rw', localDB.attendance_records, localDB.outbox, async () => {
             
-            const existingRecordsOnDate = await localDB.attendance_records
-                .where('date').between(startOfDay, endOfDay)
-                .and(rec => rec.isDeleted !== 1)
+            // --- INI ADALAH FIX UTAMA ---
+            // Ambil SEMUA record dan filter di JS
+            const allDbRecords = await localDB.attendance_records
+                .where('isDeleted').notEqual(1) 
                 .toArray();
-            const existingRecordMap = new Map(existingRecordsOnDate.map(rec => [rec.id, rec]));
             
-            const workerIdsInPending = new Set(entries.flat().map(e => e.workerId));
-            
-            const processedDbIds = new Set(); 
+            // Filter tanggal secara manual di JavaScript
+            const allRecordsOnDate = allDbRecords.filter(rec => {
+                if (!rec.date) return false;
+                const recDate = getJSDate(rec.date); 
+                if (isNaN(recDate.getTime())) return false; 
+                return recDate >= startOfDay && recDate <= endOfDay;
+            });
+            // --- AKHIR FIX ---
 
-            for (const entryOrArray of entries) {
-                const workerEntries = Array.isArray(entryOrArray) ? entryOrArray : [entryOrArray];
-                if (workerEntries.length === 0) continue;
+            const recordsForThisProject = new Map(); 
+            const recordsElsewhere = new Map(); 
+
+            allRecordsOnDate.forEach(rec => {
+                if (rec.projectId === projectId) {
+                    recordsForThisProject.set(rec.workerId, rec);
+                } else if (rec.attendanceStatus !== 'absent') {
+                    recordsElsewhere.set(rec.workerId, rec);
+                }
+            });
+
+            for (const entry of entries) {
+                const { id: entryId, workerId, workerName, status, role, pay, customWage, projectId: entryProjectId } = entry;
                 
-                const workerId = workerEntries[0].workerId;
+                const attendanceStatus = (status === 'Hadir' || status === 'full_day') ? 'full_day' 
+                                       : (status === '1/2 Hari' || status === 'half_day') ? 'half_day' 
+                                       : 'absent';
 
-                const existingRecordElsewhere = existingRecordsOnDate.find(
-                    r => r.workerId === workerId && 
-                         (r.attendanceStatus === 'full_day' || r.attendanceStatus === 'half_day') &&
-                         !workerEntries.some(e => e.projectId === r.projectId)
-                );
-                
-                const isTryingToSaveProductive = workerEntries.some(e => e.status !== 'absent');
+                if (attendanceStatus !== 'absent' && recordsElsewhere.has(workerId)) {
+                    skippedWorkers.add(workerName);
+                    continue; 
+                }
 
-                if (existingRecordElsewhere && isTryingToSaveProductive) {
-                    skippedWorkers.add(workerEntries[0].workerName);
-                    continue;
+                let existingRecord = null;
+                if (entryId) {
+                    existingRecord = allRecordsOnDate.find(r => r.id === entryId);
+                }
+                if (!existingRecord) {
+                    existingRecord = recordsForThisProject.get(workerId);
                 }
                 
-                for (const entry of workerEntries) {
-                    const { workerId, workerName, status, role, pay, projectId, id: entryId } = entry;
-                    
-                    const attendanceStatus = (status === 'Hadir' || status === 'full_day') ? 'full_day' 
-                                           : (status === '1/2 Hari' || status === 'half_day') ? 'half_day' 
-                                           : 'absent';
-                    
-                    let recordToUpdate = null;
-                    if (entryId && !String(entryId).startsWith('local_')) {
-                        recordToUpdate = existingRecordMap.get(entryId);
-                    }
+                if (attendanceStatus !== 'absent') {
+                    const dataToSave = {
+                        attendanceStatus: attendanceStatus,
+                        totalPay: pay,
+                        jobRole: role,
+                        customWage: customWage,
+                        projectId: entryProjectId, 
+                        isDeleted: 0,
+                        type: 'manual',
+                        status: 'completed',
+                        updatedAt: new Date()
+                    };
 
-                    if (recordToUpdate) {
-                        const isDelete = (attendanceStatus === 'absent');
-                        
-                        const updateData = {
-                            attendanceStatus: attendanceStatus,
-                            totalPay: isDelete ? 0 : pay,
-                            jobRole: isDelete ? null : role,
-                            projectId: projectId,
-                            isDeleted: isDelete ? 1 : 0,
-                            syncState: 'pending_update',
-                            updatedAt: new Date(),
-                            type: 'manual',
-                            status: 'completed'
+                    if (existingRecord) {
+                        await localDB.attendance_records.update(existingRecord.id, { ...dataToSave, syncState: 'pending_update' });
+                        await queueOutbox({ table: 'attendance_records', docId: existingRecord.id, op: 'upsert', payload: { id: existingRecord.id, ...dataToSave }, priority: 6 });
+                    } else {
+                        const newRecord = {
+                            ...dataToSave,
+                            id: generateUUID(),
+                            workerId,
+                            workerName,
+                            date: dateObj,
+                            isPaid: false,
+                            createdAt: new Date(),
+                            syncState: 'pending_create'
                         };
-                        await localDB.attendance_records.update(recordToUpdate.id, updateData);
-                        await queueOutbox({ table: 'attendance_records', docId: recordToUpdate.id, op: 'upsert', payload: { id: recordToUpdate.id, ...updateData }, priority: 6 });
-                        processedDbIds.add(recordToUpdate.id);
-
-                    } else if (attendanceStatus !== 'absent') {
-                        const existingRecForProject = existingRecordsOnDate.find(
-                            r => r.workerId === workerId && r.projectId === projectId
-                        );
-
-                        if (existingRecForProject) {
+                        await localDB.attendance_records.add(newRecord);
+                        await queueOutbox({ table: 'attendance_records', docId: newRecord.id, op: 'upsert', payload: newRecord, priority: 6 });
+                    }
+                } else { 
+                    if (existingRecord) {
+                        if (existingRecord.attendanceStatus !== 'absent') {
                             const updateData = {
-                                attendanceStatus: attendanceStatus,
-                                totalPay: pay,
-                                jobRole: role,
-                                isDeleted: 0,
+                                attendanceStatus: 'absent',
+                                totalPay: 0,
+                                jobRole: null,
+                                customWage: null,
+                                projectId: null, 
+                                isDeleted: 1, 
                                 syncState: 'pending_update',
-                                updatedAt: new Date(),
-                                type: 'manual',
-                                status: 'completed'
+                                updatedAt: new Date()
                             };
-                            await localDB.attendance_records.update(existingRecForProject.id, updateData);
-                            await queueOutbox({ table: 'attendance_records', docId: existingRecForProject.id, op: 'upsert', payload: { id: existingRecForProject.id, ...updateData }, priority: 6 });
-                            processedDbIds.add(existingRecForProject.id);
-                        } else {
-                            const newRecord = {
-                                id: generateUUID(),
-                                workerId,
-                                workerName,
-                                projectId: projectId,
-                                date: dateObj,
-                                attendanceStatus: attendanceStatus,
-                                totalPay: pay,
-                                jobRole: role,
-                                isPaid: false,
-                                type: 'manual',
-                                status: 'completed',
-                                createdAt: new Date(),
-                                isDeleted: 0,
-                                syncState: 'pending_create'
-                            };
-                            await localDB.attendance_records.add(newRecord);
-                            await queueOutbox({ table: 'attendance_records', docId: newRecord.id, op: 'upsert', payload: newRecord, priority: 6 });
+                            await localDB.attendance_records.update(existingRecord.id, updateData);
+                            await queueOutbox({ table: 'attendance_records', docId: existingRecord.id, op: 'upsert', payload: { id: existingRecord.id, ...updateData }, priority: 5 });
                         }
-                    }
-                }
-            }
-            
-            for (const workerId of workerIdsInPending) {
-                const pendingEntries = entries.flat().filter(e => e.workerId === workerId);
-                const pendingDbIds = new Set(
-                    pendingEntries
-                        .map(e => e.id)
-                        .filter(id => id && !String(id).startsWith('local_'))
-                );
-
-                const recordsInDbForWorker = existingRecordsOnDate.filter(r => r.workerId === workerId);
-
-                for (const dbRecord of recordsInDbForWorker) {
-                    if (!pendingDbIds.has(dbRecord.id) && !processedDbIds.has(dbRecord.id)) {
-                        
-                        if (dbRecord.projectId !== appState.manualAttendanceSelectedProjectId && 
-                            !pendingEntries.some(e => e.projectId === dbRecord.projectId)) {
-                             continue;
-                        }
-
-                        const updateData = {
-                            isDeleted: 1,
-                            syncState: 'pending_update',
-                            updatedAt: new Date()
+                    } else {
+                        const newRecord = {
+                            id: generateUUID(),
+                            workerId,
+                            workerName,
+                            projectId: null, 
+                            date: dateObj,
+                            attendanceStatus: 'absent',
+                            totalPay: 0,
+                            jobRole: null,
+                            customWage: null,
+                            isPaid: false,
+                            type: 'manual',
+                            status: 'completed',
+                            createdAt: new Date(),
+                            isDeleted: 0, 
+                            syncState: 'pending_create'
                         };
-                        await localDB.attendance_records.update(dbRecord.id, updateData);
-                        await queueOutbox({ table: 'attendance_records', docId: dbRecord.id, op: 'upsert', payload: { id: dbRecord.id, ...updateData }, priority: 5 });
-                        processedDbIds.add(dbRecord.id);
+                        await localDB.attendance_records.add(newRecord);
+                        await queueOutbox({ table: 'attendance_records', docId: newRecord.id, op: 'upsert', payload: newRecord, priority: 6 });
                     }
                 }
             }
@@ -1079,12 +1142,6 @@ export async function openManualAbsenceStatusPanel(selectedWorkerIds = []) {
         const date = parseLocalDate(dateStr);
         
         let defaultStatus = 'full_day';
-        const firstWorkerId = selectedWorkerIds[0];
-        const pendingData = appState.pendingAttendance.get(firstWorkerId);
-        if (pendingData) {
-            const firstEntry = Array.isArray(pendingData) ? pendingData[0] : pendingData;
-            defaultStatus = firstEntry.status || 'full_day';
-        }
         
         const pendingCount = appState.pendingAttendance?.size || 0;
         const saveAllDisabled = pendingCount === 0 ? 'disabled' : '';
@@ -1115,7 +1172,7 @@ export async function openManualAbsenceStatusPanel(selectedWorkerIds = []) {
     `;
 
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
-    
+    const controller = new AbortController();
     const modalInstance = createModal('actionsPopup', {
         title: 'Set Status Absensi Massal',
         content: content,
@@ -1131,7 +1188,6 @@ export async function openManualAbsenceStatusPanel(selectedWorkerIds = []) {
                 if (!appState.pendingAttendance) {
                     appState.pendingAttendance = new Map();
                 }
-
                 let appliedCount = 0;
                 let skippedCount = 0;
                 const skippedNames = [];
@@ -1202,11 +1258,27 @@ export async function openManualAbsenceStatusPanel(selectedWorkerIds = []) {
                     toast('info', `${skippedCount} pekerja dilewati (tidak ada tarif/proyek default): ${skippedNames.join(', ')}.`);
                 }
                 
+                if (appState.selectionMode.active) {
+                    appState.selectionMode.selectedIds.clear();
+                    emit('ui.selection.changed'); 
+                }                
                 resetFormDirty();
                 emit('ui.absensi.renderManualForm'); 
                 emit('ui.absensi.updateFooter'); 
+                
                 closeModal(modalInstance); 
-            });
+                controller.abort();
+                if (modalInstance) modalInstance.remove();
+
+            }, { signal: controller.signal }); 
+
+
+            modalInstance.querySelector('[data-action="history-back"]')?.addEventListener('click', () => {
+                closeModal(modalInstance);
+                controller.abort();
+                if (modalInstance) modalInstance.remove();
+            }, { signal: controller.signal });
+
         }
     } catch (e) {
         console.error("Error opening manual absence panel:", e);

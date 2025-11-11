@@ -1,17 +1,15 @@
 import { emit, on } from "../../../state/eventBus.js";
 import { attachClientValidation, validateForm } from '../../../utils/validation.js';
 import { toProperCase } from "../../../utils/helpers.js";
-// PERBAIKAN: Impor 'serializeForm' dari 'formPersistence'
 import { submitFormAsync, fallbackLocalFormHandler, serializeForm } from "../../../utils/formPersistence.js";
 import { handleAddMasterItem, handleUpdateMasterItem } from "../../../services/data/masterDataService.js";
-// PERBAIKAN: Impor 'createModal' dan 'closeModalImmediate'
 import { createModal, closeModal, resetFormDirty, markFormDirty, closeDetailPane, closeDetailPaneImmediate, hideMobileDetailPage, hideMobileDetailPageImmediate, closeModalImmediate } from "../modal.js";
 import { handleUpdatePemasukan, handleAddPemasukan } from "../../../services/data/transactions/pemasukanService.js";
 import { handleUpdatePengeluaran, handleAddPengeluaran } from "../../../services/data/transactions/pengeluaranService.js";
 import { handleDeleteAttachment, handleReplaceAttachment } from "../../../services/data/transactions/attachmentService.js";
 import { toast } from "../toast.js";
 import { appState } from "../../../state/appState.js";
-import { openWorkerWageDetailModal, formatNumberInput, addInvoiceItemRow, handleInvoiceItemChange, initCustomSelects } from "./index.js";
+import { openWorkerWageDetailModal, _createWorkerWageSummaryItemHTML, formatNumberInput, addInvoiceItemRow, handleInvoiceItemChange, initCustomSelects } from "./index.js";
 import { parseFormattedNumber, parseLocaleNumber } from "../../../utils/formatters.js";
 import { handleAttachmentUpload } from './attachmentManager.js';
 
@@ -389,73 +387,106 @@ export function initializeFormListeners() {
 
     initializeFormSpecificListeners();
 
-    // Listener untuk upah pekerja (sudah benar, tidak perlu diubah)
     on('ui.form.openWorkerWageDetail', ({ target } = {}) => {
         try {
-            const form = (target && target.closest && target.closest('form#master-data-form[data-type="workers"]')) || null;
+            const form = (target && target.closest)
+                ? target.closest('form[data-type="workers"]')
+                : document.querySelector('form[data-type="workers"]');
+            
             if (!form) return;
-            const list = form.querySelector('#worker-wages-summary-list');
-            if (!list) return;
-
+            
+            const initialList = form.querySelector('#worker-wages-summary-list');
+            if (!initialList) return;
+            
             const existingWages = {};
-            list.querySelectorAll('.worker-wage-summary-item').forEach(it => {
+            initialList.querySelectorAll('.worker-wage-summary-item').forEach(it => {
                 const pid = it.dataset.projectId;
-                try { existingWages[pid] = JSON.parse(it.dataset.wages || '{}'); } catch { existingWages[pid] = {}; }
+                if (!pid) return;
+                
+                if (!existingWages[pid]) existingWages[pid] = {};
+                try {
+                    const wages = JSON.parse(it.dataset.wages || '{}');
+                    Object.assign(existingWages[pid], wages);
+                } catch {}
             });
-
+            
             const editingItem = target && target.closest ? target.closest('.worker-wage-summary-item') : null;
-            const editProjectId = editingItem ? editingItem.dataset.projectId : null;
-
-            const onSave = ({ projectId, roles }) => {
-                const project = (window.appState || appState).projects.find(p => p.id === projectId);
-                const rolesHTML = Object.entries(roles).map(([name, wage]) => `<span class="badge">${name}: ${new Intl.NumberFormat('id-ID').format(wage)}</span>`).join(' ');
-                const markup = `
-                    <div class="worker-wage-summary-item" data-project-id="${projectId}" data-wages='${JSON.stringify(roles)}'>
-                      <div class="dense-list-item">
-                        <div class="item-main-content">
-                            <strong class="item-title">${project?.projectName || 'Proyek'}</strong>
-                            <div class="item-sub-content role-summary">${rolesHTML}</div>
-                        </div>
-                        <div class="item-actions">
-                          <button type="button" class="btn-icon" title="Edit" data-action="edit-worker-wage">${createIcon('edit')}</button>
-                          <button type="button" class="btn-icon btn-icon-danger" title="Hapus" data-action="remove-worker-wage">${createIcon('trash-2')}</button>
-                        </div>
-                      </div>
-                    </div>`;
-
-                const existingEl = list.querySelector(`.worker-wage-summary-item[data-project-id="${projectId}"]`);
-                if (existingEl) existingEl.outerHTML = markup;
-                else list.insertAdjacentHTML('beforeend', markup);
-
-                const empty = list.querySelector('.empty-state-small');
-                if (empty) empty.remove();
-                markFormDirty(true);
-            };
-
-            openWorkerWageDetailModal({ projectId: editProjectId, existingWages, onSave });
-        } catch (e) { console.error(e); }
-    });
-
-    // Hapus pengaturan upah proyek pada ringkasan di form pekerja
-    on('ui.form.removeWorkerWage', ({ target } = {}) => {
-        try {
-            const form = (target && target.closest && target.closest('form#master-data-form[data-type="workers"]')) || document.querySelector('form#master-data-form[data-type="workers"]');
-            if (!form) return;
-            const list = form.querySelector('#worker-wages-summary-list');
-            if (!list) return;
-            const item = target && target.closest ? target.closest('.worker-wage-summary-item') : null;
-            if (item) {
-                item.remove();
-                // Jika kosong, tampilkan placeholder kosong
-                if (!list.querySelector('.worker-wage-summary-item')) {
-                    const emptyHTML = '<p class="empty-state-small empty-state-small--left">Belum ada pengaturan upah.</p>';
-                    list.innerHTML = emptyHTML;
-                }
-                markFormDirty(true);
+            
+            let originalProjectId = null; 
+            
+            if (editingItem) {
+                originalProjectId = editingItem.dataset.projectId;
             }
-        } catch (e) { console.error(e); }
+            
+            const onSave = ({ projectId, roles }) => {
+            
+                const project = (window.appState || appState).projects.find(p => p.id === projectId);
+                if (!project) return;
+            
+                const markup = _createWorkerWageSummaryItemHTML(projectId, project.projectName, roles);
+            
+                const currentList = document.querySelector('#worker-wages-summary-list');
+                if (!currentList) {
+                    console.error("Gagal menemukan #worker-wages-summary-list saat onSave");
+                    return;
+                }
+    
+                if (originalProjectId && originalProjectId !== projectId) {
+                    const originalItem = currentList.querySelector(`.worker-wage-summary-item[data-project-id="${originalProjectId}"]`);
+                    if (originalItem) {
+                        originalItem.remove();
+                    }
+                }
+    
+                let itemToReplace = currentList.querySelector(`.worker-wage-summary-item[data-project-id="${projectId}"]`);
+
+                if (itemToReplace) {
+                    console.log(`[onSave] Mengganti HTML untuk project: ${projectId}`);
+                    itemToReplace.outerHTML = markup;
+                } else {
+                    console.warn(`[onSave] Menambah HTML untuk project: ${projectId}`);
+                    currentList.insertAdjacentHTML('beforeend', markup);
+                }
+                    
+                const empty = currentList.querySelector('.empty-state-small');
+                if (empty) empty.remove();
+                
+                try {
+                    if (typeof markFormDirty === 'function') markFormDirty(true);
+                    else emit('ui.form.markDirty', true);
+                } catch(_) {}
+            };
+    
+            openWorkerWageDetailModal({
+                projectId: originalProjectId, // Kirim ID project original ke modal
+                existingWages: existingWages, // Kirim semua upah yang ada
+                onSave: onSave
+            });
+        } catch (e) { console.error("Error di ui.form.openWorkerWageDetail:", e); }
     });
 
+    on('ui.form.removeWorkerWage', ({ target } = {}) => {
+            try {
+                const item = target && target.closest ? target.closest('.worker-wage-summary-item') : null;
+                if (item) {
+                    // Simpan ID parent SEBELUM item dihapus
+                    const listId = item.parentElement.id; 
+                    item.remove(); // Hapus item
+    
+                    // Kueri ulang list 'fresh' menggunakan ID
+                    const list = document.getElementById(listId);
+                    if (list && !list.querySelector('.worker-wage-summary-item')) {
+                        const emptyHTML = '<p class="empty-state-small empty-state-small--left">Belum ada pengaturan upah.</p>';
+                        list.innerHTML = emptyHTML;
+                    }
+    
+                    try {
+                        if (typeof markFormDirty === 'function') markFormDirty(true);
+                        else emit('ui.form.markDirty', true);
+                    } catch(_) {}
+                }
+            } catch (e) { console.error("Error di ui.form.removeWorkerWage:", e); }
+        });
     on('ui.form.addRoleWageRow', ({ target } = {}) => {
         try {
             const context = (target && target.closest && target.closest('.modal-bg, .detail-pane')) || document;

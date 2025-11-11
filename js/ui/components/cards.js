@@ -220,8 +220,8 @@ export function _getMasterDataListHTML(type, items, config) {
             'item-id': itemId, 
             type: type, 
             table: config.dbTable || type,
-            pageContext: 'master_data', // <-- Tambahkan konteks halaman
-            title: title // <-- Tambahkan judul untuk modal
+            pageContext: 'master_data', // <-- Ini sudah benar untuk actionMenuUtils
+            title: title
         };
 
         return createUnifiedCard({
@@ -230,8 +230,9 @@ export function _getMasterDataListHTML(type, items, config) {
             headerMeta: '',
             metaBadges: badges,
             mainContentHTML: mainContent,
-            dataset: { ...dataset, action: 'edit-item' },            moreAction: true,
-            actions: [],
+            dataset: dataset, 
+            moreAction: true, // <-- Ini sudah benar, memicu menu "..."
+            actions: [], // <-- Ini sudah benar, membiarkan actionMenuUtils.js mengisi menu
             selectionEnabled: selectionActive,
             isSelected: isSelected
         });

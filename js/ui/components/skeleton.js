@@ -98,23 +98,17 @@ function createCategoryNavSkeleton() {
     `;
 }
 
-// --- [FUNGSI SKELETON SPESIFIK HALAMAN (REVISI)] ---
-
-// Helper untuk membuat skeleton toolbar standar
 function _createStandardToolbarSkeleton(title, { hasSearch = false, hasMore = false, hasNavBack = false } = {}) {
     const headerActions = [];
     
-    // Halaman Tagihan punya tombol search
     if (hasSearch) {
         headerActions.push(`<div class="skeleton skeleton-button" style="width: 40px; height: 40px; border-radius: 12px; margin-left: 8px;"></div>`);
     }
     
-    // Halaman Pemasukan, Recycle Bin, Komentar punya tombol more_vert
     if (hasMore) {
         headerActions.push(`<div class="skeleton skeleton-button" style="width: 40px; height: 40px; border-radius: 12px; margin-left: 8px;"></div>`);
     }
 
-    // Halaman Master Data punya tombol kembali
     const titleBtn = hasNavBack ? navBackBtn : mobileToggleBtn;
 
     return `
@@ -124,7 +118,6 @@ function _createStandardToolbarSkeleton(title, { hasSearch = false, hasMore = fa
                     ${titleBtn}
                     <div class="title-group"><h4 class="page-name">${title}</h4></div>
                 </div>
-                <div id="sync-indicator" class="sync-indicator"></div>
                 <div class="header-actions">
                     ${headerActions.join('')}
                 </div>
@@ -358,7 +351,7 @@ export function createPengaturanPageSkeletonHTML() {
     const body = profileSkeleton + settingsGroupSkeleton(1) + settingsGroupSkeleton(3) + settingsGroupSkeleton(1);
     
     return `
-        <div class="content-panel settings-panel">
+        <div class="content-panel transparent-panel">
             <div class="panel-header">
                 ${_createStandardToolbarSkeleton('Pengaturan')}
             </div>
@@ -464,26 +457,34 @@ export function createDashboardPageSkeletonHTML() {
             <div class="card-body skeleton" style="flex-grow: 1; border-radius: 8px; margin: 0.5rem;"></div>
         </div>`;
 
-    return `
-        ${_createStandardToolbarSkeleton('Dashboard')}
-        <div id="sub-page-content" class="scrollable-content" style="padding: 1rem;">
-            ${createHeroSkeleton('110px')}
-            <div class="dashboard-stats-grid" style="margin-bottom: 1.5rem;">
-                ${statCard}${statCard}${statCard}${statCard}
-            </div>
-            <div class="dashboard-hero quote-hero skeleton" style="height: 130px; margin-bottom: 1.5rem; border-radius: var(--radius-lg);"></div>
-            <div class="dashboard-card card-full-width skeleton" id="dashboard-card-budgets" style="height: 200px; margin-bottom: 1.5rem; border-radius: var(--radius);"></div>
-            <div class="dashboard-worker-stats-grid" style="margin-bottom: 1.5rem;">
-                ${statCard}${statCard}${statCard}${statCard}
-            </div>
-            <div class="info-hero-card skeleton" style="height: 100px; margin-bottom: 1.5rem; border-radius: var(--radius-lg);"></div>
-            <div class="dashboard-grid-layout">
-                ${chartCard('300px')}
-                ${chartCard('300px')}
-            </div>
-        </div>
-    `;
-}
+        const bodyContent = `
+                ${createHeroSkeleton('110px')}
+                <div class="dashboard-stats-grid" style="margin-bottom: 1.5rem;">
+                    ${statCard}${statCard}${statCard}${statCard}
+                </div>
+                <div class="dashboard-hero quote-hero skeleton" style="height: 130px; margin-bottom: 1.5rem; border-radius: var(--radius-lg);"></div>
+                <div class="dashboard-card card-full-width skeleton" id="dashboard-card-budgets" style="height: 200px; margin-bottom: 1.5rem; border-radius: var(--radius);"></div>
+                <div class="dashboard-worker-stats-grid" style="margin-bottom: 1.5rem;">
+                    ${statCard}${statCard}${statCard}${statCard}
+                </div>
+                <div class="info-hero-card skeleton" style="height: 100px; margin-bottom: 1.5rem; border-radius: var(--radius-lg);"></div>
+                <div class="dashboard-grid-layout">
+                    ${chartCard('300px')}
+                    ${chartCard('300px')}
+                </div>
+            `;
+        
+            return `
+                <div class="content-panel transparent-panel">
+                    <div class="panel-header">
+                        ${_createStandardToolbarSkeleton('Dashboard', {hasMore: true})}
+                    </div>
+                    <div id="sub-page-content" class="panel-body scrollable-content">
+                        ${bodyContent}
+                    </div>
+                </div>
+            `;
+        }
 
 function createStokPageSkeletonHTML() {
     return `

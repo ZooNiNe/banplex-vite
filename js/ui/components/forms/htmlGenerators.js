@@ -17,6 +17,7 @@ function createIcon(iconName, size = 18, classes = '') {
         'trash-2': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2 ${classes}"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`,
         'plus-circle': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-circle ${classes}"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>`,
         pencil: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil ${classes}"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`,
+        'edit-3': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-edit-3 ${classes}"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`,
         info: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info ${classes}"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`
     };
     return icons[iconName] || '';
@@ -482,7 +483,6 @@ export function getFormFakturMaterialHTML(itemData = null, options = {}) {
 }
 
 export async function getMasterDataFormHTML(type, itemData = null) {
-    // ... (logika fungsi tidak berubah) ...
     const isEdit = !!itemData;
     const config = masterDataConfig[type];
     if (!config) return '<p class="empty-state">Form tidak tersedia untuk tipe data ini.</p>';
@@ -499,7 +499,6 @@ export async function getMasterDataFormHTML(type, itemData = null) {
     `;
     switch (type) {
         case 'materials':
-            // ... (logika 'materials' tidak berubah) ...
             fieldsHTML += `
                 <div class="form-group">
                     <label for="itemUnit">Satuan</label>
@@ -512,90 +511,91 @@ export async function getMasterDataFormHTML(type, itemData = null) {
             `;
             break;
         case 'suppliers':
-            // --- PERBAIKAN (BUG 3): Tambah 'false' untuk showSearch di dropdown statis ---
-            fieldsHTML += createMasterDataSelect('itemCategory', 'Kategori Supplier', [
-                { value: 'Material', text: 'Material' },
-                { value: 'Operasional', text: 'Operasional' },
-                { value: 'Lainnya', text: 'Lainnya' }
-            ], isEdit ? itemData.category : 'Material', null, true, false); // <-- 'false' ditambahkan
+            fieldsHTML += `
+                <div class="form-group">
+                    ${createMasterDataSelect('itemCategory', 'Kategori Supplier', [
+                        { value: 'Material', text: 'Material' },
+                        { value: 'Operasional', text: 'Operasional' },
+                        { value: 'Lainnya', text: 'Lainnya' }
+                    ], isEdit ? itemData.category : 'Material', null, true, false)}
+                </div>
+            `;
             break;
         case 'projects':
              fieldsHTML += `
-                ${createMasterDataSelect('projectType', 'Tipe Proyek', [
-                    { value: 'main_income', text: 'Proyek Utama (Pendapatan)' },
-                    { value: 'internal_expense', text: 'Proyek Internal (Beban)' }
-                ], isEdit ? itemData.projectType : 'internal_expense', null, true, false)} <div class="form-group">
+                <div class="form-group">
+                    ${createMasterDataSelect('projectType', 'Tipe Proyek', [
+                        { value: 'main_income', text: 'Proyek Utama (Pendapatan)' },
+                        { value: 'internal_expense', text: 'Proyek Internal (Beban)' }
+                    ], isEdit ? itemData.projectType : 'internal_expense', null, true, false)}
+                </div>
+                <div class="form-group">
                     <label for="budget">Anggaran (Opsional)</label>
                     <input type="text" id="budget" name="budget" inputmode="numeric" value="${isEdit && itemData.budget ? new Intl.NumberFormat('id-ID').format(itemData.budget) : '0'}" placeholder="Contoh: 100.000.000">
                 </div>
                 <div class="form-group">
                      <label class="custom-checkbox-label">
-                        <input type="checkbox" name="isWageAssignable" ${isEdit && itemData.isWageAssignable ? 'checked' : ''}>
-                        <span class="custom-checkbox-visual"></span>
-                        <span>Dapat dialokasikan upah pekerja</span>
-                    </label>
+                         <input type="checkbox" name="isWageAssignable" ${isEdit && itemData.isWageAssignable ? 'checked' : ''}>
+                         <span class="custom-checkbox-visual"></span>
+                         <span>Dapat dialokasikan upah pekerja</span>
+                     </label>
                 </div>
              `;
             break;
-        case 'workers': {
-            // ... (logika 'workers' tidak berubah) ...
-            const professionOptions = (appState.professions || []).filter(p => !p.isDeleted).map(p => ({ value: p.id, text: p.professionName }));
-            const statusOptions = [
-                { value: 'active', text: 'Aktif' },
-                { value: 'inactive', text: 'Non-Aktif' }
-            ];
-
-            let wagesSummaryHTML = '<p class="empty-state-small empty-state-small--left">Belum ada pengaturan upah.</p>';
-            if (isEdit && itemData.projectWages) {
-                // ... (logika wagesSummaryHTML tidak berubah) ...
-                const projectWages = Object.entries(itemData.projectWages);
-                if (projectWages.length > 0) {
-                    wagesSummaryHTML = projectWages.map(([projectId, roles]) => {
+            case 'workers': {
+                const professionOptions = (appState.professions || []).filter(p => !p.isDeleted).map(p => ({ value: p.id, text: p.professionName }));
+                const statusOptions = [
+                    { value: 'active', text: 'Aktif' },
+                    { value: 'inactive', text: 'Non-Aktif' }
+                ];
+            
+                let wagesSummaryHTML = '<p class="empty-state-small empty-state-small--left">Belum ada pengaturan upah.</p>';
+                if (isEdit && itemData.projectWages) {
+                    const projectWagesEntries = Object.entries(itemData.projectWages);
+                    if (projectWagesEntries.length > 0) {
+                        const summaryItems = [];
+            
+                        for (const [projectId, roles] of projectWagesEntries) {
                         const project = appState.projects.find(p => p.id === projectId);
-                        if (!project) return '';
-                        const rolesHTML = Object.entries(roles).map(([name, wage]) => `<span class="badge">${name}: ${new Intl.NumberFormat('id-ID').format(wage)}</span>`).join(' ');
-                        return `
-                            <div class="worker-wage-summary-item" data-project-id="${projectId}" data-wages='${JSON.stringify(roles)}'>
-                              <div class="dense-list-item">
-                                <div class="item-main-content">
-                                    <strong class="item-title">${project.projectName}</strong>
-                                    <div class="item-sub-content role-summary">${rolesHTML}</div>
-                                </div>
-                                <div class="item-actions">
-                                  <button type="button" class="btn-icon" title="Edit" data-action="edit-worker-wage">${createIcon('pencil')}</button>
-                                  <button type="button" class="btn-icon btn-icon-danger" title="Hapus" data-action="remove-worker-wage">${createIcon('trash-2')}</button>
-                                </div>
-                              </div>
-                            </div>`;
-                    }).join('');
-                     if (wagesSummaryHTML.trim() === '') wagesSummaryHTML = '<p class="empty-state-small empty-state-small--left">Belum ada pengaturan upah (proyek terkait mungkin sudah dihapus).</p>';
+                    if (!project) continue; 
+                        summaryItems.push(
+                        _createWorkerWageSummaryItemHTML(projectId, project.projectName, roles)
+                        );
+                    }
+                        wagesSummaryHTML = summaryItems.join('');
+                        if (wagesSummaryHTML.trim() === '') wagesSummaryHTML = '<p class="empty-state-small empty-state-small--left">Belum ada pengaturan upah.</p>';
+                    }
                 }
-            }
-
-
             fieldsHTML += `
-                ${createMasterDataSelect('professionId', 'Profesi', professionOptions, isEdit ? itemData.professionId : '', 'professions', true)}
-                ${createMasterDataSelect('workerStatus', 'Status', statusOptions, isEdit ? itemData.status : 'active', null, true, false)} <div class="form-group full-width">
+                <div class="form-group">
+                    ${createMasterDataSelect('professionId', 'Profesi', professionOptions, isEdit ? itemData.professionId : '', 'professions', true)}
+                </div>
+                <div class="form-group">
+                    ${createMasterDataSelect('workerStatus', 'Status', statusOptions, isEdit ? itemData.status : 'active', null, true, false)}
+                </div>
+                <div class="form-group full-width">
                     <label>Pengaturan Upah per Proyek</label>
                     <div class="card" style="padding: 1rem; background-color: var(--surface-muted);">
                         <div id="worker-wages-summary-list" class="dense-list-container">${wagesSummaryHTML}</div>
                         <button type="button" class="btn btn-secondary" data-action="add-worker-wage" style="margin-top: 1rem;">Tambah Pengaturan Upah</button>
                     </div>
                      <p class="form-notice">
-                        ${createIcon('info', 16)} Tentukan upah harian spesifik untuk setiap peran pekerja di masing-masing proyek yang relevan.
+                         ${createIcon('info', 16)} Tentukan upah harian spesifik untuk setiap peran pekerja di masing-masing proyek yang relevan.
                      </p>
                 </div>
             `;
             break;
         }
         case 'staff':
-            // --- PERBAIKAN (BUG 3): Tambah 'false' untuk showSearch di dropdown statis ---
             fieldsHTML += `
-                ${createMasterDataSelect('paymentType', 'Tipe Pembayaran', [
-                    { value: 'fixed_monthly', text: 'Gaji Tetap Bulanan' },
-                    { value: 'per_termin', text: 'Fee per Termin (%)' },
-                    { value: 'fixed_per_termin', text: 'Fee Tetap per Termin' }
-                ], isEdit ? itemData.paymentType : '', null, true, false)} <div class="form-group staff-payment-field staff-salary-group" style="display:none;">
+                <div class="form-group">
+                    ${createMasterDataSelect('paymentType', 'Tipe Pembayaran', [
+                        { value: 'fixed_monthly', text: 'Gaji Tetap Bulanan' },
+                        { value: 'per_termin', text: 'Fee per Termin (%)' },
+                        { value: 'fixed_per_termin', text: 'Fee Tetap per Termin' }
+                    ], isEdit ? itemData.paymentType : '', null, true, false)}
+                </div>
+                <div class="form-group staff-payment-field staff-salary-group" style="display:none;">
                     <label for="salary">Gaji Bulanan</label>
                     <input type="text" id="salary" name="salary" inputmode="numeric" value="${isEdit && itemData.salary ? new Intl.NumberFormat('id-ID').format(itemData.salary) : ''}" placeholder="Contoh: 5.000.000">
                 </div>
@@ -603,13 +603,12 @@ export async function getMasterDataFormHTML(type, itemData = null) {
                     <label for="feePercentage">Persentase Fee (%)</label>
                     <input type="number" id="feePercentage" name="feePercentage" step="0.1" value="${isEdit ? (itemData.feePercentage || '') : ''}" placeholder="Contoh: 2.5">
                 </div>
-
                 <div class="form-group staff-payment-field staff-fee-amount-group" style="display:none;">
                     <label for="feeAmount">Nominal Fee Tetap</label>
                     <input type="text" id="feeAmount" name="feeAmount" inputmode="numeric" value="${isEdit && itemData.feeAmount ? new Intl.NumberFormat('id-ID').format(itemData.feeAmount) : ''}" placeholder="Contoh: 500.000">
                 </div>
                  <p class="form-notice full-width">
-                    ${createIcon('info', 16)} Pilih tipe pembayaran dan isi nominal yang sesuai. Fee per termin akan otomatis dihitung saat input termin baru.
+                     ${createIcon('info', 16)} Pilih tipe pembayaran dan isi nominal yang sesuai. Fee per termin akan otomatis dihitung saat input termin baru.
                  </p>
             `;
             break;
@@ -624,8 +623,6 @@ export async function getMasterDataFormHTML(type, itemData = null) {
     `;
 
     const submitButtonText = isEdit ? 'Simpan Perubahan' : 'Simpan Data Baru';
-
-    // ... (sisa 'heroHTML_Master' dan return tidak berubah) ...
     const variantClass = type === 'materials' ? 'success-hero--material'
         : type === 'suppliers' ? 'success-hero--expense'
         : type === 'projects' ? 'success-hero--income'
@@ -657,6 +654,41 @@ export async function getMasterDataFormHTML(type, itemData = null) {
                     <button type="submit" class="btn btn-primary">${submitButtonText}</button>
                 </div>
             </form>
+        </div>
+    `;
+}
+
+export function _createWorkerWageSummaryItemHTML(projectId, projectName, roles) {
+    const rolesHtml = Object.entries(roles)
+        .map(([role, wage]) => `
+            <div class="role-wage-pair">
+                <span>${toProperCase(role)}</span>
+                <span>${fmtIDR(wage)}</span>
+            </div>
+        `)
+        .join('');
+
+    const wagesJson = JSON.stringify(roles || {});
+
+    return `
+        <div class="worker-wage-summary-item" 
+             data-project-id="${projectId}" 
+             data-wages='${wagesJson}'>
+            
+            <div class="summary-item-main">
+                <span class="summary-item-project-name">${projectName}</span>
+                <div class="summary-item-role-list">
+                    ${rolesHtml.length > 0 ? rolesHtml : '<span class="text-meta">Belum ada peran</span>'}
+                </div>
+            </div>
+            <div class="summary-item-actions">
+                <button type="button" class="btn-icon" data-action="edit-worker-wage">
+                    ${createIcon('edit-3', 16)}
+                </button>
+                <button type="button" class="btn-icon btn-icon-danger" data-action="remove-worker-wage">
+                    ${createIcon('trash-2', 16)}
+                </button>
+            </div>
         </div>
     `;
 }

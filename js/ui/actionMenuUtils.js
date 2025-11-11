@@ -273,8 +273,6 @@ export function getItemActions(context) {
                     { icon: 'edit', label: 'Edit', action: 'edit-master-item', type: itemType, itemId },
                     { icon: 'delete', label: 'Hapus', action: 'delete-master-item', type: itemType, itemId, isDanger: true }
                 ];
-            } else { 
-                 baseActions.push({ icon: 'visibility', label: 'Lihat Detail', action: 'edit-master-item', type: itemType, itemId });
             }
         } else {
              console.warn(`[getItemActions] Konfigurasi master data tidak ditemukan untuk tipe: ${itemType}`);
