@@ -261,18 +261,15 @@ export const clickActions = {
     'edit-attendance-day': (ctx) => {
                emit('ui.jurnal.openDailyProjectPicker', { date: ctx.date });
             },
-           'goto-manual-add': (ctx) => {
-               appState.defaultAttendanceDate = ctx.date;
-               localStorage.setItem('attendance.defaultDate', ctx.date);
-               appState.manualAttendanceSelectedProjectId = ctx.projectId;
-               localStorage.setItem('attendance.manualSelectedProjectId', ctx.projectId);
-               
-               closeDetailPaneImmediate();
-               emit('ui.modal.closeAll');
-               
-               emit('ui.navigate', 'absensi&subpage=manual');
-           },
-
+            'goto-manual-add': (ctx) => {
+                appState.defaultAttendanceDate = ctx.date;
+                try {
+                 localStorage.setItem('attendance.defaultDate', ctx.date);
+                } catch(e) { console.warn(e) }
+                closeDetailPaneImmediate();
+                emit('ui.modal.closeAll');
+                emit('ui.navigate', 'absensi');
+            },
         'toggle-layout': () => {
         const page = (window.appState && window.appState.activePage) || '';
         if (!page) return;

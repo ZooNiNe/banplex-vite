@@ -292,55 +292,53 @@ export async function handleDeleteSalaryBill(billId) {
 }
 
 export async function openDailyProjectPickerForEdit(dateStr) {
-    const { startOfDay, endOfDay } = getLocalDayBounds(dateStr);
-    const records = (appState.attendanceRecords || []).filter(rec => {
-        const recDate = getJSDate(rec.date);
-        return recDate >= startOfDay && recDate <= endOfDay && !rec.isDeleted && rec.projectId;
-    });
-    const projectIds = [...new Set(records.map(r => r.projectId))];
-    const projects = (appState.projects || []).filter(p => projectIds.includes(p.id));
-
-    if (projects.length === 0) {
-        toast('info', 'Tidak ada absensi berproyek untuk diedit pada hari ini.');
-        return;
-    }
-
-    if (projects.length === 1) {
-        emit('ui.jurnal.openDailyEditorPanel', { dateStr, projectId: projects[0].id });
-        return;
-    }
-
-    const content = `
-        <div class="dense-list-container">
-            <p class="helper-text" style="text-align: center; margin-bottom: 1rem;">Pilih proyek yang ingin Anda edit absensinya untuk tanggal ${parseLocalDate(dateStr).toLocaleDateString('id-ID')}:</p>
-            ${projects.map(p => `
-                <button class="dense-list-item btn btn-ghost" data-action="select-project-for-edit" data-project-id="${p.id}" data-date-str="${dateStr}">
-                    <div class="item-main-content">
-                        <strong class="item-title">${p.projectName}</strong>
+       const { startOfDay, endOfDay } = getLocalDayBounds(dateStr);
+       const records = (appState.attendanceRecords || []).filter(rec => {
+           const recDate = getJSDate(rec.date);
+           return recDate >= startOfDay && recDate <= endOfDay && !rec.isDeleted && rec.projectId;
+       });
+       const projectIds = [...new Set(records.map(r => r.projectId))];
+       const projects = (appState.projects || []).filter(p => projectIds.includes(p.id));
+   
+       if (projects.length === 0) {
+           toast('info', 'Tidak ada absensi berproyek untuk diedit pada hari ini.');
+           return;
+       }
+   
+       if (projects.length === 1) {
+           emit('ui.jurnal.openDailyEditorPanel', { dateStr, projectId: projects[0].id });
+           return;
+       }
+    const projectIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-building2-icon lucide-building-2"><path d="M10 12h4"/><path d="M10 8h4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2"/><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/></svg>`;
+    const content = `<div class="picker-container">
+        <div class="helper-text">Pilih proyek yang ingin Anda edit absensinya untuk tanggal ${parseLocalDate(dateStr).toLocaleDateString('id-ID')}:
+            </div>
+                <div class="picker-grid">
+                    ${projects.map(p => `
+                        <button class="project-picker-item btn btn-ghost" data-action="select-project-for-edit" data-project-id="${p.id}" data-date-str="${dateStr}">${projectIconSvg}
+                        <span class="picker-item-label">${p.projectName}</span>
+                        </button>
+                    `).join('')}
                     </div>
-                </button>
-            `).join('')}
-        </div>`;
-    
-    const isMobile = window.matchMedia('(max-width: 599px)').matches;
-    const modal = createModal('dataDetail', { 
-        title: 'Pilih Proyek untuk Diedit', 
-        content,
-        isUtility: true
-    });
-
-    if (isMobile) {
-        modal.classList.add('is-bottom-sheet');
-    }
-
-    modal.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-action="select-project-for-edit"]');
-        if (btn) {
-            e.stopPropagation(); 
-
-            const { projectId, dateStr } = btn.dataset;
-            closeModal(modal);
-            emit('ui.jurnal.openDailyEditorPanel', { dateStr, projectId });
-        }
-    });
-}
+                </div>`;
+                const isMobile = window.matchMedia('(max-width: 599px)').matches;
+                const modal = createModal('dataDetail', { 
+           title: 'Pilih Proyek untuk Diedit', 
+           content,
+           isUtility: true
+       });
+   
+       if (isMobile) {
+           modal.classList.add('is-bottom-sheet');
+       }
+   
+       modal.addEventListener('click', (e) => {
+           const btn = e.target.closest('[data-action="select-project-for-edit"]');
+           if (btn) {
+               e.stopPropagation(); 
+               const { projectId, dateStr } = btn.dataset;
+               closeModal(modal);
+               emit('ui.jurnal.openDailyEditorPanel', { dateStr, projectId });
+           }
+       });
+   }

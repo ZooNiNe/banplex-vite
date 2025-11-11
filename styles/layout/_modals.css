@@ -196,7 +196,7 @@
   max-width: 95%;
   height: auto;
   max-height: 80vh;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
   border-radius: 1rem 1rem;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
   transform: translateY(95%);
@@ -210,6 +210,7 @@
 
 .modal-bg.is-bottom-sheet .modal-header {
   padding: 1rem;
+  padding-bottom: 0rem;
   text-align: center;
   position: relative;
   flex-shrink: 0;
@@ -730,8 +731,54 @@ background-color: var(--panel);
   color: var(--text-dim);
 }
 
-/* Jika ada elemen form setelah teks, beri jarak */
 .modal-body .confirm-modal-text + .form-group {
   margin-top: 1.5rem;
 }
 
+ .picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 16px; /* Jarak murni antar item */
+  padding-top: 12px;
+}
+
+.project-picker-item {
+  display: flex;
+  flex-direction: column; 
+  align-items: center;     
+  justify-content: center;   
+  height: 120px; /* Ketinggian seragam untuk setiap kotak */
+  border-radius: 8px;
+  text-align: center; /* Memastikan teks label di tengah jika ter-wrap */
+  word-break: break-word;
+  padding: 16px;
+  border-color: 1px solid var(--primary-light) !important;
+}
+
+#dataDetail-modal .picker-grid button svg{
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px; /* Jarak antara ikon dan label di bawahnya */
+  color: var(--primary); /* Warna ikon */
+}
+
+/* 4. STYLE UNTUK LABEL PROYEK */
+.picker-item-label {
+  font-size: 0.875rem; /* 14px */
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--text);
+  
+  /* Mencegah nama proyek yang sangat panjang merusak layout */
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* Batasi teks hingga 2 baris */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Efek hover untuk interaksi */
+.project-picker-item:hover,
+.project-picker-item:focus {
+  background-color: var(--panel);
+}
