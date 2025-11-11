@@ -17,10 +17,6 @@ function createIcon(iconName, size = 18, classes = '') {
     return icons[iconName] || '';
 }
 
-/**
- * Fungsi helper untuk membuat baris input peran/upah
- * Dipanggil oleh 'addRow'
- */
 function createRoleRowHTML(name = '', wage = '') {
     const wageFormatted = wage ? new Intl.NumberFormat('id-ID').format(wage) : '';
     return `
@@ -32,47 +28,50 @@ function createRoleRowHTML(name = '', wage = '') {
 export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) {
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
 
+    // --- PERBAIKAN: Buat ID UNIK untuk FORM dan SELECT ---
+    const uniqueId = Date.now();
+    const uniqueFormId = `worker-wage-form-${uniqueId}`;
+    const uniqueSelectId = `wage-project-id-${uniqueId}`;
+    // --- AKHIR PERBAIKAN ---
+
     const projectOptions = (appState.projects || [])
         .filter(p => p.isWageAssignable && !p.isDeleted)
         .map(p => ({
             value: p.id,
             text: p.projectName,
-            // Nonaktifkan proyek jika sudah ada DAN kita TIDAK sedang mengeditnya
             disabled: (p.id !== projectId) && !!existingWages[p.id]
         }));
 
-    // Ini adalah 'existingRoleData'
     const rolesToEdit = (projectId && existingWages[projectId]) ? existingWages[projectId] : {};
     
     const content = `
-        <form id="worker-wage-form">
+        <form id="${uniqueFormId}"> 
             ${createMasterDataSelect(
-                'wage-project-id', 
+                uniqueSelectId, // Gunakan ID unik
                 'Proyek', 
                 projectOptions, 
                 projectId || '', 
                 null, 
                 true, 
-                false // Sembunyikan search
+                false
             )}
             <div class="role-wage-list">
                 ${Object.keys(rolesToEdit).length > 0
                     ? Object.entries(rolesToEdit).map(([name, wage]) => `
                         <div class="role-wage-row">${createRoleRowHTML(name, wage)}</div>
                       `).join('')
-                    : `<div class="role-wage-row">${createRoleRowHTML()}</div>` // Mulai dengan satu baris kosong
+                    : `<div class="role-wage-row">${createRoleRowHTML()}</div>`
                 }
             </div>
         </form>
     `;
     
-    // Tombol "Tambah Peran" ini akan ditangani oleh 'formListeners.js'
     const footer = `
         <button type="button" class="btn btn-secondary" data-action="add-role-wage-row" style="margin-right: auto;">
             ${createIcon('plus', 18)}
             <span class="btn-text">Tambah Peran</span>
         </button>
-        <button type="submit" form="worker-wage-form" class="btn btn-primary">Simpan</button>
+        <button type="submit" form="${uniqueFormId}" class="btn btn-primary">Simpan</button>
     `;
 
     const modal = createModal('dataDetail', {
@@ -82,31 +81,42 @@ export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) 
         layoutClass: isMobile ? 'is-bottom-sheet' : 'is-simple-dialog'
     });
 
-    const form = modal.querySelector('#worker-wage-form');
+    // --- PERBAIKAN: Cari form dengan ID unik ---
+    const form = modal.querySelector(`#${uniqueFormId}`);
+    // --- AKHIR PERBAIKAN ---
+
     const roleList = modal.querySelector('.role-wage-list');
 
-    // Tambahkan listener ke elemen yang SUDAH ADA saat modal dibuka
+    // Jika form tidak ditemukan, hentikan eksekusi untuk mencegah error
+    if (!form) {
+        console.error("KRITIS: Form upah pekerja tidak dapat ditemukan di DOM modal.");
+        toast('error', 'Gagal memuat form. Silakan coba muat ulang halaman.');
+        return;
+    }
+
     roleList.querySelectorAll('.role-wage-row').forEach(row => {
          row.querySelector('input[name="role_wage"]').addEventListener('input', formatNumberInput);
          row.querySelector('input[name="role_name"]').addEventListener('blur', (e) => {
              e.target.value = toProperCase(e.target.value);
         });
-         // 'data-action="remove-role-wage-row"' akan ditangani oleh formListeners.js
     });
 
     initCustomSelects(modal);
     
-    // 'data-action="add-role-wage-row"' akan ditangani oleh formListeners.js
-
-    form.addEventListener('submit', (e) => {
+    // --- PERBAIKAN: Gunakan .onsubmit untuk MENGGANTI listener ---
+    // Ini mencegah penumpukan listener dari modal yang dibuka sebelumnya.
+    form.onsubmit = (e) => {
         e.preventDefault();
-        const selectedProjectId = form.elements['wage-project-id'].value;
+
+        const selectElement = modal.querySelector(`#${uniqueSelectId}`);
+        const selectedProjectId = selectElement ? selectElement.value : null;
+
         if (!selectedProjectId) {
             toast('error', 'Silakan pilih proyek.');
             return;
         }
 
-        const roles = {}; // Ini akan menampung BANYAK peran
+        const roles = {}; 
         let isValid = true;
         let hasDuplicate = false;
         
@@ -117,21 +127,22 @@ export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) 
             const name = nameInput.value.trim();
             const wage = parseFormattedNumber(wageInput.value);
             
+            // PERBAIKAN VALIDASI: Abaikan baris yang benar-benar kosong
             if (!name && (wage === 0 || isNaN(wage))) {
-                return; 
+                return; // 1. Abaikan baris kosong
             }
-    
+
             if (name && wage > 0) {
                 const properName = toProperCase(name);
-                if (roles[properName]) {
+                if (roles[properName]) { 
                     hasDuplicate = true;
                 }
                 roles[properName] = wage;
             } else {
-                isValid = false;
+                isValid = false; // 2. Baris diisi sebagian (tidak valid)
             }
         });
-
+        
         if (hasDuplicate) {
             toast('error', 'Nama peran dalam satu proyek tidak boleh sama.');
             return;
@@ -150,5 +161,7 @@ export function openWorkerWageDetailModal({ projectId, existingWages, onSave }) 
         
         resetFormDirty();
         emit('ui.modal.close', modal);
-    });
+        
+        form.onsubmit = null; // Hapus handler setelah selesai
+    };
 }
