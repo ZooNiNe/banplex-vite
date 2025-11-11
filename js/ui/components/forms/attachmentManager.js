@@ -184,85 +184,85 @@ export async function handleAttachmentUpload(file, contextForm, inputName, isSin
 }
 
 
-export function _attachSingleFileUploadListener(context, inputName, containerSelector) {
-    const fileInput = context.querySelector(`input[name="${inputName}"]`);
-    const attachmentContainer = context.querySelector(containerSelector);
-    const urlInput = context.querySelector(`input[name="${inputName}_url"]`);
-
-    if (!fileInput || !attachmentContainer || !urlInput) {
-        console.warn("Element attachment tidak lengkap untuk listener single upload.", { fileInput, attachmentContainer, urlInput });
-        return;
-    }
-
+export function _attachSingleFileUploadListener(context, inputName, containerSelector, signal) { // <-- PERBAIKAN: Tambah 'signal'
+        const fileInput = context.querySelector(`input[name="${inputName}"]`);
+        const attachmentContainer = context.querySelector(containerSelector);
+        const urlInput = context.querySelector(`input[name="${inputName}_url"]`);
+    
+        if (!fileInput || !attachmentContainer || !urlInput) {
+            console.warn("Element attachment tidak lengkap untuk listener single upload.", { fileInput, attachmentContainer, urlInput });
+            return;
+        }
+    
     attachmentContainer.addEventListener('click', (e) => {
-        const trigger = e.target.closest('[data-action="trigger-single-upload"]');
-        if (trigger && trigger.dataset.target === inputName) {
-            if (window.matchMedia('(max-width: 599px)').matches) {
-                e.preventDefault();
-                emit('ui.modal.create', 'uploadSource', {
-                    onSelect: (source) => {
-                        fileInput.removeAttribute('capture');
-                        if (source === 'camera') {
-                            fileInput.setAttribute('capture', 'environment');
-                        }
-                        setTimeout(() => fileInput.click(), 50);
-                    }
-                });
-            } else {
-                fileInput.click();
+                const trigger = e.target.closest('[data-action="trigger-single-upload"]');
+                if (trigger && trigger.dataset.target === inputName) {
+                    if (window.matchMedia('(max-width: 599px)').matches) {
+                        e.preventDefault();
+                        emit('ui.modal.create', 'uploadSource', {
+                                isUtility: true,
+                            onSelect: (source) => {
+                                fileInput.removeAttribute('capture');
+                                if (source === 'camera') {
+                                    fileInput.setAttribute('capture', 'environment');
+                                }
+                                setTimeout(() => fileInput.click(), 50);
+                            }
+                        });
+                    } else {
+                        fileInput.click();
+                    }
+                }        
+                const removeBtn = e.target.closest('[data-action="remove-payment-attachment"]');
+                if (removeBtn) {
+                    fileInput.value = '';
+                    urlInput.value = '';
+                    attachmentContainer.innerHTML = `
+                        <div class="attachment-manager-item placeholder" data-action="trigger-single-upload" data-target="${inputName}">
+                            ${createIcon('add_photo_alternate', 32)}
+                            <span>Tambah Lampiran</span>
+                             <div class="upload-progress" style="display: none; width: 80%; margin-top: 0.5rem;">
+                                 <div class="upload-progress-bar-container"><div class="upload-progress-bar" style="width: 0%;"></div></div>
+                                 <span class="upload-progress-text" style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.2rem;">0%</span>
+                            </div>
+                             <span class="upload-error-text" style="font-size: 0.7rem; color: var(--danger); margin-top: 0.2rem; display:none;"></span>
+                        </div>`;
+                    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    toast('info', 'Lampiran dibatalkan.');
+                     import('../modal.js').then(({ markFormDirty }) => markFormDirty(true));
+                }
+        
+                const deleteExistingBtn = e.target.closest('[data-action="delete-attachment"]');
+                 if (deleteExistingBtn) {
+                     const expenseId = deleteExistingBtn.dataset.expenseId;
+                     const urlToDelete = deleteExistingBtn.dataset.url;
+                     if (expenseId && urlToDelete) {
+                         emit('data.deleteAttachment', { expenseId, url: urlToDelete });
+                         const itemPreview = deleteExistingBtn.closest('.attachment-manager-item');
+                         if (itemPreview) itemPreview.remove();
+                     }
+                 }
+        
+            }, { signal: signal });    
+
+        fileInput.addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    urlInput.value = '';
+            
+                    if (!file) {
+                        attachmentContainer.innerHTML = `
+                            <div class="attachment-manager-item placeholder" data-action="trigger-single-upload" data-target="${inputName}">
+                                ${createIcon('add_photo_alternate', 32)}
+                                <span>Tambah Lampiran</span>
+                                <div class="upload-progress" style="display: none; width: 80%; margin-top: 0.5rem;">
+                                     <div class="upload-progress-bar-container"><div class="upload-progress-bar" style="width: 0%;"></div></div>
+                                     <span class="upload-progress-text" style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.2rem;">0%</span>
+                                </div>
+                                 <span class="upload-error-text" style="font-size: 0.7rem; color: var(--danger); margin-top: 0.2rem; display:none;"></span>
+                            </div>`;
+                        return;
+                    }
+            
+                    await handleAttachmentUpload(file, context.closest('form') || context, inputName, true);
+                }, { signal: signal });
             }
-        }
-
-        const removeBtn = e.target.closest('[data-action="remove-payment-attachment"]');
-        if (removeBtn) {
-            fileInput.value = '';
-            urlInput.value = '';
-            attachmentContainer.innerHTML = `
-                <div class="attachment-manager-item placeholder" data-action="trigger-single-upload" data-target="${inputName}">
-                    ${createIcon('add_photo_alternate', 32)}
-                    <span>Tambah Lampiran</span>
-                     <div class="upload-progress" style="display: none; width: 80%; margin-top: 0.5rem;">
-                         <div class="upload-progress-bar-container"><div class="upload-progress-bar" style="width: 0%;"></div></div>
-                         <span class="upload-progress-text" style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.2rem;">0%</span>
-                    </div>
-                     <span class="upload-error-text" style="font-size: 0.7rem; color: var(--danger); margin-top: 0.2rem; display:none;"></span>
-                </div>`;
-            fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-            toast('info', 'Lampiran dibatalkan.');
-             import('../modal.js').then(({ markFormDirty }) => markFormDirty(true));
-        }
-
-        const deleteExistingBtn = e.target.closest('[data-action="delete-attachment"]');
-         if (deleteExistingBtn) {
-             const expenseId = deleteExistingBtn.dataset.expenseId;
-             const urlToDelete = deleteExistingBtn.dataset.url;
-             if (expenseId && urlToDelete) {
-                 emit('data.deleteAttachment', { expenseId, url: urlToDelete });
-                 const itemPreview = deleteExistingBtn.closest('.attachment-manager-item');
-                 if (itemPreview) itemPreview.remove();
-             }
-         }
-
-    });
-
-    fileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        urlInput.value = '';
-
-        if (!file) {
-            attachmentContainer.innerHTML = `
-                <div class="attachment-manager-item placeholder" data-action="trigger-single-upload" data-target="${inputName}">
-                    ${createIcon('add_photo_alternate', 32)}
-                    <span>Tambah Lampiran</span>
-                    <div class="upload-progress" style="display: none; width: 80%; margin-top: 0.5rem;">
-                         <div class="upload-progress-bar-container"><div class="upload-progress-bar" style="width: 0%;"></div></div>
-                         <span class="upload-progress-text" style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.2rem;">0%</span>
-                    </div>
-                     <span class="upload-error-text" style="font-size: 0.7rem; color: var(--danger); margin-top: 0.2rem; display:none;"></span>
-                </div>`;
-            return;
-        }
-
-        await handleAttachmentUpload(file, context.closest('form') || context, inputName, true);
-    });
-}

@@ -1,3 +1,5 @@
+// js/ui/eventListeners/attachmentListeners.js
+
 import { emit, on, off } from "../../state/eventBus.js";
 import { toast } from "../components/toast.js";
 import { closeModalImmediate } from "../components/modal.js";
@@ -63,6 +65,7 @@ export function handleAttachmentAction(context, clickedElement, event) {
     if (actionsTriggeringPicker.has(action)) {
         if (isMobile) {
             emit('ui.modal.create', 'uploadSource', {
+                isUtility: true, // <-- PERBAIKAN 1: Tambahkan isUtility
                 onSelect: (source, selectEvent) => {
                     const uploadSourceModal = document.getElementById('uploadSource-modal');
                     if (uploadSourceModal && uploadSourceModal.classList.contains('show')) {
@@ -84,6 +87,16 @@ export function handleAttachmentAction(context, clickedElement, event) {
 
 
 export function initializeAttachmentListeners() {
+    
+    // --- PERBAIKAN 2: Tambahkan listener untuk mereset flag saat modal source ditutup ---
+    on('ui.modal.closed', (modalId) => {
+        if (modalId === 'uploadSource-modal') {
+            // Panggil resetAttachmentFlag, yang ada di scope file ini
+            resetAttachmentFlag();
+        }
+    });
+    // --- AKHIR PERBAIKAN 2 ---
+
     on('ui.attachments.viewPayment', async (context) => {
         const { url, localId } = context;
         if (url) {

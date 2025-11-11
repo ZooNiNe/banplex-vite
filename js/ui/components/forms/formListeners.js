@@ -21,14 +21,15 @@ function createIcon(iconName, size = 18, classes = '') {
     };
     return icons[iconName] || '';
 }
+let currentFormAbortController = null;
 
 
-export function attachStaffFormListeners(context = document) {
-
-    const paymentTypeSelect = context.querySelector('input[name="paymentType"]');
-    if (paymentTypeSelect) {
-        const updateVisibility = () => {
-            const type = paymentTypeSelect.value;
+export function attachStaffFormListeners(context = document, signal = null) { 
+        const paymentTypeSelect = context.querySelector('input[name="paymentType"]');
+        if (paymentTypeSelect) {
+            const updateVisibility = () => {
+        
+        const type = paymentTypeSelect.value;
             const salaryGroup = context.querySelector('.staff-salary-group');
             const feeGroup = context.querySelector('.staff-fee-group');
             const feeAmountGroup = context.querySelector('.staff-fee-amount-group');
@@ -38,19 +39,18 @@ export function attachStaffFormListeners(context = document) {
             if (feeAmountGroup) feeAmountGroup.style.display = type === 'fixed_per_termin' ? '' : 'none';
         };
         updateVisibility();
-        // PERHATIAN: 'change' event mungkin tidak reliable untuk custom select.
-        // Jika ini custom select, listener harus ada di 'initCustomSelects' atau event bus.
-        // Asumsi ini adalah <select> atau radio group standar untuk saat ini.
-        paymentTypeSelect.addEventListener('change', updateVisibility);
-    }
+        if (signal) {
+            paymentTypeSelect.addEventListener('change', updateVisibility, { signal: signal });
+        } else {
+            paymentTypeSelect.addEventListener('change', updateVisibility);
+        }
+    }
 }
 
 
 function initializeFormSpecificListeners() {
 
     emit('ui.forms.init', document);
-
-    // Listener 'blur' untuk proper-case
     document.body.addEventListener('blur', (e) => {
         if (e.target.matches('input[data-proper-case="true"], textarea[data-proper-case="true"]')) {
             e.target.value = toProperCase(e.target.value);
@@ -572,39 +572,39 @@ function _switchMaterialFormMode(form, newType) {
 }
 
 
-// Fungsi attachPengeluaranFormListeners (tetap sama)
-export function attachPengeluaranFormListeners(type, context = document) {
-    initCustomSelects(context);
-    const form = (type === 'material')
-        ? context.querySelector('#material-invoice-form, #edit-item-form')
-        : context.querySelector('#pengeluaran-form, #edit-item-form');
-    if (!form) return;
-
-    attachClientValidation(form);
-
-    const attachmentContainer = form.querySelector('#new-attachment-container');
-    const fileInput = form.querySelector('input[name="attachment"]');
-
-    if (attachmentContainer && fileInput) {
-        attachmentContainer.addEventListener('click', (e) => {
-            const placeholder = e.target.closest('.placeholder[data-action="upload-attachment"]');
-            if (placeholder) {
-                if (window.matchMedia('(max-width: 599px)').matches) {
-                    e.preventDefault();
-                    emit('ui.modal.create', 'uploadSource', {
-                        isUtility: true, // Tandai sebagai utility
-                        onSelect: (source) => {
-                            fileInput.removeAttribute('capture');
-                            if (source === 'camera') {
-                                fileInput.setAttribute('capture', 'environment');
-                            }
-                            setTimeout(() => fileInput.click(), 50);
-                        }
-                    });
-                } else {
-                    fileInput.click();
-                }
-            }
+export function attachPengeluaranFormListeners(type, context, signal) {
+    
+        initCustomSelects(context);
+        const form = (type === 'material')
+            ? context.querySelector('#material-invoice-form, #edit-item-form')
+            : context.querySelector('#pengeluaran-form, #edit-item-form');
+        if (!form) return;
+    
+        attachClientValidation(form);
+    
+        const attachmentContainer = form.querySelector('#new-attachment-container');
+        const fileInput = form.querySelector('input[name="attachment"]');
+    
+        if (attachmentContainer && fileInput) {
+            attachmentContainer.addEventListener('click', (e) => {
+                const placeholder = e.target.closest('.placeholder[data-action="upload-attachment"]');
+                if (placeholder) {
+                    if (window.matchMedia('(max-width: 599px)').matches) {
+                        e.preventDefault();
+                        emit('ui.modal.create', 'uploadSource', {
+                            isUtility: true, // Tandai sebagai utility
+                            onSelect: (source) => {
+                                fileInput.removeAttribute('capture');
+                                if (source === 'camera') {
+                                    fileInput.setAttribute('capture', 'environment');
+                                }
+                                setTimeout(() => fileInput.click(), 50);
+                            }
+                        });
+                    } else {
+                        fileInput.click();
+                    }
+                }
 
             const deleteBtn = e.target.closest('[data-action="delete-temp-attachment"]');
             if (deleteBtn) {
@@ -632,81 +632,77 @@ export function attachPengeluaranFormListeners(type, context = document) {
                  }
              }
 
-        });
-
-        fileInput.addEventListener('change', async (e) => {
-            const files = e.target.files;
-            if (!files || files.length === 0) return;
-
-
-            for (const file of files) {
-                await handleAttachmentUpload(file, form, 'attachment', false);
-            }
-            fileInput.value = ''; // Reset input file
-        });
+            }, { signal: signal });
+                    fileInput.addEventListener('change', async (e) => {
+                        const files = e.target.files;
+                        if (!files || files.length === 0) return;
+            
+                        for (const file of files) {
+                            await handleAttachmentUpload(file, form, 'attachment', false);
+                        }
+                        fileInput.value = ''; // Reset input file
+                    }, { signal: signal });
     }
 
 
     form.querySelectorAll('.segmented-control input[name="status"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
-            // (Logika jika diperlukan...)
-        });
-    });
-
-    if (type === 'material') {
-        const addInvoiceItemBtn = form.querySelector('[data-action="add-invoice-item-btn"]');
-        if (addInvoiceItemBtn) {
-            addInvoiceItemBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                addInvoiceItemRow(form);
-            });
-        }
-
-        const itemsContainer = form.querySelector('#invoice-items-container');
-
-        itemsContainer.addEventListener('click', (e) => {
-            const removeBtn = e.target.closest('.remove-item-btn');
-            if (removeBtn) {
-                e.preventDefault();
-                const row = removeBtn.closest('.multi-item-row');
-                if (row) {
-                    row.remove();
-                    handleInvoiceItemChange(form);
-                }
-            }
-        });
-
-        if (itemsContainer) {
-            handleInvoiceItemChange(form); // Hitung total awal
-            itemsContainer.addEventListener('input', (e) => {
-                if(e.target.classList.contains('item-qty') || e.target.classList.contains('item-price')) {
-                    handleInvoiceItemChange(form);
-                }
-            });
-            itemsContainer.addEventListener('change', (e) => {
-                 if(e.target.type === 'hidden' && e.target.id.startsWith('materialId_')) {
-                    handleInvoiceItemChange(form);
-                 }
-            });
-
-        }
-
-        const typeSelector = form.querySelector('#form-type-selector');
-        if (typeSelector) {
-            const formTypeHidden = form.querySelector('input[name="formType"]');
-            typeSelector.querySelectorAll('input[name="_formTypeRadio"]').forEach(radio => {
-                radio.addEventListener('change', (e) => {
-                    const newType = e.target.value;
-                    formTypeHidden.value = newType;
-                    _switchMaterialFormMode(form, newType);
-                });
-            });
-        }
-
-        const initialFormType = form.querySelector('input[name="formType"]')?.value || 'faktur';
-        _switchMaterialFormMode(form, initialFormType);
-    } else {
-        const amountInput = form.querySelector('#pengeluaran-jumlah');
-        if(amountInput) amountInput.addEventListener('input', formatNumberInput);
+        }, { signal: signal });
+        });
+    
+        if (type === 'material') {
+            const addInvoiceItemBtn = form.querySelector('[data-action="add-invoice-item-btn"]');
+            if (addInvoiceItemBtn) {
+                addInvoiceItemBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    addInvoiceItemRow(form);
+                }, { signal: signal });
+            }
+    
+            const itemsContainer = form.querySelector('#invoice-items-container');
+    
+            itemsContainer.addEventListener('click', (e) => {
+                const removeBtn = e.target.closest('.remove-item-btn');
+                if (removeBtn) {
+                    e.preventDefault();
+                    const row = removeBtn.closest('.multi-item-row');
+                    if (row) {
+                        row.remove();
+                        handleInvoiceItemChange(form);
+                    }
+                }
+            }, { signal: signal });
+    
+            if (itemsContainer) {
+                handleInvoiceItemChange(form);
+                itemsContainer.addEventListener('input', (e) => {
+                    if(e.target.classList.contains('item-qty') || e.target.classList.contains('item-price')) {
+                        handleInvoiceItemChange(form);
+                    }
+                }, { signal: signal });
+                itemsContainer.addEventListener('change', (e) => {
+                     if(e.target.type === 'hidden' && e.target.id.startsWith('materialId_')) {
+                        handleInvoiceItemChange(form);
+                     }
+                }, { signal: signal });
+            }
+    
+            const typeSelector = form.querySelector('#form-type-selector');
+            if (typeSelector) {
+                const formTypeHidden = form.querySelector('input[name="formType"]');
+                typeSelector.querySelectorAll('input[name="_formTypeRadio"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        const newType = e.target.value;
+                        formTypeHidden.value = newType;
+                        _switchMaterialFormMode(form, newType);
+                    }, { signal: signal });
+                });
+            }
+    
+            const initialFormType = form.querySelector('input[name="formType"]')?.value || 'faktur';
+            _switchMaterialFormMode(form, initialFormType);
+        } else {
+            const amountInput = form.querySelector('#pengeluaran-jumlah');
+            if(amountInput) amountInput.addEventListener('input', formatNumberInput, { signal: signal }); // [PERBAIKAN]
+        }
     }
-}

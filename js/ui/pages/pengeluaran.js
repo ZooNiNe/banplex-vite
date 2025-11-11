@@ -11,6 +11,8 @@ import { projectsCol, suppliersCol, opCatsCol, otherCatsCol, materialsCol } from
 import { initPullToRefresh, destroyPullToRefresh } from "../components/pullToRefresh.js";
 import { showLoadingModal, hideLoadingModal } from "../components/modal.js";
 
+let pageAbortController = null
+
 function updateFormDropdowns(form, activeTab) {
     console.log(`[Pengeluaran] Memperbarui dropdown untuk form tab: ${activeTab}`);
     
@@ -19,10 +21,6 @@ function updateFormDropdowns(form, activeTab) {
         return list;
     };
 
-    /**
-     * Menemukan wrapper <custom-select> berdasarkan master-type
-     * dan membangun ulang HANYA daftar opsinya.
-     */
     const updateSelect = (masterType, options) => {
         const wrappers = form.querySelectorAll(`.custom-select-wrapper[data-master-type="${masterType}"]`);
         wrappers.forEach(wrapper => {
@@ -110,6 +108,13 @@ async function renderPengeluaranContent() {
     
     // Jika form belum ada atau tab berubah, render ulang seluruh konten
     console.log("[Pengeluaran] Merender ulang konten form penuh.");
+    if (pageAbortController) {
+                pageAbortController.abort();
+                console.log("[Pengeluaran] Listener lama dibatalkan.");
+            }
+            pageAbortController = new AbortController();
+            const { signal } = pageAbortController;
+
     let formHTML = '';
 
     const getSafeOptions = (data, valueField, textField) => {
@@ -139,19 +144,18 @@ async function renderPengeluaranContent() {
 
     container.innerHTML = formHTML;
 
-    // Pasang persistensi draft agar nilai tidak hilang saat keluar sementara ke master_data
-    try {
-        const form = container.querySelector('#pengeluaran-form, #material-invoice-form');
-        if (form) attachFormDraftPersistence(form);
-    } catch (_) {}
+try {
+        const form = container.querySelector('#pengeluaran-form, #material-invoice-form');
+        if (form) attachFormDraftPersistence(form);
+    } catch (_) {}
 
-    if (activeTab === 'material') {
-        attachPengeluaranFormListeners('material', container);
-    } else {
-        attachPengeluaranFormListeners(activeTab, container);
-    }
+    if (activeTab === 'material') {
+        attachPengeluaranFormListeners('material', container, signal);
+    } else {
+        attachPengeluaranFormListeners(activeTab, container, signal);
+    }
 
-    emit('ui.forms.init', container);
+    emit('ui.forms.init', container);
 }
 
 function initPengeluaranPage() {
@@ -232,14 +236,18 @@ function initPengeluaranPage() {
     } catch (_) {}
 }
 on('app.unload.pengeluaran', () => { 
-    // [PERBAIKAN] Hapus juga listener 'masterData.updated' saat unload
     off('masterData.updated', renderPengeluaranContent);
+    if (pageAbortController) {
+                pageAbortController.abort();
+                pageAbortController = null;
+                console.log("[Pengeluaran] Listener halaman dibatalkan saat unload.");
+            }
     try { 
         if (initPengeluaranPage._live) { 
             initPengeluaranPage._live.unsubscribe?.(); 
             initPengeluaranPage._live = null; 
         } 
-    } catch(_) {} 
+    } catch(_) {}
 });
 
 export { initPengeluaranPage };
