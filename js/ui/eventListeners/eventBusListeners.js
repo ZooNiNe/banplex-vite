@@ -154,7 +154,13 @@ export function initializeEventBusListeners() {
              });
         }
     });
-    on('ui.action.edit-master-item', (dataset) => handleManageMasterData(dataset.type, { itemId: dataset.itemId, activeTab: 'form' }));
+    on('ui.action.edit-master-item', (dataset) => {
+        if (appState.activePage === 'master_data') {
+            return;
+        }
+        handleManageMasterData(dataset.type, { itemId: dataset.itemId, activeTab: 'form' });
+    });
+    
     on('ui.action.delete-master-item', (dataset) => handleDeleteMasterItem(dataset.itemId, dataset.type));
     on('ui.action.delete-item', (dataset) => handleDeleteItem(dataset.itemId, dataset.type));
     on('ui.action.restore-item', (dataset) => _handleRestoreItems([{ id: dataset.itemId, table: dataset.table }]));
