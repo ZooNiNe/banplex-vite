@@ -134,13 +134,6 @@ function _renderSalaryPaymentPanelContent(bill, allPayments) {
  * Memasang listener untuk panel kelola pembayaran.
  */
 function _attachSalaryPaymentPanelListeners(pane, bill, allPayments) {
-    const controller = pane.__controller;
-    if (!controller) {
-        console.warn('Pane controller not found for salaryPaymentPanel');
-        return;
-    }
-    const { signal } = controller;
-
     pane.addEventListener('click', (e) => {
         const actionTarget = e.target.closest('[data-action]');
         if (!actionTarget) return;
@@ -149,6 +142,7 @@ function _attachSalaryPaymentPanelListeners(pane, bill, allPayments) {
         const dataset = actionTarget.dataset;
 
         if (action === 'pay-individual-salary') {
+            // Membuka modal pembayaran individual baru
             emit('ui.modal.payIndividualSalary', dataset);
         }
         
@@ -160,10 +154,12 @@ function _attachSalaryPaymentPanelListeners(pane, bill, allPayments) {
             emit('ui.action.cetak-kwitansi-kolektif', dataset);
         }
         
+        // PERBAIKAN: Tambahkan handler untuk 'pay-bill'
         if (action === 'pay-bill') {
+            // Ini akan memicu modal pembayaran tagihan standar
             emit('ui.action.pay-bill', dataset);
         }
-    }, { signal });
+    });
 }
 
 /**

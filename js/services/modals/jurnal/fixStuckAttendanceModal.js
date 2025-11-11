@@ -31,14 +31,6 @@ export async function handleFixStuckAttendanceModal() {
     const modalEl = document.getElementById('dataDetail-modal');
     if (!modalEl) return;
 
-    // Ambil controller dari elemen modal
-    const controller = modalEl.__controller;
-    if (!controller) {
-        console.warn('Modal controller not found for fixStuckAttendanceModal');
-        return;
-    }
-    const { signal } = controller;
-
     const workerSelectContainer = modalEl.querySelector('#worker-select-container');
     if (workerSelectContainer) {
         workerSelectContainer.innerHTML = createMasterDataSelect(
@@ -63,6 +55,6 @@ export async function handleFixStuckAttendanceModal() {
         message: msg,
         onConfirm: () => _forceResetAttendanceStatus(e.target)
       });
-    }, { signal }); // Gunakan signal di sini
+    });
   }, 100);
 }

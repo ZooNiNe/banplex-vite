@@ -332,23 +332,14 @@ export async function openDailyProjectPickerForEdit(dateStr) {
         modal.classList.add('is-bottom-sheet');
     }
 
-    // Ambil controller yang sudah dibuat oleh createModal
-    const controller = modal.__controller;
-    if (!controller) {
-        console.warn('Modal controller not found for openDailyProjectPickerForEdit');
-        return;
-    }
-    const { signal } = controller;
-
     modal.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action="select-project-for-edit"]');
         if (btn) {
             e.stopPropagation(); 
+
             const { projectId, dateStr } = btn.dataset;
-            // Tidak perlu panggil controller.abort() secara manual di sini,
-            // karena closeModal(modal) akan menanganinya.
             closeModal(modal);
             emit('ui.jurnal.openDailyEditorPanel', { dateStr, projectId });
         }
-    }, { signal });
+    });
 }

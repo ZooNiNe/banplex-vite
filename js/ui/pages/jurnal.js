@@ -492,7 +492,8 @@ function initJurnalPage() {
     initJurnalHeroCarousel();
 
     on('ui.jurnal.openDailyProjectPicker', ({ date }) => openDailyProjectPickerForEdit(date), { signal: listenerSignal });
-    on('ui.jurnal.openDailyEditorPanel', ({ dateStr, projectId }) => openDailyAttendanceEditorPanel(dateStr, projectId), { signal: listenerSignal });
+    // PERBAIKAN: Hapus signal dari listener ini agar tidak dibatalkan saat modal terbuka
+    on('ui.jurnal.openDailyEditorPanel', ({ dateStr, projectId }) => openDailyAttendanceEditorPanel(dateStr, projectId));
     on('ui.jurnal.renderContent', renderJurnalContent, { signal: listenerSignal });
     on('request-more-data', loadMoreJurnal, { signal: listenerSignal });
     
