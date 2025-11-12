@@ -25,7 +25,6 @@ async function __ensurePdfLibs() {
     await __pdfLibsReady;
 }
 
-// Lightweight Chart.js loader for report generation context
 let __chartLibReady;
 async function __ensureChartLibForPdf() {
     if (typeof window.Chart !== 'undefined' && window.Chart && typeof window.Chart === 'function') return;
@@ -397,12 +396,33 @@ async function _prepareAnalisisBebanDataForPdf() {
     const mainProject = appState.projects.find(p => p.projectType === 'main_income');
     const mainProjectId = mainProject ? mainProject.id : null;
 
+// --- PERBAIKAN DIMULAI DI SINI ---
     (appState.bills || []).filter(bill => !bill.isDeleted).forEach(bill => {
         const group = (bill.projectId === mainProjectId) ? 'main' : 'internal';
+
+        // Pastikan grup dan tipe ada di objek totals
         if (totals[group] && totals[group][bill.type]) {
+            
+            // Ambil nominal total, pastikan angka
+            const totalAmount = parseFloat(bill.amount || 0);
+
+            // Cek status berdasarkan struktur data di laporan.js
+            if (bill.status === 'paid') {
+                // Jika lunas, tambahkan seluruh jumlah ke 'paid'
+                totals[group][bill.type]['paid'] += totalAmount;
+            
+            } else if (bill.status === 'unpaid') {
+                // Jika belum lunas, ambil jumlah yang sudah dibayar
+                const paidAmount = parseFloat(bill.paidAmount || 0);
+                
+                // Hitung sisa tagihan (outstanding)
+                const outstandingAmount = Math.max(0, totalAmount - paidAmount);
+                
+                // Tambahkan sisa tagihan ke 'unpaid'
+                totals[group][bill.type]['unpaid'] += outstandingAmount;
+            }
         }
     });
-
     const sections = [];
     const categories = [
         { key: 'material', label: 'Beban Material' },

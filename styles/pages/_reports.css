@@ -914,3 +914,12 @@ body.laporan-layout-cards .dashboard-grid-layout { grid-template-columns: 1fr; }
 /* Boundaries for tables and charts */
 .page--laporan .table-like { border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--panel) 98%, transparent); box-shadow: var(--shadow-sm); padding: .75rem; }
 .page--laporan .card-body-chart { box-shadow: var(--shadow-sm); }
+
+.title-pdf-report{
+  display: flex;
+  justify-content: center;
+  position: static;
+  margin-top :0.75em;
+  font-size: .9rem;
+  font-weight:600;
+}

@@ -23,7 +23,6 @@ export const BOTTOM_NAV_BY_ROLE = {
     Viewer: ['dashboard', 'jurnal', 'tagihan', 'laporan', 'pengaturan']
 };
 
-// Auto-rebase settings for sync conflicts
 export const AUTO_REBASE_TABLES = new Set(['expenses', 'bills', 'incomes', 'funding_sources']);
 
 export const masterDataConfig = {
