@@ -9,10 +9,46 @@ import { showLoadingModal, hideLoadingModal } from "../../../ui/components/modal
 import { _logActivity } from "../../logService.js";
 import { _uploadFileToCloudinary, _compressImage, _enforceLocalFileStorageLimit } from "../../fileService.js";
 import { parseFormattedNumber, fmtIDR } from "../../../utils/formatters.js";
-// PERBAIKAN: Impor fungsi penutup 'Immediate' dan 'hideMobileDetailPageImmediate'
 import { createModal, closeModal, closeDetailPane, closeModalImmediate, closeDetailPaneImmediate, hideMobileDetailPage, hideMobileDetailPageImmediate } from "../../../ui/components/modal.js";
 import { queueOutbox } from "../../outboxService.js";
 
+/**
+ * Mendapatkan detail penerima pembayaran untuk Tagihan (non-pinjaman).
+ * Digunakan untuk notifikasi success.
+ * @param {string} billId
+ * @param {import('../../../state/appState').AppState} currentState
+ */
+function _getBillRecipientDetails(billId, currentState) {
+    const bill = currentState.bills.find(b => b.id === billId);
+    let recipient = 'Penerima';
+    let description = bill?.description || 'Tagihan';
+    let workerDetail = null;
+
+    if (!bill) return { recipient, description, workerDetail: null };
+
+    // Logika Gaji (selalu individu sekarang)
+    if (bill.type === 'gaji') {
+        // Karena rekap selalu perorangan, kita asumsikan hanya ada 1 workerDetail
+        workerDetail = bill.workerDetails?.[0] || {};
+        recipient = workerDetail.name || 'Pekerja';
+        description = `Pembayaran gaji untuk ${recipient}`;
+    } else if (bill.expenseId) {
+        // Logika Biaya/Expense
+        const expense = currentState.expenses.find(e => e.id === bill.expenseId);
+        const supplier = expense ? currentState.suppliers.find(s => s.id === expense.supplierId) : null;
+        recipient = supplier?.supplierName || 'Penerima Biaya';
+        description = bill.description;
+    } else {
+        description = bill.description;
+    }
+
+    return { recipient, description, workerDetail };
+}
+
+/**
+ * Memproses pembayaran untuk Tagihan (Bill), termasuk Gaji (Salary).
+ * @param {HTMLFormElement} formElement
+ */
 export async function handleProcessBillPayment(formElement) {
     const amountToPay = parseFormattedNumber(formElement.elements.amount.value);
     const amountFormatted = fmtIDR(amountToPay);
@@ -21,52 +57,57 @@ export async function handleProcessBillPayment(formElement) {
     const now = new Date();
     const date = new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate(), now.getHours(), now.getMinutes(), 0, 0);
     const file = formElement.elements.paymentAttachment?.files?.[0];
-    // Idempotency untuk cicilan pinjaman
+
+    if (amountToPay <= 0) {
+        toast('error', 'Jumlah pembayaran harus lebih dari nol.');
+        return false;
+    }
+
+    // Ambil detail bill untuk konfirmasi/notifikasi awal
+    const initialBill = appState.bills.find(b => b.id === billId);
+    if (!initialBill) {
+        toast('error', 'Tagihan tidak ditemukan di App State.');
+        return false;
+    }
+
+    const { recipient: initialRecipientName, description: billDescription, workerDetail } = _getBillRecipientDetails(billId, appState);
+    
+    // Idempotency key
     let clientPaymentId = formElement.dataset.paymentId;
     if (!clientPaymentId) {
-        try { clientPaymentId = crypto.randomUUID(); } catch(_) { clientPaymentId = `loan-pay-${id}-${Date.now()}`; }
+        try { clientPaymentId = crypto.randomUUID(); } catch(_) { clientPaymentId = `pay-${billId}-${workerDetail?.id || Date.now()}`; }
         formElement.dataset.paymentId = clientPaymentId;
     }
 
     createModal('confirmPayBill', {
-        message: `Anda akan membayar tagihan sebesar <strong>${amountFormatted}</strong>. Lanjutkan?`,
+        message: `Anda akan membayar ${initialBill.type === 'gaji' ? 'gaji' : 'tagihan'} sebesar <strong>${amountFormatted}</strong> kepada <strong>${initialRecipientName}</strong>. Lanjutkan?`,
         onConfirm: async () => {
-            let loadingToast;
             let containerToClose = null;
             try {
-                // Ganti snackbar loading dengan modal loading
                 showLoadingModal('Memproses pembayaran...');
-                // Simpan placeholder agar referensi lama tidak error
-                loadingToast = { close: () => {} };
                 containerToClose = formElement.closest('.modal-bg, #detail-pane');
-
-                if (amountToPay <= 0) {
-                    throw new Error('Jumlah pembayaran harus lebih dari nol.');
-                }
 
                 let attachmentUrl = null;
                 let localAttachmentId = null;
-                // Idempotency key untuk menghindari duplikasi pembayaran offline
-                let clientPaymentId = formElement.dataset.paymentId;
-                if (!clientPaymentId) {
-                    try { clientPaymentId = crypto.randomUUID(); } catch(_) { clientPaymentId = `pay-${billId}-${Date.now()}`; }
-                    formElement.dataset.paymentId = clientPaymentId;
-                }
 
                 const processPayment = async () => {
-                     if (navigator.onLine && !_isQuotaExceeded()) {
+                    if (navigator.onLine && !_isQuotaExceeded()) {
+                        // --- ONLINE (FIREBASE TRANSACTION) ---
                         try {
                             if (file) {
-                                 attachmentUrl = await _uploadFileToCloudinary(file, { silent: true });
-                                 if (!attachmentUrl) throw new Error("Gagal mengunggah lampiran.");
-                             }
+                                attachmentUrl = await _uploadFileToCloudinary(file, { silent: true });
+                                if (!attachmentUrl) throw new Error("Gagal mengunggah lampiran.");
+                            }
+                            
                             await runTransaction(db, async (transaction) => {
                                 const billRef = doc(billsCol, billId);
                                 const billSnap = await transaction.get(billRef);
                                 if (!billSnap.exists()) throw new Error("Tagihan tidak ditemukan di server.");
                                 const billData = billSnap.data();
+                                
                                 const newPaidAmount = (billData.paidAmount || 0) + amountToPay;
                                 const isNowPaid = newPaidAmount >= (billData.amount || 0);
+
                                 transaction.update(billRef, {
                                     paidAmount: newPaidAmount,
                                     status: isNowPaid ? 'paid' : 'unpaid',
@@ -74,12 +115,15 @@ export async function handleProcessBillPayment(formElement) {
                                     updatedAt: serverTimestamp(),
                                     ...(isNowPaid && { paidAt: Timestamp.fromDate(date) })
                                 });
+                                
                                 const paymentRef = doc(collection(billRef, 'payments'), clientPaymentId);
                                 const paymentData = {
                                     amount: amountToPay,
                                     date: Timestamp.fromDate(date),
                                     createdAt: serverTimestamp(),
                                     ...(attachmentUrl && { attachmentUrl: attachmentUrl }),
+                                    // Detail Gaji Individual (Jika ada)
+                                    ...(workerDetail?.id && { workerId: workerDetail.id, workerName: workerDetail.name }),
                                 };
                                 transaction.set(paymentRef, paymentData);
                             });
@@ -89,6 +133,7 @@ export async function handleProcessBillPayment(formElement) {
                             throw error;
                         }
                     } else {
+                        // --- OFFLINE (DEXIE TRANSACTION) ---
                         try {
                             const transactionTables = ['bills', 'expenses', 'attendance_records', 'pending_payments'];
                             if (file) transactionTables.push('files');
@@ -97,15 +142,20 @@ export async function handleProcessBillPayment(formElement) {
                             await localDB.transaction('rw', dexieTables, async () => {
                                 const bill = await localDB.bills.get(billId);
                                 if (!bill) throw new Error("Tagihan tidak ditemukan di perangkat.");
+
+                                // Kelola lampiran
                                 if (file) {
                                     const compressed = await _compressImage(file, 0.85, 1280);
                                     const blob = compressed || file;
-                                    localAttachmentId = `payment-${billId}-${Date.now()}`;
+                                    localAttachmentId = `payment-${billId}-${workerDetail?.id || Date.now()}`;
                                     await localDB.files.put({ id: localAttachmentId, file: blob, addedAt: new Date(), size: blob.size || 0 });
-                                     await _enforceLocalFileStorageLimit();
+                                    await _enforceLocalFileStorageLimit();
                                 }
+
                                 const newPaidAmount = (bill.paidAmount || 0) + amountToPay;
                                 const isNowPaid = newPaidAmount >= (bill.amount || 0);
+                                
+                                // Update bill
                                 await localDB.bills.where('id').equals(billId).modify({
                                     paidAmount: newPaidAmount,
                                     status: isNowPaid ? 'paid' : 'unpaid',
@@ -113,19 +163,32 @@ export async function handleProcessBillPayment(formElement) {
                                     updatedAt: new Date(),
                                     ...(isNowPaid && { paidAt: date })
                                 });
-                                if (isNowPaid && bill.expenseId) {
-                                     await localDB.expenses.where('id').equals(bill.expenseId).modify({ status: 'paid', syncState: 'pending_update' });
+
+                                // Update Expense/Attendance (Jika Lunas)
+                                if (isNowPaid) {
+                                    if (bill.expenseId) {
+                                        await localDB.expenses.where('id').equals(bill.expenseId).modify({ status: 'paid', syncState: 'pending_update' });
+                                    }
+                                    if (bill.type === 'gaji' && bill.recordIds && bill.recordIds.length > 0) {
+                                        // Asumsi semua records yang terkait di bill dibayar lunas
+                                        await localDB.attendance_records.where('id').anyOf(bill.recordIds).modify({ isPaid: true, syncState: 'pending_update' });
+                                    }
                                 }
-                                if (isNowPaid && bill.type === 'gaji' && bill.recordIds && bill.recordIds.length > 0) {
-                                    await localDB.attendance_records.where('id').anyOf(bill.recordIds).modify({ isPaid: true, syncState: 'pending_update' });
-                                }
-                                await localDB.pending_payments.add({ billId, amount: amountToPay, date, localAttachmentId, createdAt: new Date(), paymentId: clientPaymentId });
+                                
+                                // Tambahkan pending payment
+                                await localDB.pending_payments.add({ 
+                                    billId, amount: amountToPay, date, 
+                                    localAttachmentId, createdAt: new Date(), paymentId: clientPaymentId,
+                                    // Detail Gaji Individual (Jika ada)
+                                    ...(workerDetail?.id && { workerId: workerDetail.id, workerName: workerDetail.name, paymentType: 'salary' }),
+                                });
                             });
-                            _logActivity(`Membayar Tagihan Cicilan (Offline)`, { billId, amount: amountToPay });
+                            
+                            _logActivity(`Membayar ${initialBill.type === 'gaji' ? `Gaji ${workerDetail.name}` : 'Tagihan'} (Offline)`, { billId, amount: amountToPay });
                             requestSync({ silent: true });
                         } catch(error){
-                             console.error("[processPayment - Offline] Error:", error);
-                             throw error;
+                            console.error("[processPayment - Offline] Error:", error);
+                            throw error;
                         }
                     }
                 };
@@ -133,51 +196,45 @@ export async function handleProcessBillPayment(formElement) {
                 await processPayment();
                 await loadAllLocalDataToState();
 
-                const bill = await localDB.bills.get(billId);
-                if (!bill) {
-                    console.error("Bill data not found after payment processing for ID:", billId);
-                    throw new Error("Data tagihan tidak ditemukan setelah pemrosesan.");
-                }
-                const expense = bill.expenseId ? await localDB.expenses.get(bill.expenseId) : null;
-                const supplier = expense ? appState.suppliers.find(s => s.id === expense.supplierId) : null;
-                const recipient = supplier ? supplier.supplierName : 'Penerima';
-                const isNowPaid = (bill.paidAmount || 0) >= (bill.amount || 0);
+                const updatedBill = await localDB.bills.get(billId);
+                if (!updatedBill) throw new Error("Data tagihan tidak ditemukan setelah pemrosesan.");
 
-                // PERBAIKAN: Gunakan fungsi penutup 'Immediate'
+                const isNowPaid = (updatedBill.paidAmount || 0) >= (updatedBill.amount || 0);
+                const { recipient: finalRecipientName } = _getBillRecipientDetails(billId, appState);
+
+                // Tutup modal/detail pane
                 if (containerToClose) {
                     if (containerToClose.id === 'detail-pane') {
                         if (window.matchMedia('(max-width: 599px)').matches) {
-                            hideMobileDetailPageImmediate(); // <--- PERBAIKAN
+                            hideMobileDetailPageImmediate();
                         } else {
                             closeDetailPaneImmediate();
                         }
                     } else if (containerToClose.classList.contains('modal-bg')) {
                         closeModalImmediate(containerToClose);
                     }
-                    containerToClose = null;
                 }
 
                 hideLoadingModal();
                 emit('uiInteraction.showPaymentSuccessPreviewPanel', {
-                    title: 'Pembayaran Tagihan Berhasil!',
-                    description: `Pembayaran untuk: ${bill.description}`,
+                    title: updatedBill.type === 'gaji' ? 'Pembayaran Gaji Berhasil!' : 'Pembayaran Tagihan Berhasil!',
+                    description: billDescription,
                     amount: amountToPay,
                     date: date,
-                    recipient: recipient,
+                    recipient: finalRecipientName,
                     isLunas: isNowPaid,
                     billId: billId,
                 }, 'tagihan');
                 toast('success', 'Pembayaran berhasil diproses!');
                 
-                return true; // Signal sukses ke modalEventListeners
+                return true;
 
             } catch (error) {
                 hideLoadingModal();
-                // PERBAIKAN: Gunakan fungsi penutup 'Immediate'
                 if (containerToClose) {
                     if (containerToClose.id === 'detail-pane') {
                         if (window.matchMedia('(max-width: 599px)').matches) {
-                            hideMobileDetailPageImmediate(); // <--- PERBAIKAN
+                            hideMobileDetailPageImmediate();
                         } else {
                             closeDetailPaneImmediate();
                         }
@@ -187,12 +244,18 @@ export async function handleProcessBillPayment(formElement) {
                 }
                 toast('error', `Gagal memproses pembayaran: ${error.message}`);
                 console.error("Gagal memproses pembayaran:", error);
-                return false; // Signal gagal ke modalEventListeners
+                return false;
             }
         }
     });
+    return true;
 }
 
+/**
+ * Memproses pembayaran Pinjaman (Loan).
+ * Fungsi ini tidak berubah dan terpisah dari Bill Payment.
+ * @param {HTMLFormElement} formElement
+ */
 export async function handleProcessPayment(formElement) {
     const { id, type } = formElement.dataset;
     if (type !== 'pinjaman' && type !== 'loan') return false;
@@ -211,7 +274,6 @@ export async function handleProcessPayment(formElement) {
     let localAttachmentId = null;
     const amountFormatted = fmtIDR(amountToPay);
 
-    // Ensure idempotent client payment id for this form session
     let clientPaymentId = formElement.dataset.paymentId;
     if (!clientPaymentId) {
         try { clientPaymentId = crypto.randomUUID(); } catch(_) { clientPaymentId = `loan-pay-${id}-${Date.now()}`; }
@@ -221,11 +283,9 @@ export async function handleProcessPayment(formElement) {
     createModal('confirmPayBill', {
         message: `Anda akan membayar cicilan pinjaman sebesar <strong>${amountFormatted}</strong>. Lanjutkan?`,
         onConfirm: async () => {
-             let loadingToast;
              let containerToClose = null;
             try {
                 showLoadingModal('Memproses pembayaran...');
-                loadingToast = { close: () => {} };
                 containerToClose = formElement.closest('.modal-bg, #detail-pane');
 
                 const processPayment = async () => {
@@ -276,9 +336,9 @@ export async function handleProcessPayment(formElement) {
                                     await localDB.files.put({ id: localAttachmentId, file: blob, addedAt: new Date(), size: blob.size || 0 });
                                     await _enforceLocalFileStorageLimit();
                                 }
-                                 const totalPayable = loan.totalRepaymentAmount || loan.totalAmount || 0;
-                                 const newPaidAmount = (loan.paidAmount || 0) + amountToPay;
-                                 const isPaid = newPaidAmount >= totalPayable;
+                                const totalPayable = loan.totalRepaymentAmount || loan.totalAmount || 0;
+                                const newPaidAmount = (loan.paidAmount || 0) + amountToPay;
+                                const isPaid = newPaidAmount >= totalPayable;
                                 await localDB.funding_sources.where('id').equals(id).modify({
                                     paidAmount: newPaidAmount,
                                     status: isPaid ? 'paid' : 'unpaid',
@@ -310,30 +370,24 @@ export async function handleProcessPayment(formElement) {
 
                 // *** PERBAIKAN: Failsafe refresh appState ***
                 if (!Array.isArray(appState.fundingSources) || appState.fundingSources.length === 0) {
-                    console.warn("[handleProcessPayment] appState.fundingSources kosong/invalid setelah loadAll. Re-fetching...");
                     appState.fundingSources = await localDB.funding_sources.where('isDeleted').notEqual(1).toArray();
                 }
                 if (!Array.isArray(appState.fundingCreditors) || appState.fundingCreditors.length === 0) {
-                    console.warn("[handleProcessPayment] appState.fundingCreditors kosong/invalid setelah loadAll. Re-fetching...");
                     appState.fundingCreditors = await localDB.funding_creditors.where('isDeleted').notEqual(1).toArray();
                 }
                 // *** AKHIR PERBAIKAN ***
 
-                // Ambil data terbaru dari appState (yang sudah di-refresh)
                 const loan = appState.fundingSources.find(f => f.id === id);
-                if (!loan) {
-                    console.error("Data pinjaman tidak ditemukan di appState bahkan setelah refresh untuk ID:", id);
-                    throw new Error("Data pinjaman tidak ditemukan setelah pemrosesan.");
-                }
+                if (!loan) throw new Error("Data pinjaman tidak ditemukan setelah pemrosesan.");
 
                 const creditor = appState.fundingCreditors.find(c => c.id === loan.creditorId);
                 const isNowPaid = loan.status === 'paid';
 
-                // PERBAIKAN: Gunakan fungsi penutup 'Immediate'
+                // Tutup modal/detail pane
                 if (containerToClose) {
                     if (containerToClose.id === 'detail-pane') {
                         if (window.matchMedia('(max-width: 599px)').matches) {
-                            hideMobileDetailPageImmediate(); // <--- PERBAIKAN
+                            hideMobileDetailPageImmediate();
                         } else {
                             closeDetailPaneImmediate();
                         }
@@ -359,15 +413,14 @@ export async function handleProcessPayment(formElement) {
                 emit('ui.page.recalcDashboardTotals');
                 toast('success', 'Pembayaran cicilan berhasil diproses!');
                 
-                return true; // Signal sukses
+                return true;
 
             } catch (error) {
                 hideLoadingModal();
-                // PERBAIKAN: Gunakan fungsi penutup 'Immediate'
                 if (containerToClose) {
                     if (containerToClose.id === 'detail-pane') {
                         if (window.matchMedia('(max-width: 599px)').matches) {
-                            hideMobileDetailPageImmediate(); // <--- PERBAIKAN
+                            hideMobileDetailPageImmediate();
                         } else {
                             closeDetailPaneImmediate();
                         }
@@ -377,7 +430,7 @@ export async function handleProcessPayment(formElement) {
                 }
                 toast('error', `Gagal memproses pembayaran: ${error.message}`);
                 console.error("Gagal memproses pembayaran pinjaman:", error);
-                return false; // Signal gagal
+                return false;
             }
         }
     });
@@ -528,184 +581,4 @@ export async function handleDeleteLoanPayment(dataset) {
         console.error('[handleDeleteLoanPayment] error:', e);
         toast('error', 'Gagal memulai penghapusan pembayaran.');
     }
-}
-
-
-export async function handleProcessIndividualSalaryPayment(formElement) {
-    const billId = formElement.dataset.billId;
-    const workerId = formElement.dataset.workerId;
-    const amountToPay = parseFormattedNumber(formElement.elements.amount.value);
-    const dateInput = new Date(formElement.elements.date.value);
-    const now = new Date();
-    const date = new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate(), now.getHours(), now.getMinutes(), 0, 0);
-
-    if (amountToPay <= 0) {
-         toast('error', 'Jumlah pembayaran harus lebih dari nol.');
-         return false;
-    }
-
-    const bill = appState.bills.find(b => b.id === billId);
-    const workerDetail = bill?.workerDetails.find(w => w.id === workerId || w.workerId === workerId);
-    if (!bill || !workerDetail) {
-         toast('error', 'Data tagihan atau pekerja tidak ditemukan.');
-         return false;
-    }
-
-    const amountFormatted = fmtIDR(amountToPay);
-
-    createModal('confirmPayBill', {
-         message: `Anda akan membayar gaji <strong>${workerDetail.name}</strong> sebesar <strong>${amountFormatted}</strong>. Lanjutkan?`,
-         onConfirm: async () => {
-             let loadingToast;
-             let containerToClose = null;
-            try {
-                 showLoadingModal('Memproses pembayaran...');
-                 loadingToast = { close: () => {} };
-                 containerToClose = formElement.closest('.modal-bg, #detail-pane');
-
-                 const processPayment = async () => {
-                     let localAttachmentId = null;
-                     const file = formElement.elements.paymentAttachment?.files?.[0];
-
-                     if (!navigator.onLine || _isQuotaExceeded()) {
-                         try {
-                             const transactionTables = ['bills', 'pending_payments'];
-                             if (file) transactionTables.push('files');
-                             const dexieTables = transactionTables.map(name => localDB[name]).filter(Boolean);
-
-                             await localDB.transaction('rw', dexieTables, async () => {
-                                 if (file) {
-                                     const compressed = await _compressImage(file, 0.85, 1280);
-                                     const blob = compressed || file;
-                                     localAttachmentId = `payment-${billId}-${workerId}-${Date.now()}`;
-                                     await localDB.files.put({ id: localAttachmentId, file: blob, addedAt: new Date(), size: blob.size || 0 });
-                                     await _enforceLocalFileStorageLimit();
-                                 }
-                                 const localBill = await localDB.bills.get(billId);
-                                 if (!localBill) throw new Error("Tagihan tidak ditemukan di perangkat.");
-                                 const baseAmount = localBill.amount || 0;
-                                 const currentPaid = localBill.paidAmount || 0;
-                                 const newPaidAmount = currentPaid + amountToPay;
-                                 const isPaid = newPaidAmount >= baseAmount;
-                                 await localDB.bills.where('id').equals(billId).modify({
-                                     paidAmount: newPaidAmount,
-                                     status: isPaid ? 'paid' : 'unpaid',
-                                     ...(isPaid ? { paidAt: date } : {}),
-                                     syncState: 'pending_update',
-                                     updatedAt: new Date()
-                                 });
-                                  await localDB.pending_payments.add({
-                                      billId: bill.id,
-                                      amount: amountToPay,
-                                      date,
-                                      workerId: workerDetail.id || workerId,
-                                      paymentId: (formElement.dataset.paymentId || `pay-${billId}-${workerId}-${Date.now()}`),
-                                     workerName: workerDetail.name, localAttachmentId, createdAt: new Date()
-                                 });
-                             });
-
-                             _logActivity(`Membayar Gaji Individual (Offline): ${workerDetail.name}`, { billId, amount: amountToPay });
-                             toast('info', 'Offline atau kuota habis. Data disimpan di perangkat.');
-                             requestSync({ silent: true });
-
-                         } catch (e) {
-                             console.error("[processPayment Gaji - Offline] Error:", e);
-                             throw e;
-                         }
-                     } else {
-                        try {
-                            const billRef = doc(billsCol, bill.id);
-                            let attachmentUrl = null;
-                            if (file) attachmentUrl = await _uploadFileToCloudinary(file, { silent: true });
-                            if (file && !attachmentUrl) throw new Error("Gagal mengunggah lampiran.");
-
-                            await runTransaction(db, async (transaction) => {
-                                const billSnap = await transaction.get(billRef);
-                                if (!billSnap.exists()) throw new Error('Tagihan tidak ditemukan di server.');
-                                const billData = billSnap.data();
-                                const baseAmountServer = billData.amount || 0;
-                                const newPaidAmountServer = (billData.paidAmount || 0) + amountToPay;
-                                const isFullyPaidServer = newPaidAmountServer >= baseAmountServer;
-                                transaction.update(billRef, {
-                                    paidAmount: increment(amountToPay),
-                                    status: isFullyPaidServer ? 'paid' : 'unpaid',
-                                    rev: (billData.rev || 0) + 1,
-                                    updatedAt: serverTimestamp(),
-                                    ...(isFullyPaidServer && { paidAt: Timestamp.fromDate(date) })
-                                });
-                                const paymentRef = doc(collection(billRef, 'payments'));
-                                const paymentData = {
-                                    amount: amountToPay, date: Timestamp.fromDate(date), workerId: workerDetail.id || workerId,
-                                    workerName: workerDetail.name, createdAt: serverTimestamp()
-                                };
-                                if (attachmentUrl) paymentData.attachmentUrl = attachmentUrl;
-                                transaction.set(paymentRef, paymentData);
-                            });
-                            _logActivity(`Membayar Gaji Individual: ${workerDetail.name}`, { billId, amount: amountToPay });
-                            await syncFromServer();
-                        } catch(error) {
-                             console.error("[processPayment Gaji - Online] Error:", error);
-                             throw error;
-                        }
-                     }
-                 };
-
-                 await processPayment();
-                 await loadAllLocalDataToState();
-
-                 const updatedBill = await localDB.bills.get(billId);
-                  if (!updatedBill) {
-                     console.error("Updated bill data not found after payment processing for ID:", billId);
-                     throw new Error("Data tagihan tidak ditemukan setelah pemrosesan.");
-                 }
-
-                // PERBAIKAN: Gunakan fungsi penutup 'Immediate'
-                if (containerToClose) {
-                    if (containerToClose.id === 'detail-pane') {
-                        if (window.matchMedia('(max-width: 599px)').matches) {
-                            hideMobileDetailPageImmediate(); // <--- PERBAIKAN
-                        } else {
-                            closeDetailPaneImmediate();
-                        }
-                    } else if (containerToClose.classList.contains('modal-bg')) {
-                        closeModalImmediate(containerToClose);
-                    }
-                    containerToClose = null;
-                }
-
-                 hideLoadingModal();
-                 emit('uiInteraction.showPaymentSuccessPreviewPanel', {
-                     title: 'Pembayaran Gaji Berhasil!',
-                     description: `Pembayaran gaji untuk ${workerDetail.name}`,
-                     amount: amountToPay,
-                     date: date,
-                     recipient: workerDetail.name,
-                     isLunas: updatedBill.status === 'paid',
-                     billId: billId,
-                 }, 'tagihan');
-                 toast('success', 'Pembayaran gaji berhasil diproses!');
-                 
-                 return true; // Signal sukses
-
-             } catch (error) {
-                 hideLoadingModal();
-                // PERBAIKAN: Gunakan fungsi penutup 'Immediate'
-                if (containerToClose) {
-                    if (containerToClose.id === 'detail-pane') {
-                        if (window.matchMedia('(max-width: 599px)').matches) {
-                            hideMobileDetailPageImmediate(); // <--- PERBAIKAN
-                        } else {
-                            closeDetailPaneImmediate();
-                        }
-                    } else if (containerToClose.classList.contains('modal-bg')) {
-                        closeModalImmediate(containerToClose);
-                    }
-                }
-                 toast('error', `Gagal memproses pembayaran: ${error.message}`);
-                 console.error("Gagal memproses pembayaran gaji individu:", error);
-                 return false; // Signal gagal
-             }
-         }
-    });
-     return true;
 }

@@ -166,7 +166,6 @@ export const clickActions = {
     'cetak-kwitansi': async (ctx) => { const { handleCetakKwitansi } = await import('../services/receiptService.js'); handleCetakKwitansi(ctx.itemId); },
     'cetak-kwitansi-individu': async (ctx) => { const { handleCetakKwitansiIndividu } = await import('../services/receiptService.js'); handleCetakKwitansiIndividu(ctx); },
     'cetak-kwitansi-kolektif': async (ctx) => { const { handleCetakKwitansiKolektif } = await import('../services/receiptService.js'); handleCetakKwitansiKolektif(ctx); },
-    'pay-individual-salary': (ctx) => { emit('ui.modal.payIndividualSalary', ctx); },
     'stok-in': (ctx) => { emit('ui.modal.stokIn', ctx.itemId); },
     'stok-out': (ctx) => { emit('ui.modal.stokOut', ctx.itemId); },
     'open-stock-usage-modal': (ctx) => { emit('ui.modal.openStockUsage', ctx); },
@@ -442,9 +441,9 @@ export const clickActions = {
     'refresh-dashboard-card': (ctx) => {
         emit('ui.dashboard.refreshCardData', ctx.cardType);
     },
-    'open-salary-payment-panel': (ctx) => {
-        emit('ui.jurnal.openSalaryPaymentPanel', ctx.itemId);
-    },
+        'open-salary-payment-panel': (ctx) => {
+        emit('ui.modal.openPayment', {id: ctx.itemId, type: 'bill'}); 
+    },
     'change-worker-role': (ctx) => {
         emit('ui.modal.openChangeRole', ctx);
     },

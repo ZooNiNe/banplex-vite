@@ -1,5 +1,5 @@
 import { $ } from "../../utils/dom.js";
-import { handleProcessBillPayment, handleProcessPayment, handleProcessIndividualSalaryPayment } from "../../services/data/transactions/paymentService.js";
+import { handleProcessBillPayment, handleProcessPayment } from "../../services/data/transactions/paymentService.js";
 import { handleUpdateAttendance } from "../../services/data/attendanceService.js";
 import { handleAddMasterItem, handleUpdateMasterItem, _saveNewMasterMaterial } from "../../services/data/masterDataService.js";
 import { signInWithGoogle, handleLogout } from "../../services/authService.js";

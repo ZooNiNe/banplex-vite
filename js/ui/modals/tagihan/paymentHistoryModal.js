@@ -116,19 +116,18 @@ async function handleOpenPaymentHistoryModal(dataset = {}) {
 
     let recipientName = defaultRecipientName;
     let description = bill?.description || 'Tagihan';
-    let action = 'cetak-kwitansi-pembayaran'; // Default action
+    
+    let action = 'cetak-kwitansi-universal'; 
     let kwitansiDataset = `data-bill-id="${bill.id}"`;
 
     if (isSalaryBill) {
         if (p.workerId && p.workerName) {
             recipientName = p.workerName;
             description = `Pembayaran Gaji: ${p.workerName}`;
-            action = 'cetak-kwitansi-individu';
             kwitansiDataset = `data-bill-id="${bill.id}" data-worker-id="${p.workerId}"`;
         } else {
             recipientName = "Pembayaran Kolektif";
             description = `Pembayaran ${bill.description}`;
-            action = 'cetak-kwitansi-kolektif'; // Tombol ini akan cetak SEMUA
             kwitansiDataset = `data-bill-id="${bill.id}"`;
         }
     }

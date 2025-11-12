@@ -19,8 +19,6 @@ import { appState } from "../../state/appState.js";
 import { localDB } from "../../services/localDbService.js";
 import { handleViewJurnalHarianModal } from "../modals/jurnal/viewJurnalHarianModal.js";
 import { handleViewWorkerRecapModal } from "../modals/jurnal/viewWorkerRecapModal.js";
-import { openSalaryPaymentPanel } from "../modals/jurnal/salaryPaymentPanel.js";
-import { openIndividualSalaryPaymentModal } from "../modals/jurnal/individualSalaryPaymentModal.js";
 import { handleOpenMassAttendanceModal } from "../modals/absensi/setMassAttendanceModal.js";
 import { handleOpenManualAttendanceModal } from "../modals/absensi/editManualAttendanceModal.js";
 import { handleOpenStockUsageModal } from "../modals/stok/stockUsageModal.js";
@@ -189,22 +187,6 @@ export function initServiceUIBridge() {
       console.error("Gagal membuka rekap Pekerja:", e);
       toast('error', 'Gagal membuka rekap Pekerja.');
     }
-  });
-  on('ui.jurnal.openSalaryPaymentPanel', async (billId) => {
-    try {
-        openSalaryPaymentPanel(billId);
-    } catch(e) {
-        console.error("Gagal membuka panel pembayaran gaji:", e);
-        toast('error', 'Gagal membuka panel pembayaran.');
-    }
-  });
-  on('ui.modal.payIndividualSalary', async (dataset) => {
-      try {
-          openIndividualSalaryPaymentModal(dataset);
-      } catch(e) {
-          console.error("Gagal membuka modal pembayaran gaji individual:", e);
-          toast('error', 'Gagal membuka modal pembayaran.');
-      }
   });
   on('ui.modal.openMassAttendanceModal', async () => {
     try {

@@ -16,7 +16,7 @@ import { handleManageMasterData, handleDeleteMasterItem } from '../../services/d
 import { _handleRestoreItems, _handleDeletePermanentItems } from '../../services/data/recycleBinService.js';
 import { addInvoiceItemRow, handleInvoiceItemChange, createMasterDataSelect, initCustomSelects } from "../components/forms/index.js";
 import { getItemActions, displayActions, displayBottomSheetActions } from '../actionMenuUtils.js';
-import { handleProcessBillPayment, handleProcessPayment, handleProcessIndividualSalaryPayment, handleDeleteBillPayment, handleDeleteLoanPayment } from "../../services/data/transactions/paymentService.js";
+import { handleProcessBillPayment, handleProcessPayment, handleDeleteBillPayment, handleDeleteLoanPayment } from "../../services/data/transactions/paymentService.js";
 import { handleAttachmentAction } from "./attachmentListeners.js";
 import { handleDeleteAttachment, handleReplaceAttachment } from "../../services/data/transactions/attachmentService.js";
 import { handlePostComment, handleDeleteComment } from "../../services/data/commentService.js";
@@ -45,7 +45,6 @@ function handleDownloadConfirmation(downloader, data, actionType, sourceButton) 
         message: `Anda akan mengunduh kwitansi sebagai ${actionType === 'kwitansi-download-image' ? 'gambar (JPG)' : 'dokumen (PDF)'}. Lanjutkan?`,
         onConfirm: async () => {
             await downloader(data);
-            // PERBAIKAN: Gunakan closeModalImmediate
             if (modal) {
                 closeModalImmediate(modal); // Tutup modal preview setelah unduh
             }
@@ -263,9 +262,9 @@ export function initializeEventBusListeners() {
     on('ui.action.forward-to-comments', (dataset) => emit('ui.selection.handleAction', 'forward-to-comments', dataset));
     on('ui.action.view-jurnal-harian', (dataset) => emit('ui.modal.viewJurnalHarian', dataset.date));
     on('ui.action.view-worker-recap', (dataset) => emit('ui.modal.viewWorkerRecap', dataset.workerId));
-    on('ui.action.open-salary-payment-panel', (context) => {
-        emit('ui.jurnal.openSalaryPaymentPanel', context.itemId);
-    });
+        on('ui.action.open-salary-payment-panel', (context) => {
+        emit('ui.modal.openPayment', {id: context.itemId, type: 'bill'});
+    });
     on('ui.action.edit-attendance-day', (context) => {
         emit('ui.jurnal.openDailyProjectPicker', { date: context.date });
     });
@@ -397,7 +396,6 @@ export function initializeEventBusListeners() {
         const { handleCetakKwitansiKolektif } = await import('../../services/receiptService.js');
         handleCetakKwitansiKolektif(dataset);
     });
-     on('ui.action.pay-individual-salary', (dataset) => emit('ui.modal.payIndividualSalary', dataset));
      on('ui.action.open-simulasi-actions', async (dataset) => {
         const { _openSimulasiItemActionsModal } = await import('../modals/simulasi/actionsModal.js');
         _openSimulasiItemActionsModal(dataset);
@@ -542,7 +540,6 @@ export function initializeEventBusListeners() {
         let handler;
         if (type === 'bill') handler = handleProcessBillPayment;
         else if (type === 'pinjaman' || type === 'loan') handler = handleProcessPayment;
-        else if (type === 'individual-salary') handler = handleProcessIndividualSalaryPayment;
         if (handler) {
             handler(form).catch(err => console.error(`Error in ${handler.name}:`, err));
         } else {
