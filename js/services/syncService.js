@@ -522,15 +522,16 @@ function _isQuotaExceeded() { try { return localStorage.getItem('firestoreQuotaE
 function _setQuotaExceededFlag(isExceeded) { try { if (isExceeded) { console.warn("KUOTA FIRESTORE HABIS."); localStorage.setItem('firestoreQuotaExceeded', 'true'); } else { console.log("Mereset flag kuota."); localStorage.removeItem('firestoreQuotaExceeded'); } } catch (e) { console.error("Gagal set flag kuota.", e); } }
 
 function _initQuotaResetScheduler() {
-    const CHECK_INTERVAL = 30 * 60 * 1000; const RESET_HOUR = 15; // WIB is UTC+7, reset happens at midnight UTC (7 AM WIB)
+    const CHECK_INTERVAL = 30 * 60 * 1000; const RESET_HOUR = 15;
     setInterval(async () => {
 
         if (!_isQuotaExceeded()) {
-
             return;
         }
+        
         const now = new Date(); const lastResetAttempt = parseInt(localStorage.getItem('lastResetAttempt') || '0'); const todayMarker = new Date(now).setHours(0,0,0,0);
-        if (now.getUTCHours() >= 0 && lastResetAttempt < todayMarker) { // Check UTC midnight
+        
+        if (now.getHours() >= RESET_HOUR && lastResetAttempt < todayMarker) { // Cek 15:00 WIB
 
             toast('info', 'Mencoba sinkronisasi ulang...'); localStorage.setItem('lastResetAttempt', Date.now().toString()); _setQuotaExceededFlag(false); await syncToServer({ silent: true });
         } else {

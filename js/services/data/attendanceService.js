@@ -708,8 +708,6 @@ export async function handleDeleteSingleAttendance(recordId) {
     });
 }
 
-// attendanceService.js (Sudah bersih, tanpa console.warn)
-
 export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
     if (typeof closeModal === 'function') {
         closeModal();
@@ -727,21 +725,49 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
         const date = parseLocalDate(dateStr);
         const { startOfDay, endOfDay } = getLocalDayBounds(dateStr);
 
-        const workers = (appState.workers || []).filter(w => w.status === 'active' && !w.isDeleted && w.projectWages && w.projectWages[projectId]);
+        
+        // 1. Dapatkan SEMUA record di hari itu yang menandakan 'hadir' atau '1/2 hari'
+        const allPresentRecordsOnDate = (appState.attendanceRecords || [])
+            .filter(rec => {
+                if (rec.isDeleted === 1 || rec.attendanceStatus === 'absent') return false;
+                const recDate = getJSDate(rec.date);
+                return recDate >= startOfDay && recDate <= endOfDay;
+            });
 
-        const workerIdsForProject = new Set(workers.map(w => w.id));
+        // 2. Buat Set berisi ID pekerja yang hadir di PROYEK LAIN
+        const assignedElsewhereIds = new Set(
+            allPresentRecordsOnDate
+                .filter(rec => rec.projectId !== projectId) // Filter yang TIDAK SAMA dengan proyek saat ini
+                .map(rec => rec.workerId)
+        );
+
+        // 3. Dapatkan pekerja HANYA untuk proyek ini
+        const workersForThisProject = (appState.workers || []).filter(w => 
+            w.status === 'active' && 
+            !w.isDeleted && 
+            w.projectWages && 
+            w.projectWages[projectId]
+        );
+        
+        // 4. Filter pekerja untuk panel: HANYA tampilkan yang BELUM diabsen di tempat lain
+        const workersToShow = workersForThisProject.filter(w => !assignedElsewhereIds.has(w.id));
+        
+
+        const workerIdsForProject = new Set(workersToShow.map(w => w.id)); // Gunakan workersToShow
+        
         const existingRecordsOnDate = (appState.attendanceRecords || [])
             .filter(rec => {
                 const recDate = getJSDate(rec.date);
                 return recDate >= startOfDay && recDate <= endOfDay &&
-                       workerIdsForProject.has(rec.workerId) &&
+                       workerIdsForProject.has(rec.workerId) && // Cek dari daftar yg sudah difilter
                        (rec.projectId === projectId || rec.attendanceStatus === 'absent') && 
                        rec.isDeleted !== 1;
             });
             
         const existingRecordMap = new Map(existingRecordsOnDate.map(rec => [rec.workerId, rec]));
 
-        const rowsHTML = workers.map(w => {
+        // Gunakan workersToShow untuk membuat baris
+        const rowsHTML = workersToShow.map(w => {
             const workerId = w.id;
             const dbRecord = existingRecordMap.get(workerId); 
 
@@ -751,14 +777,12 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
             let recordId = ''; 
 
             if (dbRecord) {
-                if (dbRecord.projectId && dbRecord.projectId !== projectId) {
-                     currentStatus = 'absent';
-                } else {
-                    currentStatus = dbRecord.attendanceStatus;
-                    currentRole = dbRecord.jobRole || currentRole; 
-                    customWage = dbRecord.customWage || 0;
-                    recordId = dbRecord.id;
-                }
+                // Logika ini sekarang lebih sederhana karena kita sudah memfilter di awal
+                // Kita hanya akan menemukan record 'absen' atau record untuk proyek INI
+                currentStatus = dbRecord.attendanceStatus;
+                currentRole = dbRecord.jobRole || currentRole; 
+                customWage = dbRecord.customWage || 0;
+                recordId = dbRecord.id;
             }
 
             const baseWage = (w.projectWages?.[projectId] || {})[currentRole] || 0;
@@ -826,8 +850,8 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
             </div>`;
 
         const bodyHTML = `
-            <div class="scrollable-content"> ${rowsHTML.length > 0 ? rowsHTML : getEmptyStateHTML({icon: 'engineering', title: 'Tidak Ada Pekerja', desc: 'Tidak ada pekerja aktif untuk proyek ini.'})}</div>
-        `;
+            <div class="scrollable-content"> ${rowsHTML.length > 0 ? rowsHTML : getEmptyStateHTML({icon: 'engineering', title: 'Tidak Ada Pekerja', desc: 'Tidak ada pekerja aktif untuk proyek ini (atau sudah diabsen di proyek lain).'})}</div>
+        `; 
 
          const summaryHTML = `
             <div class="invoice-total attendance-manual-summary" id="attendance-manual-summary">
@@ -894,7 +918,8 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
             
             try {
                 const entries = [];
-                workers.forEach(w => {
+                // Gunakan workersToShow lagi di sini untuk memastikan kita hanya mengambil data yang relevan
+                workersToShow.forEach(w => {
                     const statusEl = context.querySelector(`input[name="status_${w.id}"]:checked`);
                     const row = context.querySelector(`.manual-assign-row[data-worker-id="${w.id}"]`);
 
@@ -921,7 +946,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
 
                 emit('ui.modal.create', 'confirmUserAction', {
                     title: 'Konfirmasi Simpan Absensi',
-                    message: `Anda akan menyimpan perubahan absensi untuk ${workers.length} pekerja pada ${date.toLocaleDateString('id-ID')}. Lanjutkan?`,
+                    message: `Anda akan menyimpan perubahan absensi untuk ${entries.length} pekerja pada ${date.toLocaleDateString('id-ID')}. Lanjutkan?`,
                     onConfirm: async () => {
                         const loadingToast = toast('syncing', 'Menyimpan perubahan...');
                         try {
@@ -972,8 +997,6 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
         controller.abort();
     }
 }
-
-// ... (fungsi lain di file Anda) ...
 
 export async function handleSaveManualAttendance(attendanceData) {
     const { date, projectId, entries } = attendanceData;

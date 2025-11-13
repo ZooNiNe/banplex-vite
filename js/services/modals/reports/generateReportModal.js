@@ -1,7 +1,8 @@
 import { createModal, closeModal, closeModalImmediate, showDetailPane } from "../../../ui/components/modal.js";
 import { createMasterDataSelect, initCustomSelects } from "../../../ui/components/forms/index.js";
 import { fetchAndCacheData } from "../../../services/data/fetch.js";
-import { projectsCol, suppliersCol } from "../../../config/firebase.js";
+// --- PERUBAHAN: Menambahkan 'workersCol' ---
+import { projectsCol, suppliersCol, workersCol } from "../../../config/firebase.js";
 import { appState } from "../../../state/appState.js";
 import { handleDownloadReport } from "../../../services/reportService.js";
 import { $ } from "../../../utils/dom.js";
@@ -34,7 +35,6 @@ async function handleGenerateReportModal() {
   ];
   const validReportTypes = new Set(reportTypeOptions.map(o => o.value));
 
-  // --- PERBAIKAN 1: Tambahkan `type="button"` untuk mencegah submit form ---
   const optionsHTML = reportTypeOptions.map((opt) => {
     return (
       `<button type="button" class="project-picker-item btn btn-ghost" data-action="select-report-type" data-type="${opt.value}">
@@ -44,7 +44,6 @@ async function handleGenerateReportModal() {
     );
   }).join('');
 
-  // --- PERBAIKAN 2: Judul dihapus dari `content` ---
   const content = `
     <form id="report-generator-form">
       <div class="picker-grid" id="report-type-actions">${optionsHTML}</div>
@@ -58,15 +57,11 @@ async function handleGenerateReportModal() {
     </button>`;
 
   const isMobile = window.matchMedia('(max-width: 599px)').matches;
-  
-  // --- PERBAIKAN 3: Menambahkan `title` di sini ---
   const title = 'Pilih Jenis Laporan';
   
-  // --- PERBAIKAN 4: Mengoper `title` ke kedua pemanggil modal ---
   let rootEl = isMobile
     ? createModal('actionsPopup', { title, content, footer, layoutClass: 'is-bottom-sheet' })
     : createModal('dataDetail', { title, content: `<div class="scrollable-content">${content}</div>`, footer });
-  // --- AKHIR PERBAIKAN ---
 
   if (!rootEl) {
     console.error("Gagal membuat modal atau detail pane.");
@@ -89,8 +84,8 @@ async function handleGenerateReportModal() {
 
     let filtersHTML = '';
 
+    // Filter tanggal (umum untuk hampir semua laporan)
     if (reportType && reportType !== 'analisis_beban') {
-
       filtersHTML += `
         <div class="rekap-filters" style="padding:0; margin-top:1rem;">
           <div class="form-group"><label>Dari Tanggal</label><input type="date" id="report-start-date" value="${firstDayOfMonth}"></div>
@@ -98,53 +93,55 @@ async function handleGenerateReportModal() {
         </div>`;
     }
 
+    // Filter spesifik per laporan
     if (reportType === 'rekapan') {
-
       await ensureMasterDataFresh(['projects']);
       const projectOptions = [{ value: 'all', text: 'Semua Proyek' }, ...appState.projects.map(p => ({ value: p.id, text: p.projectName }))];
-
       filtersHTML += createMasterDataSelect('report-project-id', 'Filter Proyek', projectOptions, 'all');
-    } else if (reportType === 'material_supplier') {
+    
+    // --- AWAL PERUBAHAN ---
+    } else if (reportType === 'upah_pekerja') {
+      // Menambahkan filter pekerja untuk laporan upah
+      await ensureMasterDataFresh(['workers']);
+      const workerOptions = [
+          { value: 'all', text: 'Semua Pekerja' }, 
+          // Filter pekerja yang aktif atau pernah aktif (tidak terhapus)
+          ...appState.workers.filter(w => !w.isDeleted).map(w => ({ value: w.id, text: w.workerName }))
+      ];
+      filtersHTML += createMasterDataSelect('report-worker-id', 'Filter Pekerja', workerOptions, 'all');
+    // --- AKHIR PERUBAHAN ---
 
+    } else if (reportType === 'material_supplier') {
       await ensureMasterDataFresh(['suppliers']);
       const supplierOptions = [{ value: 'all', text: 'Semua Supplier' }, ...appState.suppliers.filter(s => s.category === 'Material').map(s => ({ value: s.id, text: s.supplierName }))];
-
       filtersHTML += createMasterDataSelect('report-supplier-id', 'Filter Supplier', supplierOptions, 'all');
+    
     } else if (reportType === 'material_usage_per_project') {
-
       await ensureMasterDataFresh(['projects']);
       const projectOptions = [{ value: '', text: '-- Pilih Proyek --' }, ...appState.projects.map(p => ({ value: p.id, text: p.projectName }))];
-
       filtersHTML += createMasterDataSelect('report-project-id', 'Pilih Proyek', projectOptions, '');
     }
 
     filtersContainer.innerHTML = filtersHTML;
-
     initCustomSelects(rootEl);
   };
 
   const handleTypeChange = async (val) => {
     if (!validReportTypes.has(val)) {
-
       if (filtersContainer) filtersContainer.innerHTML = '';
       if (submitButton) submitButton.disabled = true;
-
       return;
     }
     await renderDynamicFilters(val);
-
     if (submitButton) submitButton.disabled = (val === '');
   };
 
   rootEl.querySelector('#report-type-actions')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action="select-report-type"]');
-
     if (!btn) return;
     selectedType = btn.dataset.type || '';
-
     rootEl.querySelectorAll('#report-type-actions .project-picker-item').forEach(it => it.classList.remove('active'));
     btn.classList.add('active');
-
     handleTypeChange(selectedType);
   });
 
@@ -153,12 +150,16 @@ async function handleGenerateReportModal() {
 
     if (!selectedType) return;
 
+    // --- AWAL PERUBAHAN ---
+    // Menambahkan 'workerId' ke objek 'filters'
     const filters = {
         start: rootEl.querySelector('#report-start-date')?.value,
         end: rootEl.querySelector('#report-end-date')?.value,
         projectId: rootEl.querySelector('#report-project-id')?.value || 'all',
         supplierId: rootEl.querySelector('#report-supplier-id')?.value || 'all',
+        workerId: rootEl.querySelector('#report-worker-id')?.value || 'all', // Ditambahkan
     };
+    // --- AKHIR PERUBAHAN ---
     
     if (selectedType === 'material_usage_per_project' && !filters.projectId) {
         toast('error', 'Silakan pilih proyek terlebih dahulu.');
@@ -169,6 +170,8 @@ async function handleGenerateReportModal() {
         return;
     }
 
+    // Objek 'filters' sekarang akan diteruskan, meskipun reportService
+    // mungkin masih membaca langsung dari DOM (kedua metode akan berfungsi)
     await handleDownloadReport('pdf', selectedType, filters);
     
     let modalIdToClose = isMobile ? 'actionsPopup' : 'dataDetail';

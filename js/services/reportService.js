@@ -210,6 +210,7 @@ async function generatePdfReport(config) {
     }
 }
 
+// reportService.js
 async function _prepareUpahPekerjaDataForPdf() {
     const startDateStr = $('#report-start-date')?.value;
     const endDateStr = $('#report-end-date')?.value;
@@ -220,15 +221,33 @@ async function _prepareUpahPekerjaDataForPdf() {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
     endDate.setHours(23, 59, 59, 999);
+    
+    // --- AWAL PERUBAHAN ---
+    // 1. Ambil ID pekerja dari filter. Asumsi ID elemen adalah 'report-worker-id'
+    const workerId = $('#report-worker-id')?.value || 'all';
 
-    const recordsInRange = (appState.attendanceRecords || [])
+    let recordsInRange = (appState.attendanceRecords || [])
         .filter(rec => {
             if (rec.isDeleted) return false;
             const recDate = getJSDate(rec.date);
             return rec.status === 'completed' && recDate >= startDate && recDate <= endDate;
-        })
-        .sort((a,b) => getJSDate(a.date) - getJSDate(b.date));
+        });
+        
+    // 2. Terapkan filter pekerja jika dipilih
+    if (workerId !== 'all') {
+        recordsInRange = recordsInRange.filter(rec => rec.workerId === workerId);
+    }
+    
+    recordsInRange.sort((a,b) => getJSDate(a.date) - getJSDate(b.date));
+
     if (recordsInRange.length === 0) return null;
+    
+    // 3. Dapatkan nama pekerja untuk subtitle
+    const workerName = workerId !== 'all' 
+        ? (appState.workers.find(w => w.id === workerId)?.workerName || 'Pekerja Tidak Ditemukan') 
+        : 'Semua Pekerja';
+        
+    // --- AKHIR PERUBAHAN ---
 
     const bodyRows = recordsInRange.map(rec => {
         const worker = appState.workers.find(w => w.id === rec.workerId);
@@ -246,7 +265,8 @@ async function _prepareUpahPekerjaDataForPdf() {
 
     return {
         title: 'Laporan Rincian Upah Pekerja',
-        subtitle: `Periode: ${startDate.toLocaleDateString('id-ID')} s/d ${endDate.toLocaleDateString('id-ID')}`,
+        // 4. Perbarui subtitle
+        subtitle: `Pekerja: ${workerName} | Periode: ${startDate.toLocaleDateString('id-ID')} s/d ${endDate.toLocaleDateString('id-ID')}`,
         filename: `Laporan-Upah-${new Date().toISOString().slice(0, 10)}.pdf`,
         sections: [{
             headers: ["Tanggal", "Pekerja", "Proyek", "Status", "Upah", "Status Bayar"],
@@ -396,29 +416,16 @@ async function _prepareAnalisisBebanDataForPdf() {
     const mainProject = appState.projects.find(p => p.projectType === 'main_income');
     const mainProjectId = mainProject ? mainProject.id : null;
 
-// --- PERBAIKAN DIMULAI DI SINI ---
     (appState.bills || []).filter(bill => !bill.isDeleted).forEach(bill => {
         const group = (bill.projectId === mainProjectId) ? 'main' : 'internal';
-
-        // Pastikan grup dan tipe ada di objek totals
         if (totals[group] && totals[group][bill.type]) {
-            
-            // Ambil nominal total, pastikan angka
             const totalAmount = parseFloat(bill.amount || 0);
-
-            // Cek status berdasarkan struktur data di laporan.js
             if (bill.status === 'paid') {
-                // Jika lunas, tambahkan seluruh jumlah ke 'paid'
                 totals[group][bill.type]['paid'] += totalAmount;
             
             } else if (bill.status === 'unpaid') {
-                // Jika belum lunas, ambil jumlah yang sudah dibayar
                 const paidAmount = parseFloat(bill.paidAmount || 0);
-                
-                // Hitung sisa tagihan (outstanding)
                 const outstandingAmount = Math.max(0, totalAmount - paidAmount);
-                
-                // Tambahkan sisa tagihan ke 'unpaid'
                 totals[group][bill.type]['unpaid'] += outstandingAmount;
             }
         }
