@@ -17,6 +17,8 @@ import { createListSkeletonHTML } from "../../ui/components/skeleton.js";
 import { showDetailPane, createModal, closeModal } from "../../ui/components/modal.js";
 import { validateForm } from "../../utils/validation.js";
 import { queueOutbox } from "../outboxService.js";
+// --- PERUBAHAN: Menambahkan impor $ (utility DOM) ---
+import { $ } from "../../utils/dom.js";
 
 function createIcon(iconName, size = 18, classes = '') {
     // ... (fungsi createIcon tetap ada jika diperlukan, misal untuk handleDeleteSalaryBill) ...
@@ -27,14 +29,7 @@ function createIcon(iconName, size = 18, classes = '') {
 }
 
 // --- FUNGSI LAMA DIHAPUS ---
-// openSalaryRecapPanel() -> Dihapus
-// _renderRekapGajiForm() -> Dihapus
-// _renderRekapGajiHistory() -> Dihapus
-// generateSalaryRecap() -> Dihapus
-// handleGenerateBulkSalaryBill() -> Dihapus
-// handlePaySingleWorkerFromRecap() -> Dihapus
-// handleRecalculateWages() -> Dihapus
-// handleGenerateDailyBill() -> Dihapus (dari langkah kita sebelumnya)
+// (Fungsi-fungsi lama yang tidak relevan telah dihapus)
 
 async function _executeGenerateBillForWorker(worker, recordsToPay, grandTotal) {
     if (!worker || !recordsToPay || recordsToPay.length === 0 || grandTotal <= 0) {
@@ -48,7 +43,8 @@ async function _executeGenerateBillForWorker(worker, recordsToPay, grandTotal) {
 
     const allRecordIds = recordsToPay.map(rec => rec.id);
     
-    const description = `Gaji: ${worker.workerName}`;
+    // --- PERUBAHAN: Deskripsi tagihan menyertakan rentang tanggal ---
+    const description = `Gaji: ${worker.workerName} (${minDate.toLocaleDateString('id-ID')} - ${maxDate.toLocaleDateString('id-ID')})`;
     
     toast('syncing', 'Membuat tagihan gaji...');
     try {
@@ -69,8 +65,8 @@ async function _executeGenerateBillForWorker(worker, recordsToPay, grandTotal) {
                 recordIds: allRecordIds 
             }], 
             recordIds: allRecordIds,
-            startDate: minDate.toISOString(),
-            endDate: maxDate.toISOString(),
+            startDate: minDate, // --- PERUBAHAN: Simpan sebagai objek Date ---
+            endDate: maxDate,   // --- PERUBAHAN: Simpan sebagai objek Date ---
             createdAt: new Date(),
             isDeleted: 0,
             syncState: 'pending_create'
@@ -120,22 +116,49 @@ export async function openGenerateBillConfirmModal(dataset) {
         return;
     }
     
+    // --- PERUBAHAN: Ambil rentang tanggal dari UI ---
+    // Asumsi ID elemen di halaman Jurnal adalah #jurnal-start-date dan #jurnal-end-date
+    const startDateStr = $('#jurnal-start-date')?.value;
+    const endDateStr = $('#jurnal-end-date')?.value;
+
+    if (!startDateStr || !endDateStr) {
+        toast('error', 'Silakan tentukan rentang tanggal di bagian atas halaman Jurnal.');
+        return;
+    }
+    
+    const startDate = parseLocalDate(startDateStr);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = parseLocalDate(endDateStr);
+    endDate.setHours(23, 59, 59, 999);
+    // --- AKHIR PERUBAHAN ---
+    
+    // --- PERUBAHAN: Modifikasi kueri untuk menyertakan filter tanggal ---
     const recordsToPay = await localDB.attendance_records
         .where('workerId').equals(workerId)
-        .and(rec => rec.isDeleted === 0 && (rec.isPaid === 0 || rec.isPaid === false))
-        .filter(rec => (rec.totalPay || 0) > 0)
+        .and(rec => 
+            rec.isDeleted === 0 && 
+            (rec.isPaid === 0 || rec.isPaid === false) &&
+            (rec.totalPay || 0) > 0
+        )
+        .filter(rec => { // Terapkan filter tanggal secara manual
+            const recDate = getJSDate(rec.date);
+            return recDate >= startDate && recDate <= endDate;
+        })
         .toArray();
+    // --- AKHIR PERUBAHAN ---
 
     if (recordsToPay.length === 0) {
-        toast('info', `Tidak ada upah yang belum dibayar untuk ${worker.workerName}.`);
+        toast('info', `Tidak ada upah yang belum dibayar untuk ${worker.workerName} pada rentang tanggal ini.`);
         return;
     }
 
     const grandTotal = recordsToPay.reduce((sum, rec) => sum + (rec.totalPay || 0), 0);
+    const formattedDateRange = `${startDate.toLocaleDateString('id-ID')} s/d ${endDate.toLocaleDateString('id-ID')}`;
 
     // --- MODAL KONFIRMASI (Req 1) ---
     emit('ui.modal.create', 'confirmGenerateBill', {
-        message: `Anda akan membuat 1 tagihan gaji untuk <strong>${worker.workerName}</strong> sebesar <strong>${fmtIDR(grandTotal)}</strong> (dari ${recordsToPay.length} absensi). Lanjutkan?`,
+        // --- PERUBAHAN: Pesan konfirmasi menyertakan rentang tanggal ---
+        message: `Anda akan membuat 1 tagihan gaji untuk <strong>${worker.workerName}</strong> sebesar <strong>${fmtIDR(grandTotal)}</strong> (dari ${recordsToPay.length} absensi antara ${formattedDateRange}). Lanjutkan?`,
         onConfirm: () => { 
             // Panggil fungsi eksekusi internal
             _executeGenerateBillForWorker(worker, recordsToPay, grandTotal);
@@ -143,6 +166,11 @@ export async function openGenerateBillConfirmModal(dataset) {
     });
 }
 
+/**
+ * @deprecated Fungsi ini mungkin duplikat dari openGenerateBillConfirmModal. 
+ * Disarankan untuk menggunakan openGenerateBillConfirmModal.
+ * Saya tetap memperbaruinya agar konsisten.
+ */
 export async function handleGenerateBillForWorker(dataset) {
     const { workerId } = dataset;
     if (!workerId) {
@@ -156,25 +184,51 @@ export async function handleGenerateBillForWorker(dataset) {
         return;
     }
     
-    // 1. Cari semua absensi yang belum dibayar untuk pekerja ini
+    // --- PERUBAHAN: Ambil rentang tanggal dari UI ---
+    const startDateStr = $('#jurnal-start-date')?.value;
+    const endDateStr = $('#jurnal-end-date')?.value;
+
+    if (!startDateStr || !endDateStr) {
+        toast('error', 'Silakan tentukan rentang tanggal di bagian atas halaman Jurnal.');
+        return;
+    }
+    
+    const startDate = parseLocalDate(startDateStr);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = parseLocalDate(endDateStr);
+    endDate.setHours(23, 59, 59, 999);
+    // --- AKHIR PERUBAHAN ---
+
+    // --- PERUBAHAN: Modifikasi kueri untuk menyertakan filter tanggal ---
     const recordsToPay = await localDB.attendance_records
         .where({ workerId: workerId, isPaid: false, isDeleted: 0 })
-        .filter(rec => (rec.totalPay || 0) > 0)
+        .filter(rec => 
+            (rec.totalPay || 0) > 0 &&
+            getJSDate(rec.date) >= startDate && 
+            getJSDate(rec.date) <= endDate
+        )
         .toArray();
+    // --- AKHIR PERUBAHAN ---
 
     if (recordsToPay.length === 0) {
-        toast('info', `Tidak ada upah yang belum dibayar untuk ${worker.workerName}.`);
+        toast('info', `Tidak ada upah yang belum dibayar untuk ${worker.workerName} pada rentang tanggal ini.`);
         return;
     }
 
     // 2. Hitung total
     const grandTotal = recordsToPay.reduce((sum, rec) => sum + (rec.totalPay || 0), 0);
     const allRecordIds = recordsToPay.map(rec => rec.id);
-    const description = `Tagihan Gaji - ${worker.workerName}`;
+    const minDate = new Date(Math.min(...recordsToPay.map(r => getJSDate(r.date).getTime())));
+    const maxDate = new Date(Math.max(...recordsToPay.map(r => getJSDate(r.date).getTime())));
+    
+    // --- PERUBAHAN: Deskripsi tagihan menyertakan rentang tanggal ---
+    const description = `Gaji: ${worker.workerName} (${minDate.toLocaleDateString('id-ID')} - ${maxDate.toLocaleDateString('id-ID')})`;
+    const formattedDateRange = `${startDate.toLocaleDateString('id-ID')} s/d ${endDate.toLocaleDateString('id-ID')}`;
 
     // 3. Tampilkan konfirmasi
     emit('ui.modal.create', 'confirmGenerateBill', {
-        message: `Anda akan membuat 1 tagihan gaji untuk <strong>${worker.workerName}</strong> sebesar <strong>${fmtIDR(grandTotal)}</strong> (dari ${recordsToPay.length} absensi). Lanjutkan?`,
+        // --- PERUBAHAN: Pesan konfirmasi menyertakan rentang tanggal ---
+        message: `Anda akan membuat 1 tagihan gaji untuk <strong>${worker.workerName}</strong> sebesar <strong>${fmtIDR(grandTotal)}</strong> (dari ${recordsToPay.length} absensi antara ${formattedDateRange}). Lanjutkan?`,
         onConfirm: async () => { 
             toast('syncing', 'Membuat tagihan gaji...');
             try {
@@ -184,11 +238,10 @@ export async function handleGenerateBillForWorker(dataset) {
                     description,
                     amount: grandTotal,
                     paidAmount: 0,
-                    dueDate: new Date(), // Tagihan dibuat hari ini
+                    dueDate: new Date(),
                     status: 'unpaid',
                     type: 'gaji',
-                    workerId: worker.id, // Simpan ID pekerja
-                    // workerDetails penting untuk ditampilkan di list tagihan
+                    workerId: worker.id,
                     workerDetails: [{ 
                         id: worker.id, 
                         name: worker.workerName, 
@@ -196,6 +249,8 @@ export async function handleGenerateBillForWorker(dataset) {
                         recordIds: allRecordIds 
                     }], 
                     recordIds: allRecordIds,
+                    startDate: minDate, // --- PERUBAHAN: Simpan sebagai objek Date ---
+                    endDate: maxDate,   // --- PERUBAHAN: Simpan sebagai objek Date ---
                     createdAt: new Date(),
                     isDeleted: 0,
                     syncState: 'pending_create'
@@ -203,15 +258,12 @@ export async function handleGenerateBillForWorker(dataset) {
 
                 // 4. Simpan ke DB Lokal dan Outbox via Transaksi
                 await localDB.transaction('rw', localDB.bills, localDB.attendance_records, localDB.outbox, async () => {
-                    // Simpan tagihan baru
                     await localDB.bills.add(newBillData);
                     await queueOutbox({ table: 'bills', docId: billId, op: 'upsert', payload: newBillData, priority: 7 });
                     
-                    // Update absensi yang terkait
                     const attendanceUpdate = { isPaid: true, billId: billId, syncState: 'pending_update', updatedAt: new Date() };
                     await localDB.attendance_records.where('id').anyOf(allRecordIds).modify(attendanceUpdate);
                     
-                    // Antrikan update absensi
                     for (const recordId of allRecordIds) {
                         await queueOutbox({ 
                             table: 'attendance_records', 
@@ -227,8 +279,8 @@ export async function handleGenerateBillForWorker(dataset) {
                 toast('success', 'Tagihan gaji berhasil dibuat.');
                 
                 requestSync({ silent: true });
-                await loadAllLocalDataToState(); // Muat ulang state
-                emit('ui.page.render'); // Render ulang halaman Jurnal
+                await loadAllLocalDataToState();
+                emit('ui.page.render'); 
 
             } catch (error) {
                 toast('error', 'Gagal membuat tagihan gaji.');
@@ -246,7 +298,6 @@ export async function handleGenerateBillForWorker(dataset) {
  */
 export async function handleDeleteSalaryBill(billId) {
     // ... (Logika fungsi ini tetap sama seperti di file js/services/data/jurnalService.js) ...
-    // [Anda bisa salin-tempel kode lengkapnya dari file yang diunggah]
     emit('ui.modal.create', 'confirmDelete', {
         message: 'Membatalkan rekap akan menghapus tagihan ini dan mengembalikan status absensi terkait menjadi "belum dibayar". Lanjutkan?',
         onConfirm: async () => {

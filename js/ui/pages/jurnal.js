@@ -8,7 +8,8 @@ import { formatDate, fmtIDR } from '../../utils/formatters.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
 import { createListSkeletonHTML } from '../components/skeleton.js';
-import { getJSDate } from '../../utils/helpers.js';
+// --- PERUBAHAN: Menambahkan parseLocalDate ---
+import { getJSDate, parseLocalDate } from '../../utils/helpers.js';
 import { localDB } from '../../services/localDbService.js';
 import { openDailyProjectPickerForEdit } from '../../services/data/jurnalService.js';
 import { openDailyAttendanceEditorPanel } from '../../services/data/attendanceService.js';
@@ -21,6 +22,8 @@ let pageEventListenerController = null;
 let journalObserverInstance = null;
 let unsubscribeLiveQuery = null;
 let renderDebounceTimer = null;
+// --- TAMBAHAN: Timer untuk Hero Carousel ---
+let heroCarouselTimer = null;
 
 function debounce(func, wait) {
   let timeout;
@@ -36,7 +39,7 @@ function debounce(func, wait) {
 
 function createIcon(iconName, size = 18, classes = '') {
     const icons = {
-        settings: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings ${classes}"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1 0-2l.15-.1a2 2 0 0 0 .73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
+        settings: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings ${classes}"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1 0-2l.15-.1a2 2 0 0 0 .73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
     };
     return icons[iconName] || '';
 }
@@ -119,13 +122,37 @@ async function renderJurnalContent(append = false) {
         container.innerHTML = createListSkeletonHTML(5);
     }
 
+    // --- PERUBAHAN: Logika filter tanggal dipindahkan ke sini ---
     const activeTab = appState.activeSubPage.get('jurnal') || 'harian';
+    let startDate, endDate;
+
+    // Hanya terapkan filter tanggal jika BUKAN tab 'harian'
+    if (activeTab === 'per_pekerja' || activeTab === 'riwayat_rekap') {
+        const startDateStr = $('#jurnal-start-date')?.value;
+        const endDateStr = $('#jurnal-end-date')?.value;
+        
+        startDate = startDateStr ? parseLocalDate(startDateStr) : new Date('2000-01-01');
+        if (startDateStr) startDate.setHours(0, 0, 0, 0);
+        
+        endDate = endDateStr ? parseLocalDate(endDateStr) : new Date('2100-01-01');
+        if (endDateStr) endDate.setHours(23, 59, 59, 999);
+    } else {
+        // Untuk tab 'harian', gunakan rentang "all time"
+        startDate = new Date('2000-01-01');
+        endDate = new Date('2100-01-01');
+    }
+    // --- AKHIR PERUBAHAN ---
+
     let sourceItems = [];
 
     if (activeTab === 'harian') {
         const groupedByDate = (appState.attendanceRecords || []).reduce((acc, record) => {
             if (record.isDeleted) return acc;
             const recDate = getJSDate(record.date);
+
+            // Terapkan filter tanggal (akan lolos jika tab 'harian' krn rentang all-time)
+            if (recDate < startDate || recDate > endDate) return acc;
+
             const y = recDate.getFullYear();
             const m = String(recDate.getMonth() + 1).padStart(2, '0');
             const d = String(recDate.getDate()).padStart(2, '0');
@@ -139,7 +166,14 @@ async function renderJurnalContent(append = false) {
         sourceItems = Object.values(groupedByDate).sort((a, b) => getJSDate(b.date) - getJSDate(a.date));
         
     } else if (activeTab === 'per_pekerja') {
-        const attendance = (appState.attendanceRecords || []).filter(r => !r.isDeleted);
+        // Filter absensi berdasarkan rentang tanggal
+        const attendance = (appState.attendanceRecords || []).filter(r => {
+            if (r.isDeleted) return false;
+            const recDate = getJSDate(r.date);
+            // Terapkan filter tanggal
+            return recDate >= startDate && recDate <= endDate;
+        });
+
         const workersMap = new Map();
 
         (appState.workers || []).filter(w => !w.isDeleted).forEach(w => {
@@ -169,9 +203,15 @@ async function renderJurnalContent(append = false) {
             .sort((a, b) => b.lastActivity - a.lastActivity);
             
     } else if (activeTab === 'riwayat_rekap') {
+        // Filter riwayat tagihan berdasarkan rentang tanggal
         sourceItems = (appState.bills || [])
-            .filter(b => b.type === 'gaji' && !b.isDeleted)
+            .filter(b => {
+                if (b.type !== 'gaji' || b.isDeleted) return false;
+                const billDate = getJSDate(b.createdAt); 
+                return billDate >= startDate && billDate <= endDate;
+            })
             .sort((a, b) => getJSDate(b.createdAt) - getJSDate(a.createdAt));
+        
         sourceItems.forEach(item => {
             item.date = item.createdAt; 
         });
@@ -198,9 +238,9 @@ async function renderJurnalContent(append = false) {
         if (activeTab === 'harian') {
             emptyConfig = { icon: 'event_note', title: 'Jurnal Kosong', desc: 'Belum ada absensi harian yang tercatat.' };
         } else if (activeTab === 'per_pekerja') {
-            emptyConfig = { icon: 'request_quote', title: 'Belum Ada Data Pekerja', desc: 'Belum ada absensi pekerja yang tercatat.' };
+            emptyConfig = { icon: 'request_quote', title: 'Belum Ada Data Pekerja', desc: 'Tidak ada absensi pekerja untuk rentang tanggal ini.' };
         } else {
-            emptyConfig = { icon: 'history', title: 'Riwayat Kosong', desc: 'Belum ada tagihan gaji yang dibuat.' };
+            emptyConfig = { icon: 'history', title: 'Riwayat Kosong', desc: 'Tidak ada tagihan gaji untuk rentang tanggal ini.' };
         }
         container.innerHTML = getEmptyStateHTML(emptyConfig);
         return;
@@ -319,12 +359,66 @@ function initJurnalHeroCarousel() {
     const container = document.getElementById('jurnal-hero-carousel');
     if (!container) return;
 
-    if (container.dataset.initialized === '1') return;
-    container.dataset.initialized = '1';
+    // --- PERUBAHAN: Fungsi helper untuk (re)start timer ---
+    const startTimer = () => {
+        if (heroCarouselTimer) clearInterval(heroCarouselTimer);
+        heroCarouselTimer = setInterval(() => {
+            const currentIndex = parseInt(container.dataset.carouselIndex || '0');
+            setIndex(currentIndex + 1);
+        }, 7000);
+    };
 
+    // --- PERUBAHAN: Fungsi helper untuk set index ---
+    const setIndex = (idx) => {
+        const total = parseInt(container.dataset.carouselTotal || '1');
+        if (total === 0) return; // Hindari modulo by zero
+        const index = (idx + total) % total;
+        container.dataset.carouselIndex = index;
+        
+        container.querySelectorAll('.hero-slide').forEach((el, i) => {
+            el.classList.toggle('active', i === index);
+        });
+        container.querySelectorAll('.hero-indicators .dot').forEach((d, i) => {
+            d.classList.toggle('active', i === index);
+        });
+    };
+
+    // --- PERUBAHAN: Pisahkan buildSlides agar bisa dipanggil ulang ---
     const buildSlides = async () => {
-        const attendance = (appState.attendanceRecords || []).filter(r => !r.isDeleted);
-        const salaryBills = (appState.bills || []).filter(b => b.type === 'gaji' && !b.isDeleted);
+        // --- PERUBAHAN: Logika filter tanggal dipindahkan ke sini ---
+        const activeTab = appState.activeSubPage.get('jurnal') || 'harian';
+        let startDate, endDate;
+
+        // Hanya terapkan filter tanggal jika BUKAN tab 'harian'
+        if (activeTab === 'per_pekerja' || activeTab === 'riwayat_rekap') {
+            const startDateStr = $('#jurnal-start-date')?.value;
+            const endDateStr = $('#jurnal-end-date')?.value;
+            
+            startDate = startDateStr ? parseLocalDate(startDateStr) : new Date('2000-01-01');
+            if (startDateStr) startDate.setHours(0, 0, 0, 0);
+            
+            endDate = endDateStr ? parseLocalDate(endDateStr) : new Date('2100-01-01');
+            if (endDateStr) endDate.setHours(23, 59, 59, 999);
+        } else {
+            // Untuk tab 'harian', statistik hero adalah "all time"
+            startDate = new Date('2000-01-01');
+            endDate = new Date('2100-01-01');
+        }
+        // --- AKHIR PERUBAHAN ---
+
+        // --- PERUBAHAN: Filter data berdasarkan rentang tanggal ---
+        const attendance = (appState.attendanceRecords || []).filter(r => {
+            if (r.isDeleted) return false;
+            const recDate = getJSDate(r.date);
+            return recDate >= startDate && recDate <= endDate;
+        });
+        const salaryBills = (appState.bills || []).filter(b => {
+            if (b.type !== 'gaji' || b.isDeleted) return false;
+            const billDate = getJSDate(b.createdAt);
+            return billDate >= startDate && billDate <= endDate;
+        });
+        // --- AKHIR PERUBAHAN ---
+
         const workers = new Set(attendance.map(r => r.workerId));
 
         let totalDays = 0;
@@ -336,9 +430,11 @@ function initJurnalHeroCarousel() {
         const totalWagesPaid = salaryBills.filter(b => b.status === 'paid').reduce((sum, b) => sum + (b.amount || 0), 0);
         const totalWagesUnpaid = salaryBills.filter(b => b.status === 'unpaid').reduce((sum, b) => sum + Math.max(0, (b.amount || 0) - (b.paidAmount || 0)), 0);
 
+        // --- PERUBAHAN: Judul slide diubah untuk menandakan data difilter/all-time ---
+        const titleSuffix = (activeTab === 'harian') ? '(Semua Waktu)' : '(Filter)';
         const slides = [
             {
-                title: 'Total Hari Kerja Tercatat',
+                title: `Total Hari Kerja ${titleSuffix}`,
                 tone: 'success',
                 lines: [
                     `${totalDays.toLocaleString('id-ID')} Hari Kerja`,
@@ -346,7 +442,7 @@ function initJurnalHeroCarousel() {
                 ]
             },
             {
-                title: 'Ringkasan Upah',
+                title: `Ringkasan Upah ${titleSuffix}`,
                 tone: 'warning',
                 lines: [
                     `Dibayar: ${fmtIDR(totalWagesPaid)}`,
@@ -354,6 +450,7 @@ function initJurnalHeroCarousel() {
                 ]
             },
         ];
+        // --- AKHIR PERUBAHAN ---
 
         container.innerHTML = [
             ...slides.map((s, idx) => `
@@ -367,51 +464,51 @@ function initJurnalHeroCarousel() {
             `<div class="hero-indicators">${slides.map((_, i) => `<span class="dot${i===0?' active':''}" data-idx="${i}"></span>`).join('')}</div>`
         ].join('');
 
-        initCarouselBehavior(container, slides.length);
-    };
+        // --- PERUBAHAN: Update state di container ---
+        container.dataset.carouselTotal = slides.length;
+        container.dataset.carouselIndex = 0;
 
-    const initCarouselBehavior = (wrap, total) => {
-        let index = 0;
-        const setIndex = (i) => {
-            index = (i + total) % total;
-            wrap.querySelectorAll('.hero-slide').forEach((el, idx) => {
-                el.classList.toggle('active', idx === index);
-            });
-            wrap.querySelectorAll('.hero-indicators .dot').forEach((d, idx) => {
-                d.classList.toggle('active', idx === index);
-            });
-        };
-
-        if (wrap._timer) clearInterval(wrap._timer);
-        wrap._timer = setInterval(() => setIndex(index + 1), 7000);
-
-        wrap.querySelectorAll('.hero-indicators .dot').forEach(dot => {
+        // --- PERUBAHAN: Pasang ulang listener untuk dot ---
+        container.querySelectorAll('.hero-indicators .dot').forEach(dot => {
             dot.addEventListener('click', () => {
                 const idx = parseInt(dot.getAttribute('data-idx')) || 0;
                 setIndex(idx);
-                if (wrap._timer) { clearInterval(wrap._timer); wrap._timer = setInterval(() => setIndex(index + 1), 7000); }
+                startTimer(); // Mulai ulang timer
             });
         });
-
-        let startX = 0, currentX = 0, isDragging = false;
-        wrap.addEventListener('touchstart', (e) => {
-            startX = e.touches[0].clientX; isDragging = true; currentX = startX;
-        }, { passive: true });
-        wrap.addEventListener('touchmove', (e) => {
-            if (!isDragging) return; currentX = e.touches[0].clientX;
-        }, { passive: true });
-        wrap.addEventListener('touchend', () => {
-            if (!isDragging) return; const dx = currentX - startX; isDragging = false;
-            if (Math.abs(dx) > 40) {
-                setIndex(index + (dx < 0 ? 1 : -1));
-                if (wrap._timer) { clearInterval(wrap._timer); wrap._timer = setInterval(() => setIndex(index + 1), 7000); }
-            }
-        });
-
-        window.addEventListener('hashchange', () => { if (wrap._timer) clearInterval(wrap._timer); }, { once: true });
+        
+        startTimer(); // Mulai timer
     };
 
-    buildSlides();
+    // --- PERUBAHAN: Logika setup satu kali ---
+    if (container.dataset.initialized !== '1') {
+        container.dataset.initialized = '1';
+
+        let startX = 0, currentX = 0, isDragging = false;
+        container.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX; isDragging = true; currentX = startX;
+            if (heroCarouselTimer) clearInterval(heroCarouselTimer); // Jeda timer
+        }, { passive: true });
+        
+        container.addEventListener('touchmove', (e) => {
+            if (!isDragging) return; currentX = e.touches[0].clientX;
+        }, { passive: true });
+        
+        container.addEventListener('touchend', () => {
+            if (!isDragging) return; 
+            const dx = currentX - startX; 
+            isDragging = false;
+            if (Math.abs(dx) > 40) {
+                const currentIndex = parseInt(container.dataset.carouselIndex || '0');
+                setIndex(currentIndex + (dx < 0 ? 1 : -1));
+            }
+            startTimer(); // Lanjutkan timer
+        });
+
+        window.addEventListener('hashchange', () => { if (heroCarouselTimer) clearInterval(heroCarouselTimer); }, { once: true });
+    }
+
+    buildSlides(); // Selalu panggil buildSlides saat inisialisasi
 }
 
 function initJurnalPage() {
@@ -423,6 +520,9 @@ function initJurnalPage() {
     journalObserverInstance = null;
     if (unsubscribeLiveQuery) unsubscribeLiveQuery.unsubscribe();
     unsubscribeLiveQuery = null;
+    // --- PERUBAHAN: Hapus timer lama saat init ---
+    if (heroCarouselTimer) clearInterval(heroCarouselTimer);
+    heroCarouselTimer = null;
 
     appState.pagination.jurnal_harian = { isLoading: false, hasMore: true, page: 0 };
     appState.pagination.jurnal_per_pekerja = { isLoading: false, hasMore: true, page: 0 };
@@ -444,23 +544,47 @@ function initJurnalPage() {
         id: 'jurnal-tabs', 
         tabs: tabsData, 
         activeTab: initialActiveTab, 
-        customClasses: 'tabs-underline three-tabs' // <-- Diubah menjadi three-tabs
+        customClasses: 'tabs-underline three-tabs' 
     });
 
     const heroHTML = `
         <div id="jurnal-hero-carousel" class="dashboard-hero-carousel hero-journal" style="position:relative;">
         </div>`;
 
+    // --- PERUBAHAN: Filter Tanggal (Labels Dihapus) ---
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+    const todayStr = today.toISOString().slice(0, 10);
+
+    const dateFilterHTML = `
+        <div class="jurnal-date-filter-bar rekap-filters" id="jurnal-date-filters">
+            <div class="form-group">
+                <input type="date" id="jurnal-start-date" value="${firstDayOfMonth}">
+            </div>
+            <div class="form-group">
+                <input type="date" id="jurnal-end-date" value="${todayStr}">
+            </div>
+        </div>
+    `;
+    // --- AKHIR PERUBAHAN ---
+
     container.innerHTML = `
         <div class="content-panel">
             <div class="panel-header">
                 ${pageToolbarHTML}
                 ${heroHTML}
+                <div id="jurnal-filter-container">
+                    ${dateFilterHTML}
+                </div>
                 ${tabsHTML}
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content"></div>
         </div>
     `;
+
+    // --- PERUBAHAN: Kontrol visibilitas filter ---
+    const filterContainer = container.querySelector('#jurnal-filter-container');
+
     const tabsContainer = container.querySelector('#jurnal-tabs');
     if (tabsContainer) {
         tabsContainer.addEventListener('click', (e) => {
@@ -469,24 +593,58 @@ function initJurnalPage() {
                 const currentActive = tabsContainer.querySelector('.sub-nav-item.active');
                 if(currentActive) currentActive.classList.remove('active');
                 tabButton.classList.add('active');
-                appState.activeSubPage.set('jurnal', tabButton.dataset.tab);
-                renderJurnalContent();
+                const newView = tabButton.dataset.tab;
+                appState.activeSubPage.set('jurnal', newView);
+                
+                // --- Logika Show/Hide ---
+                if (newView === 'harian') {
+                    filterContainer.style.display = 'none';
+                } else {
+                    filterContainer.style.display = 'block';
+                }
+                // --- Akhir Logika ---
+                
+                renderJurnalContent(false); // Muat ulang konten (yang kini punya logika filter)
+                initJurnalHeroCarousel(); // Muat ulang hero (yang kini punya logika filter)
             }
         }, { signal: listenerSignal });
     }
+    
+    // --- Set Visibilitas Awal ---
+    if (initialActiveTab === 'harian') {
+        filterContainer.style.display = 'none';
+    }
+    // --- AKHIR PERUBAHAN ---
+
+
+    // --- PERUBAHAN: Pastikan listener tanggal me-render ulang KEDUA bagian ---
+    const dateFiltersContainer = container.querySelector('#jurnal-date-filters');
+    if (dateFiltersContainer) {
+        dateFiltersContainer.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target.type === 'date') {
+                renderJurnalContent(false); 
+                initJurnalHeroCarousel(); // Ini sudah benar
+            }
+        }, { signal: listenerSignal });
+    }
+    // --- AKHIR PERUBAHAN ---
 
     journalObserverInstance = initInfiniteScroll('#sub-page-content');
     
     if (unsubscribeLiveQuery) unsubscribeLiveQuery.unsubscribe();
     
+    // --- PERUBAHAN: Pastikan liveQuery juga me-render ulang hero ---
     unsubscribeLiveQuery = liveQueryMulti(
         ['attendanceRecords', 'workers', 'bills'],
         (changedKeys) => {
             if (appState.activePage === 'jurnal') {
                 renderJurnalContent(false);
+                initJurnalHeroCarousel(); // <-- Pastikan ini dipanggil
             }
         }
     );
+    // --- AKHIR PERUBAHAN ---
 
     emit('ui.jurnal.renderContent');
     initJurnalHeroCarousel();
@@ -510,6 +668,10 @@ function initJurnalPage() {
             journalObserverInstance = null;
         }
         cleanupInfiniteScroll();
+        
+        // --- TAMBAHAN: Hapus timer carousel ---
+        if (heroCarouselTimer) clearInterval(heroCarouselTimer);
+        heroCarouselTimer = null;
         
         off('app.unload.jurnal', cleanupJurnal);
     };
