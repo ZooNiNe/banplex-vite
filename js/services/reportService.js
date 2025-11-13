@@ -3,7 +3,7 @@ import { appState } from "../state/appState.js";
 import { settingsDocRef, projectsCol, billsCol, suppliersCol } from "../config/firebase.js";
 import { getDoc } from "../config/firebase.js";
 import { toast } from "../ui/components/toast.js";
-import { getJSDate } from "../utils/helpers.js";
+import { getJSDate, parseLocalDate } from "../utils/helpers.js";
 import { fetchAndCacheData } from "./data/fetch.js";
 import { $ } from "../utils/dom.js";
 import { fmtIDR as fmtIDRFormat } from "../utils/formatters.js";
@@ -210,69 +210,120 @@ async function generatePdfReport(config) {
     }
 }
 
-// reportService.js
 async function _prepareUpahPekerjaDataForPdf() {
-    const startDateStr = $('#report-start-date')?.value;
-    const endDateStr = $('#report-end-date')?.value;
-    if (!startDateStr || !endDateStr) {
-        toast('error', 'Silakan pilih rentang tanggal laporan terlebih dahulu.');
-        return null;
-    }
-    const startDate = new Date(startDateStr);
-    const endDate = new Date(endDateStr);
-    endDate.setHours(23, 59, 59, 999);
-    
-    // --- AWAL PERUBAHAN ---
-    // 1. Ambil ID pekerja dari filter. Asumsi ID elemen adalah 'report-worker-id'
-    const workerId = $('#report-worker-id')?.value || 'all';
-
-    let recordsInRange = (appState.attendanceRecords || [])
-        .filter(rec => {
-            if (rec.isDeleted) return false;
-            const recDate = getJSDate(rec.date);
-            return rec.status === 'completed' && recDate >= startDate && recDate <= endDate;
-        });
-        
-    // 2. Terapkan filter pekerja jika dipilih
-    if (workerId !== 'all') {
-        recordsInRange = recordsInRange.filter(rec => rec.workerId === workerId);
-    }
-    
-    recordsInRange.sort((a,b) => getJSDate(a.date) - getJSDate(b.date));
-
-    if (recordsInRange.length === 0) return null;
-    
-    // 3. Dapatkan nama pekerja untuk subtitle
-    const workerName = workerId !== 'all' 
-        ? (appState.workers.find(w => w.id === workerId)?.workerName || 'Pekerja Tidak Ditemukan') 
-        : 'Semua Pekerja';
-        
+    // --- PERUBAHAN: Mengambil filter dari DOM, sesuai file asli Anda ---
+    const startDateStr = $('#report-start-date')?.value;
+    const endDateStr = $('#report-end-date')?.value;
+    if (!startDateStr || !endDateStr) {
+        toast('error', 'Silakan pilih rentang tanggal laporan terlebih dahulu.');
+        return null;
+    }
+    // --- PERUBAHAN: Menggunakan parseLocalDate (sesuai import di file Anda) ---
+    const startDate = parseLocalDate(startDateStr); 
+    const endDate = parseLocalDate(endDateStr); 
+    const workerId = $('#report-worker-id')?.value || 'all'; // Ambil workerId
+    endDate.setHours(23, 59, 59, 999);
     // --- AKHIR PERUBAHAN ---
 
-    const bodyRows = recordsInRange.map(rec => {
-        const worker = appState.workers.find(w => w.id === rec.workerId);
-        const project = appState.projects.find(p => p.id === rec.projectId);
-        const statusText = (rec.attendanceStatus === 'full_day') ? 'Hadir' : '1/2 Hari';
-        return [
-            getJSDate(rec?.date).toLocaleDateString('id-ID'),
-            worker?.workerName || '-',
-            project?.projectName || '-',
-            statusText,
-            fmtIDRFormat(rec.totalPay || 0),
-            rec.isPaid ? 'Lunas' : 'Belum Dibayar'
-        ];
-    });
+    let recordsInRange = (appState.attendanceRecords || [])
+        .filter(rec => {
+            if (rec.isDeleted) return false;
+            const recDate = getJSDate(rec.date);
+            // --- PERUBAHAN: Filter hanya absensi yang hadir/setengah hari ---
+            const isPresent = (rec.attendanceStatus === 'full_day' || rec.attendanceStatus === 'half_day');
+            // Pastikan status 'completed' tidak lagi digunakan untuk filter ini
+            return isPresent && recDate >= startDate && recDate <= endDate && (rec.totalPay || 0) > 0;
+        });
+        
+    if (workerId !== 'all') {
+        recordsInRange = recordsInRange.filter(rec => rec.workerId === workerId);
+    }
+    
+    recordsInRange.sort((a,b) => getJSDate(a.date) - getJSDate(b.date));
 
-    return {
-        title: 'Laporan Rincian Upah Pekerja',
-        // 4. Perbarui subtitle
-        subtitle: `Pekerja: ${workerName} | Periode: ${startDate.toLocaleDateString('id-ID')} s/d ${endDate.toLocaleDateString('id-ID')}`,
-        filename: `Laporan-Upah-${new Date().toISOString().slice(0, 10)}.pdf`,
-        sections: [{
-            headers: ["Tanggal", "Pekerja", "Proyek", "Status", "Upah", "Status Bayar"],
-            body: bodyRows
-        }]
+    if (recordsInRange.length === 0) return null;
+    
+    // --- TAMBAHAN: Inisialisasi Total ---
+    let totalUpah = 0;
+    let totalHari = 0;
+
+    // --- PERUBAHAN: Buat Map dari tagihan untuk pencarian cepat ---
+    const billsMap = new Map((appState.bills || []).map(b => [b.id, b]));
+
+    const bodyRows = recordsInRange.map(rec => {
+        const worker = appState.workers.find(w => w.id === rec.workerId);
+        const project = appState.projects.find(p => p.id === rec.projectId);
+        const statusText = (rec.attendanceStatus === 'full_day') ? 'Hadir' : '1/2 Hari';
+        
+        // --- PERUBAHAN: Logika Status Bayar Baru ---
+        let statusBayarText = 'Belum Direkap'; // Default
+        if (rec.billId) {
+            // 1. Ada tagihan terkait
+            const bill = billsMap.get(rec.billId);
+            if (bill) {
+                // 2. Cek status tagihan
+                if (bill.status === 'paid') {
+                    statusBayarText = 'Lunas';
+                } else {
+                    statusBayarText = 'Belum Lunas'; // Tagihan ada, tapi belum lunas
+                }
+            } else {
+                // Punya billId tapi tagihan tidak ditemukan (data anomali)
+                statusBayarText = 'Belum Lunas'; 
+            }
+        }
+        // --- AKHIR PERUBAHAN STATUS ---
+
+        // --- TAMBAHAN: Akumulasi Total ---
+        totalUpah += rec.totalPay || 0;
+        if (rec.attendanceStatus === 'full_day') {
+            totalHari += 1;
+        } else if (rec.attendanceStatus === 'half_day') {
+            totalHari += 0.5;
+        }
+        // --- AKHIR TAMBAHAN TOTAL ---
+
+        return [
+            getJSDate(rec?.date).toLocaleDateString('id-ID'),
+            worker?.workerName || '-',
+            project?.projectName || '-',
+            statusText,
+            fmtIDRFormat(rec.totalPay || 0),
+            statusBayarText // Gunakan status baru
+        ];
+    });
+    
+
+    // --- PERUBAHAN: Membuat subtitle di sini agar (generatePdfReport) bisa menggunakannya ---
+    const workerName = workerId !== 'all' ? (appState.workers.find(w => w.id === workerId)?.workerName || '-') : 'Semua Pekerja';
+    const subtitle = `Pekerja: ${workerName} | Periode: ${startDate.toLocaleDateString('id-ID')} s/d ${endDate.toLocaleDateString('id-ID')}`;
+
+    // --- TAMBAHAN: Buat Bagian (Section) untuk Total (DI ATAS) ---
+    const summarySection = {
+        sectionTitle: 'Ringkasan Total', // Judul untuk tabel total
+        headers: ["Deskripsi", { content: 'Total', styles: { halign: 'right' } }],
+        body: [
+            ["Total Hari Kerja", { content: `${totalHari.toLocaleString('id-ID')} Hari`, styles: { halign: 'right' } }],
+            ["Total Upah Gaji", { content: fmtIDRFormat(totalUpah), styles: { halign: 'right' } }]
+        ],
+        foot: [] // Kosongkan footer
     };
+    // --- AKHIR TAMBAHAN ---
+
+    return {
+        title: 'Laporan Rincian Upah Pekerja',
+        subtitle: subtitle, // <-- PERUBAHAN: Menambahkan subtitle
+        filename: `Laporan-Upah-${new Date().toISOString().slice(0, 10)}.pdf`,
+        sections: [
+            summarySection, // <-- PERUBAHAN: Total ditaruh di atas
+            {
+                sectionTitle: 'Rincian Absensi', // <-- Judul untuk tabel rincian
+                headers: ["Tanggal", "Pekerja", "Proyek", "Status", "Upah", "Status"],
+                body: bodyRows,
+                foot: [] // <-- PERUBAHAN: Footer dikosongkan
+            }
+        ]
+    };
 }
 
 async function _prepareMaterialSupplierDataForPdf() {
