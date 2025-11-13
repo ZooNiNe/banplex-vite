@@ -435,6 +435,7 @@ export async function handleSaveAllPendingAttendance() {
     });
 }
 
+// Ganti fungsi ini di attendanceService.js
 async function _executeSaveAttendance(dateStr) {
     const pending = appState.pendingAttendance;
     const dateObj = parseLocalDate(dateStr);
@@ -449,18 +450,33 @@ async function _executeSaveAttendance(dateStr) {
     let skippedCount = 0;
 
     try {
-        const existingRecords = await localDB.attendance_records
-            .where('date').between(startOfDay, endOfDay)
-            .and(r => r.isDeleted !== 1)
+        // --- GUARD CANGGIH 1: PENGAMBILAN DATA ANTI-BUG ---
+        // Ambil SEMUA record dan filter di JS, bukan mengandalkan query Dexie yang rapuh
+        const allDbRecords = await localDB.attendance_records
+            .where('isDeleted').notEqual(1) 
             .toArray();
+        
+        // Filter tanggal secara manual di JavaScript untuk akurasi 100%
+        const existingRecords = allDbRecords.filter(rec => {
+            if (!rec.date) return false;
+            const recDate = getJSDate(rec.date); 
+            if (isNaN(recDate.getTime())) return false; 
+            return recDate >= startOfDay && recDate <= endOfDay;
+        });
+        // --- AKHIR GUARD 1 ---
             
         const existingRecordsByWorker = new Map();
         existingRecords.forEach(r => {
+            // --- GUARD CANGGIH 2: Simpan SEBAGAI LIST ---
+            // Ini untuk menangani jika sudah ada duplikat di database
             const list = existingRecordsByWorker.get(r.workerId) || [];
             list.push(r);
             existingRecordsByWorker.set(r.workerId, list);
         });
 
+        // --- INI ADALAH LOGIKA "NUKE AND PAVE" (Pemusnahan dan Pembangunan Ulang) ---
+
+        // 1. Proses Pekerja dari "Pending" (yang diubah manual)
         for (const [workerId, data] of pending.entries()) {
             const worker = allWorkers.find(w => w.id === workerId);
             if (!worker) {
@@ -468,12 +484,13 @@ async function _executeSaveAttendance(dateStr) {
                 continue;
             }
             
-            const entries = Array.isArray(data) ? data : [data];
-            
+            // Ambil SEMUA rekaman lama, tandai untuk dihapus (Nuke)
             const oldRecords = existingRecordsByWorker.get(workerId) || [];
             oldRecords.forEach(r => dbIdsToSoftDelete.add(r.id));
             
+            const entries = Array.isArray(data) ? data : [data];
             for (const entry of entries) {
+                // Buat rekaman baru (Pave)
                 const isAbsent = entry.status === 'absent';
                 recordsToSave.push({
                     id: generateUUID(),
@@ -495,10 +512,11 @@ async function _executeSaveAttendance(dateStr) {
             }
         }
 
+        // 2. Proses Pekerja dari "Selection Mode" (yang dicentang)
         const projectId = appState.manualAttendanceSelectedProjectId;
         if (projectId) {
             for (const workerId of selectedWorkerIds) {
-                if (pendingWorkerIds.has(workerId)) continue; 
+                if (pendingWorkerIds.has(workerId)) continue; // Sudah diproses
 
                 const worker = allWorkers.find(w => w.id === workerId);
                 if (!worker) {
@@ -515,9 +533,11 @@ async function _executeSaveAttendance(dateStr) {
                     continue; 
                 }
 
+                // Ambil SEMUA rekaman lama, tandai untuk dihapus (Nuke)
                 const oldRecords = existingRecordsByWorker.get(workerId) || [];
                 oldRecords.forEach(r => dbIdsToSoftDelete.add(r.id));
 
+                // Buat rekaman baru (Pave)
                 recordsToSave.push({
                     id: generateUUID(),
                     workerId,
@@ -538,13 +558,16 @@ async function _executeSaveAttendance(dateStr) {
             }
         }
 
+        // 3. Proses SEMUA pekerja sisanya (yang tidak disentuh) -> Tandai sebagai Absen
         for (const worker of allWorkers) {
-            if (pendingWorkerIds.has(worker.id)) continue;
-            if (selectedWorkerIds.has(worker.id)) continue;
+            if (pendingWorkerIds.has(worker.id)) continue; // Sudah diproses
+            if (selectedWorkerIds.has(worker.id)) continue; // Sudah diproses
             
+            // Ambil SEMUA rekaman lama, tandai untuk dihapus (Nuke)
             const oldRecords = existingRecordsByWorker.get(worker.id) || [];
             oldRecords.forEach(r => dbIdsToSoftDelete.add(r.id));
             
+            // Buat rekaman 'Absen' baru (Pave)
             recordsToSave.push({
                 id: generateUUID(),
                 workerId: worker.id,
@@ -564,16 +587,19 @@ async function _executeSaveAttendance(dateStr) {
             });
         }
         
+        // Eksekusi Transaksi Nuke and Pave
         await localDB.transaction('rw', localDB.attendance_records, localDB.outbox, async () => {
+            // Fase Nuke (Soft Delete)
             if (dbIdsToSoftDelete.size > 0) {
                 const ids = Array.from(dbIdsToSoftDelete);
                 const deleteUpdate = { isDeleted: 1, syncState: 'pending_update', updatedAt: new Date() };
                 await localDB.attendance_records.where('id').anyOf(ids).modify(deleteUpdate);
                 for (const id of ids) {
-                await queueOutbox({ table: 'attendance_records', docId: id, op: 'upsert', payload: { id, isDeleted: 1 }, priority: 5 });
+                    await queueOutbox({ table: 'attendance_records', docId: id, op: 'upsert', payload: { id, isDeleted: 1 }, priority: 5 });
                 }
             }
             
+            // Fase Pave (Bulk Add)
             if (recordsToSave.length > 0) {
                 await localDB.attendance_records.bulkAdd(recordsToSave);
                 for (const record of recordsToSave) {
@@ -608,7 +634,7 @@ async function _executeSaveAttendance(dateStr) {
     } catch (error) {
         console.error("Gagal menyimpan absensi manual (v3):", error);
         toast('error', `Gagal menyimpan absensi: ${error.message}`);
-        return { success: false, skipped: entries ? entries.length : 0, summary: null }; // <--- Pastikan summary: null ada di sini
+        return { success: false, skipped: skippedCount, summary: null }; // <-- Modifikasi di sini
     }
 }
 
@@ -998,6 +1024,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
     }
 }
 
+// Ganti juga fungsi ini di attendanceService.js
 export async function handleSaveManualAttendance(attendanceData) {
     const { date, projectId, entries } = attendanceData;
 
@@ -1015,8 +1042,7 @@ export async function handleSaveManualAttendance(attendanceData) {
     try {
         await localDB.transaction('rw', localDB.attendance_records, localDB.outbox, async () => {
             
-            // --- INI ADALAH FIX UTAMA ---
-            // Ambil SEMUA record dan filter di JS
+            // --- GUARD CANGGIH 1: PENGAMBILAN DATA ANTI-BUG ---
             const allDbRecords = await localDB.attendance_records
                 .where('isDeleted').notEqual(1) 
                 .toArray();
@@ -1028,19 +1054,29 @@ export async function handleSaveManualAttendance(attendanceData) {
                 if (isNaN(recDate.getTime())) return false; 
                 return recDate >= startOfDay && recDate <= endOfDay;
             });
-            // --- AKHIR FIX ---
+            // --- AKHIR GUARD 1 ---
 
-            const recordsForThisProject = new Map(); 
+            // --- GUARD CANGGIH 2: Pemetaan Cerdas ---
+            // Pisahkan rekaman untuk proyek ini DAN proyek lain
+            const recordsForThisProjectByWorker = new Map(); 
             const recordsElsewhere = new Map(); 
 
             allRecordsOnDate.forEach(rec => {
                 if (rec.projectId === projectId) {
-                    recordsForThisProject.set(rec.workerId, rec);
+                    // Simpan SEMUA record untuk proyek ini
+                    const list = recordsForThisProjectByWorker.get(rec.workerId) || [];
+                    list.push(rec);
+                    recordsForThisProjectByWorker.set(rec.workerId, list);
                 } else if (rec.attendanceStatus !== 'absent') {
+                    // Catat jika pekerja hadir di proyek lain
                     recordsElsewhere.set(rec.workerId, rec);
                 }
             });
 
+            const dbIdsToSoftDelete = new Set();
+            const recordsToSave = [];
+
+            // --- LOGIKA "NUKE AND PAVE" (Pemusnahan dan Pembangunan Ulang) ---
             for (const entry of entries) {
                 const { id: entryId, workerId, workerName, status, role, pay, customWage, projectId: entryProjectId } = entry;
                 
@@ -1048,86 +1084,53 @@ export async function handleSaveManualAttendance(attendanceData) {
                                        : (status === '1/2 Hari' || status === 'half_day') ? 'half_day' 
                                        : 'absent';
 
+                // --- GUARD CANGGIH 3: Pengecekan Lintas Proyek ---
                 if (attendanceStatus !== 'absent' && recordsElsewhere.has(workerId)) {
                     skippedWorkers.add(workerName);
-                    continue; 
+                    continue; // Lewati, jangan simpan. Dia sudah diabsen di tempat lain.
                 }
 
-                let existingRecord = null;
-                if (entryId) {
-                    existingRecord = allRecordsOnDate.find(r => r.id === entryId);
-                }
-                if (!existingRecord) {
-                    existingRecord = recordsForThisProject.get(workerId);
-                }
+                // Ambil SEMUA rekaman lama untuk worker ini DI PROYEK INI
+                const oldRecords = recordsForThisProjectByWorker.get(workerId) || [];
                 
-                if (attendanceStatus !== 'absent') {
-                    const dataToSave = {
-                        attendanceStatus: attendanceStatus,
-                        totalPay: pay,
-                        jobRole: role,
-                        customWage: customWage,
-                        projectId: entryProjectId, 
-                        isDeleted: 0,
-                        type: 'manual',
-                        status: 'completed',
-                        updatedAt: new Date()
-                    };
-
-                    if (existingRecord) {
-                        await localDB.attendance_records.update(existingRecord.id, { ...dataToSave, syncState: 'pending_update' });
-                        await queueOutbox({ table: 'attendance_records', docId: existingRecord.id, op: 'upsert', payload: { id: existingRecord.id, ...dataToSave }, priority: 6 });
-                    } else {
-                        const newRecord = {
-                            ...dataToSave,
-                            id: generateUUID(),
-                            workerId,
-                            workerName,
-                            date: dateObj,
-                            isPaid: false,
-                            createdAt: new Date(),
-                            syncState: 'pending_create'
-                        };
-                        await localDB.attendance_records.add(newRecord);
-                        await queueOutbox({ table: 'attendance_records', docId: newRecord.id, op: 'upsert', payload: newRecord, priority: 6 });
-                    }
-                } else { 
-                    if (existingRecord) {
-                        if (existingRecord.attendanceStatus !== 'absent') {
-                            const updateData = {
-                                attendanceStatus: 'absent',
-                                totalPay: 0,
-                                jobRole: null,
-                                customWage: null,
-                                projectId: null, 
-                                isDeleted: 1, 
-                                syncState: 'pending_update',
-                                updatedAt: new Date()
-                            };
-                            await localDB.attendance_records.update(existingRecord.id, updateData);
-                            await queueOutbox({ table: 'attendance_records', docId: existingRecord.id, op: 'upsert', payload: { id: existingRecord.id, ...updateData }, priority: 5 });
-                        }
-                    } else {
-                        const newRecord = {
-                            id: generateUUID(),
-                            workerId,
-                            workerName,
-                            projectId: null, 
-                            date: dateObj,
-                            attendanceStatus: 'absent',
-                            totalPay: 0,
-                            jobRole: null,
-                            customWage: null,
-                            isPaid: false,
-                            type: 'manual',
-                            status: 'completed',
-                            createdAt: new Date(),
-                            isDeleted: 0, 
-                            syncState: 'pending_create'
-                        };
-                        await localDB.attendance_records.add(newRecord);
-                        await queueOutbox({ table: 'attendance_records', docId: newRecord.id, op: 'upsert', payload: newRecord, priority: 6 });
-                    }
+                // Tandai SEMUA untuk dihapus (Nuke)
+                oldRecords.forEach(r => dbIdsToSoftDelete.add(r.id));
+                
+                // Buat SATU rekaman baru (Pave)
+                const newRecord = {
+                    id: generateUUID(),
+                    workerId,
+                    workerName,
+                    projectId: attendanceStatus === 'absent' ? null : entryProjectId,
+                    jobRole: attendanceStatus === 'absent' ? null : role,
+                    date: dateObj,
+                    attendanceStatus: attendanceStatus,
+                    totalPay: attendanceStatus === 'absent' ? 0 : pay,
+                    customWage: attendanceStatus === 'absent' ? null : (customWage || null),
+                    isPaid: false,
+                    type: 'manual',
+                    status: 'completed',
+                    createdAt: new Date(),
+                    isDeleted: 0,
+                    syncState: 'pending_create'
+                };
+                recordsToSave.push(newRecord);
+            }
+            
+            // Eksekusi Transaksi Nuke and Pave
+            if (dbIdsToSoftDelete.size > 0) {
+                const ids = Array.from(dbIdsToSoftDelete);
+                const deleteUpdate = { isDeleted: 1, syncState: 'pending_update', updatedAt: new Date() };
+                await localDB.attendance_records.where('id').anyOf(ids).modify(deleteUpdate);
+                for (const id of ids) {
+                    await queueOutbox({ table: 'attendance_records', docId: id, op: 'upsert', payload: { id, isDeleted: 1 }, priority: 5 });
+                }
+            }
+            
+            if (recordsToSave.length > 0) {
+                await localDB.attendance_records.bulkAdd(recordsToSave);
+                for (const record of recordsToSave) {
+                    await queueOutbox({ table: 'attendance_records', docId: record.id, op: 'upsert', payload: record, priority: 6 });
                 }
             }
         });
@@ -1285,23 +1288,19 @@ export async function openManualAbsenceStatusPanel(selectedWorkerIds = []) {
                     appState.selectionMode.selectedIds.clear();
                     emit('ui.selection.changed'); 
                 }                
-                resetFormDirty();
+                
+                // --- AWAL PERBAIKAN ---
+                resetFormDirty(); // <-- 1. Reset status 'dirty' SEBELUM ditutup
+                // --- AKHIR PERBAIKAN ---
+                
                 emit('ui.absensi.renderManualForm'); 
                 emit('ui.absensi.updateFooter'); 
                 
-                closeModal(modalInstance); 
+                closeModal(modalInstance); // <-- 2. Sekarang tutup tanpa peringatan
                 controller.abort();
                 if (modalInstance) modalInstance.remove();
 
-            }, { signal: controller.signal }); 
-
-
-            modalInstance.querySelector('[data-action="history-back"]')?.addEventListener('click', () => {
-                closeModal(modalInstance);
-                controller.abort();
-                if (modalInstance) modalInstance.remove();
             }, { signal: controller.signal });
-
         }
     } catch (e) {
         console.error("Error opening manual absence panel:", e);
@@ -1514,12 +1513,14 @@ export async function _openWorkerDefaultsModal(workerId, workerName) {
                 }
 
                 toast('success', `Pengaturan untuk ${workerName} disimpan.`);
-                closeModal(modal);
+                
+                resetFormDirty(); // 1. Reset 'dirty' SEBELUM menutup modal
+                closeModal(modal); // 2. Tutup modal 'popup'
+
                 requestSync({ silent: true });
                 
                 if (appState.activePage === 'absensi') {
                     appState.absensi.manualListNeedsUpdate = true;
-                    handleOpenAttendanceSettings(); 
                     emit('ui.absensi.renderManualForm'); 
                 }
                 

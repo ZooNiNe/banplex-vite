@@ -3,7 +3,8 @@ import { appState } from "../../state/appState.js";
 import { db, expensesCol, billsCol, incomesCol, fundingSourcesCol, attendanceRecordsCol, stockTransactionsCol, materialsCol, logsCol, membersCol, projectsCol, suppliersCol, workersCol, staffCol, professionsCol, opCatsCol, matCatsCol, otherCatsCol, fundingCreditorsCol, commentsCol, settingsDocRef } from "../../config/firebase.js";
 import { doc, runTransaction, writeBatch, getDocs, getDoc, setDoc, updateDoc, deleteDoc, addDoc, query, where, orderBy, serverTimestamp, increment, collection, Timestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { toast } from "../../ui/components/toast.js";
-import { _isQuotaExceeded, _setQuotaExceededFlag, syncFromServer } from "../syncService.js";
+// --- PERUBAHAN: Menambahkan 'requestSync' ---
+import { _isQuotaExceeded, _setQuotaExceededFlag, syncFromServer, requestSync } from "../syncService.js";
 import { localDB, loadAllLocalDataToState } from "../localDbService.js";
 import { fetchAndCacheData } from "./fetch.js";
 import { showDetailPane } from "../../ui/components/modal.js";
@@ -15,6 +16,8 @@ function createIcon(iconName, size = 18, classes = '') {
         functions: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sigma ${classes}"><path d="M18 7V4H6l6 8-6 8h12v-3"/></svg>`,
         'spray-can': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-spray-can ${classes}"><path d="M15.228 17.02c.797-.832 1.34-1.93 1.39-3.155.07-.97.19-2.083.47-3.266C17.68 7.9 18.73 6.18 19 5a2.5 2.5 0 0 0-2.5-2.5c-1.18 0-2.9 1.05-5.606 1.68-.088.016-.176.03-.265.044-.954.127-2.15.267-3.324.47-1.186.204-2.227.76-3.024 1.558C3.47 7.03 3 8.13 3 9.255c-.048 1.225.494 2.322 1.29 3.154.912.956 2.062 1.59 3.322 1.766 1.173.18 2.348.3 3.394.444.09.016.18.028.27.042 2.705.63 4.425 1.68 5.605 1.68A2.5 2.5 0 0 0 21 19c-.27-1.18-1.32-2.9-1.92-5.605a22.5 22.5 0 0 0-.47-3.266"/><path d="m14 6 1-1"/><path d="M8.5 2.76a10.4 10.4 0 0 1 2.91 1.74 5.7 5.7 0 0 1 1.74 2.91"/></svg>`,
         'alert-octagon': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-alert-octagon ${classes}"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>`,
+        // --- TAMBAHAN: Ikon untuk tombol baru ---
+        'upload-cloud': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-upload-cloud ${classes}"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>`,
     };
     return icons[iconName] || '';
 }
@@ -58,6 +61,9 @@ export async function _safeFirestoreWrite(writeFunction, successMessage, failure
 export function openToolsGrid() {
     const tools = [
         { label: 'Statistik & Backup', action: 'open-storage-stats', icon: 'storage', role: ['Owner', 'Editor'] },
+        // --- TAMBAHAN: Tombol sinkronisasi manual ---
+        { label: 'Push Data Lokal ke Server', action: 'manual-push-sync', icon: 'upload-cloud', role: ['Owner', 'Editor'] },
+        // ---
         { label: 'Perbaiki Absensi Ganda', action: 'fix-stuck-attendance', icon: 'healing', role: ['Owner'] },
         { label: 'Hitung Ulang Penggunaan Material', action: 'recalculate-usage', icon: 'functions', role: ['Owner'] },
         { label: 'Bersihkan Data Server', action: 'server-cleanup', icon: 'spray-can', role: ['Owner'] },
@@ -81,6 +87,31 @@ export function openToolsGrid() {
         title: 'Tools Aplikasi',
         content: gridHTML,
     });
+
+    // --- TAMBAHAN: Listener untuk tombol baru ---
+    // Kita tambahkan listener setelah panel ditampilkan
+    setTimeout(() => {
+        // Cari panel detail yang aktif
+        const pane = document.querySelector('#detail-pane.detail-view-active, #detail-pane.detail-pane-open, #detail-pane');
+        if (!pane) {
+            console.warn('Tidak dapat menemukan panel detail untuk melampirkan listener tool admin.');
+            return;
+        }
+
+        const pushSyncButton = pane.querySelector('[data-action="manual-push-sync"]');
+        if (pushSyncButton && !pushSyncButton._listenerAttached) {
+            pushSyncButton.addEventListener('click', () => {
+                toast('info', 'Memulai sinkronisasi manual ke server...');
+                // Memanggil requestSync (non-silent) untuk memicu syncToServer
+                requestSync({ silent: false })
+                    .catch(err => {
+                        console.error('Sinkronisasi manual gagal:', err);
+                        toast('error', 'Gagal memulai sinkronisasi manual.');
+                    });
+            });
+            pushSyncButton._listenerAttached = true; // Tandai agar listener tidak ganda
+        }
+    }, 100); // Penundaan singkat untuk memastikan panel di-render
 }
 
 
@@ -484,4 +515,3 @@ export const adminPanelService = {
 if (typeof window !== 'undefined') {
     window.adminService = Object.assign({}, window.adminService || {}, adminPanelService);
 }
-
