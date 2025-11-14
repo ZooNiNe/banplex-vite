@@ -202,17 +202,31 @@
    font-size: 0.85rem;
    color: var(--text-dim);
  }
- .log-item-timestamp {
-   flex-shrink: 0;
-   font-size: 0.8rem;
-   color: var(--text-dim);
-   align-self: flex-start;
- }
+.log-item-timestamp {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  align-self: flex-start;
+}
 
- .jurnal-list {
-   display: flex;
-   flex-direction: column;
-   gap: 0;
+.log-item-warning {
+  border-left: 4px solid #f5a524;
+  background: var(--surface-muted);
+  position: relative;
+}
+
+.log-item-warning .log-item-title {
+  color: #f5a524;
+}
+
+.log-item-warning .log-item-timestamp {
+  color: #f9c97a;
+}
+
+.jurnal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
  }
 
  .jurnal-item-header {
@@ -255,9 +269,9 @@
    min-width: 0;
    gap: 0.2rem;
  }
- .dense-list-item {
-     display: flex;
-     align-items: center;
+.dense-list-item {
+    display: flex;
+    align-items: center;
      justify-content: space-between;
      gap: 1rem;
  }
@@ -484,3 +498,43 @@
      padding: 1.5rem;
      margin-top: 1rem;
  }
+.log-item-warning::after {
+  content: 'Pending Quota';
+  position: absolute;
+  top: .35rem;
+  right: .65rem;
+  font-size: .65rem;
+  font-weight: 700;
+  color: #f5a524;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.pending-warning-banner {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  padding: .75rem;
+  margin-bottom: .65rem;
+  border-radius: var(--radius);
+  border: 1px dashed #f5a524;
+  background: color-mix(in srgb, #f5a524 12%, transparent);
+  color: var(--text);
+}
+
+.pending-warning-banner strong {
+  color: #7a4d08;
+  display: block;
+  font-size: .9rem;
+}
+
+.pending-warning-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.pending-warning-actions .btn {
+  padding: .35rem .75rem;
+  font-size: .75rem;
+}

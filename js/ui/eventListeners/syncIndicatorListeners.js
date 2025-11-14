@@ -1,7 +1,7 @@
 import { emit, on } from "../../state/eventBus.js";
 import { appState } from "../../state/appState.js";
 import { updateSyncIndicator } from "../../services/syncService.js";
-import { toast, hideToast } from "../components/toast.js";
+import { showLoadingModal, hideLoadingModal, updateLoadingModal } from "../components/modal.js";
 
 let __capsuleTimer = null;
 let __lastNet = (typeof navigator !== 'undefined' && navigator.onLine) ? 'online' : 'offline';
@@ -35,23 +35,20 @@ export function initializeSyncIndicatorListeners() {
                     : Math.round(s.syncProgress?.percentage || 0);
                 const pctClamped = Math.max(0, Math.min(100, pct));
 
-                // PERBAIKAN 2: Hanya tampilkan toast jika tidak silent
                 if (!silent) {
-                    // Show/update syncing snackbar with percentage and keep it persistent
-                    toast('syncing', `Sinkron ${pctClamped}%`, 0, { forceSnackbar: true });
-                } else {
-                    // Jika silent, pastikan toast sync (jika ada) disembunyikan
-                    try { hideToast(); } catch (_) {}
+                    if (!document.getElementById('global-loading-modal')) {
+                        showLoadingModal('Sinkronisasi data...', pctClamped);
+                    } else {
+                        updateLoadingModal('Sinkronisasi data...', pctClamped);
+                    }
                 }
 
-                // Hide header capsule during syncing (we moved indicator to snackbar)
                 if (capsule) hideCapsule(capsule);
                 if (__capsuleTimer) { clearTimeout(__capsuleTimer); __capsuleTimer = null; }
                 return;
             }
 
-            // Not syncing anymore: ensure snackbar is closed
-            try { hideToast(); } catch (_) {}
+            hideLoadingModal();
 
             const nowState = online ? 'online' : 'offline';
             if (nowState !== __lastNet) {

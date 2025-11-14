@@ -26,6 +26,9 @@ import { forceSaveFormDraft } from "../utils/formPersistence.js";
 import { getRecycleBinHeaderOverflowActions } from './pages/recycleBin.js';
 import { getHeaderOverflowActions, getItemActions, displayActions, displayBottomSheetActions } from "./actionMenuUtils.js";
 import { attachBottomSheetActionListeners } from "./eventListeners/dynamicElementListeners.js";
+import { localDB } from "../services/localDbService.js";
+import { showPendingDataModal } from "./modals/pendingDataModal.js";
+import { decodePayloadFromDataset } from "../services/pendingQuotaService.js";
 
 export const clickActions = {
     'navigate': (ctx) => { handleNavigation(ctx.nav); },
@@ -78,6 +81,36 @@ export const clickActions = {
     'open-sort-modal-pemasukan': () => { emit('ui.modal.showPemasukanSort', () => emit('ui.pemasukan.renderContent')); },    'open-attendance-filter-modal': () => { emit('ui.modal.showAttendanceFilter', () => emit('ui.absensi.renderContent')); },
     'open-stock-sort-modal': () => { emit('ui.modal.showStockSort', () => emit('ui.stok.renderContent')); },
     'open-attendance-sort-modal': () => { emit('ui.modal.showAttendanceSort', () => emit('ui.absensi.renderContent')); },
+    'view-pending-data': async (ctx) => {
+        try {
+            let payload = null;
+            if (ctx.payload) {
+                payload = decodePayloadFromDataset(ctx.payload);
+            }
+            if (!payload && ctx.logId && localDB.logs) {
+                try {
+                    const logEntry = await localDB.logs.get(ctx.logId);
+                    payload = logEntry?.dataPayload || payload;
+                } catch (_) {}
+            }
+            if (!payload && ctx.dataType && ctx.dataId) {
+                try {
+                    const table = localDB[ctx.dataType];
+                    if (table?.get) {
+                        payload = await table.get(ctx.dataId);
+                    }
+                } catch (_) {}
+            }
+            if (!payload) {
+                toast('info', 'Data pending tidak tersedia.');
+                return;
+            }
+            showPendingDataModal({ payload, meta: { dataType: ctx.dataType, dataId: ctx.dataId } });
+        } catch (err) {
+            console.error('Gagal membuka data pending:', err);
+            toast('error', 'Gagal membuka data pending.');
+        }
+    },
     'open-pemasukan-detail': (ctx) => { handleOpenPemasukanDetail({ dataset: { id: ctx.itemId, type: ctx.type } }); },
     'pay-loan': (ctx) => { emit('ui.modal.openPayment', {id: ctx.itemId, type: 'pinjaman'}); },
     'open-loan-payment-history': (ctx) => { emit('ui.modal.openLoanPaymentHistory', { id: ctx.itemId }); },

@@ -140,6 +140,33 @@ export const appState = {
         manualWorkerListCache: null,
         manualListNeedsUpdate: true,
     },
+    jurnalFilters: (function(){
+        try {
+            const raw = localStorage.getItem('jurnal.filters');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object') {
+                    return parsed;
+                }
+            }
+        } catch (_) {}
+        return {};
+    })(),
+    jurnalSort: (function(){
+        const defaults = { harian: 'date_desc', riwayat_rekap: 'date_desc' };
+        try {
+            const raw = localStorage.getItem('jurnal.sort');
+            if (!raw) return { ...defaults };
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                return {
+                    harian: parsed.harian || defaults.harian,
+                    riwayat_rekap: parsed.riwayat_rekap || defaults.riwayat_rekap,
+                };
+            }
+        } catch (_) {}
+        return { ...defaults };
+    })(),
     manualRoleSelectionByWorker: {},
     visitedPages: new Set(),
     setUser(userData = null) {

@@ -3,6 +3,7 @@ import { $ } from '../../utils/dom.js';
 import { createPageToolbarHTML } from '../components/toolbar.js';
 import { createTabsHTML } from '../components/tabs.js';
 import { createUnifiedCard } from '../components/cards.js';
+import { buildPendingQuotaBanner } from '../components/pendingQuotaBanner.js';
 import { getEmptyStateHTML, getEndOfListPlaceholderHTML } from '../components/emptyState.js';
 import { formatDate } from '../../utils/formatters.js';
 import { emit, on, off } from '../../state/eventBus.js';
@@ -10,6 +11,7 @@ import { liveQueryMulti } from '../../state/liveQuery.js';
 import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
 import { createListSkeletonHTML } from '../components/skeleton.js';
 import { getJSDate } from '../../utils/helpers.js';
+import { getPendingQuotaMaps } from '../../services/pendingQuotaService.js';
 
 const ITEMS_PER_PAGE_STOCK = 30;
 let stockObserverInstance = null;
@@ -105,6 +107,9 @@ async function renderStokContent(append = false) {
 
     try {
         const activeTab = appState.activeSubPage.get('stok') || 'daftar';
+        const pendingMaps = await getPendingQuotaMaps(activeTab === 'daftar' ? ['materials'] : ['expenses']);
+        const pendingMaterials = pendingMaps.get('materials') || new Map();
+        const pendingExpenses = pendingMaps.get('expenses') || new Map();
         
         let sourceItems = [];
         if (activeTab === 'daftar') {
@@ -164,7 +169,9 @@ async function renderStokContent(append = false) {
                 const currentStock = Number(mat.currentStock || 0);
                 const mainContentHTML = `<div class="wa-card-v2__description">Stok Saat Ini: <strong>${currentStock}</strong> ${mat.unit || ''}</div>`;
                 const dataset = { 'item-id': mat.id, pageContext: 'stok', type: 'materials' };
-                return createUnifiedCard({ id: `material-${mat.id}`, title, headerMeta, metaBadges: [], mainContentHTML, dataset, moreAction: true, amount: '', amountLabel: '' });
+                const cardHTML = createUnifiedCard({ id: `material-${mat.id}`, title, headerMeta, metaBadges: [], mainContentHTML, dataset, moreAction: true, amount: '', amountLabel: '' });
+                const pendingLog = pendingMaterials.get(mat.id);
+                return pendingLog ? `${buildPendingQuotaBanner(pendingLog)}${cardHTML}` : cardHTML;
             }).join('');
         } else {
             itemsHTML = itemsToDisplay.map(exp => {
@@ -174,7 +181,9 @@ async function renderStokContent(append = false) {
                 const headerMeta = formatDate(getJSDate(exp.date));
                 const mainContentHTML = `<div class="wa-card-v2__description sub">${supplier?.supplierName || "Supplier -" } ${project ? ("| " + project.projectName) : ""}</div>`;
                 const dataset = { 'item-id': exp.id, pageContext: 'stok', type: 'expense', expenseId: exp.id };
-                return createUnifiedCard({ id: `exp-${exp.id}`, title, headerMeta, metaBadges: [], mainContentHTML, dataset, moreAction: true, amount: '', amountLabel: '' });
+                const cardHTML = createUnifiedCard({ id: `exp-${exp.id}`, title, headerMeta, metaBadges: [], mainContentHTML, dataset, moreAction: true, amount: '', amountLabel: '' });
+                const pendingLog = pendingExpenses.get(exp.id);
+                return pendingLog ? `${buildPendingQuotaBanner(pendingLog)}${cardHTML}` : cardHTML;
             }).join('');
         }
 

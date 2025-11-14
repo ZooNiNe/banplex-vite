@@ -716,6 +716,13 @@ background-color: var(--panel);
   margin: 0;
 }
 
+.loading-progress {
+  display: inline-block;
+  margin-left: .35rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
 /* Pastikan animasi ptr-spin ada (jika belum ada di file ini) */
 @keyframes ptr-spin {
   to {
@@ -781,4 +788,36 @@ background-color: var(--panel);
 .project-picker-item:hover,
 .project-picker-item:focus {
   background-color: var(--panel);
+}
+
+.pending-data-modal {
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--panel);
+  padding: .75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+
+.pending-data-meta {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 .5rem 0;
+  font-size: .85rem;
+  color: var(--text-dim);
+}
+
+.pending-data-meta li + li {
+  margin-top: .35rem;
+}
+
+.pending-data-pre {
+  margin: 0;
+  padding: .75rem;
+  background: var(--surface-muted);
+  border-radius: var(--radius);
+  border: 1px dashed var(--line);
+  font-size: .8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

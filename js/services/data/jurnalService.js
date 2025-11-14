@@ -20,6 +20,32 @@ import { queueOutbox } from "../outboxService.js";
 // --- PERUBAHAN: Menambahkan impor $ (utility DOM) ---
 import { $ } from "../../utils/dom.js";
 
+function getDefaultJurnalFilterRangeStrings() {
+    const today = new Date();
+    return {
+        startDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10),
+        endDate: today.toISOString().slice(0, 10)
+    };
+}
+
+function getActiveJurnalFilterRange() {
+    const defaults = getDefaultJurnalFilterRangeStrings();
+    let startDateStr = appState.jurnalFilters?.startDate || defaults.startDate;
+    let endDateStr = appState.jurnalFilters?.endDate || defaults.endDate;
+
+    if ((!startDateStr || !endDateStr) && typeof document !== 'undefined') {
+        startDateStr = document.getElementById('jurnal-start-date')?.value || startDateStr;
+        endDateStr = document.getElementById('jurnal-end-date')?.value || endDateStr;
+    }
+
+    const startDate = parseLocalDate(startDateStr);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = parseLocalDate(endDateStr);
+    endDate.setHours(23, 59, 59, 999);
+
+    return { startDateStr, endDateStr, startDate, endDate };
+}
+
 function createIcon(iconName, size = 18, classes = '') {
     // ... (fungsi createIcon tetap ada jika diperlukan, misal untuk handleDeleteSalaryBill) ...
     const icons = {
@@ -116,21 +142,7 @@ export async function openGenerateBillConfirmModal(dataset) {
         return;
     }
     
-    // --- PERUBAHAN: Ambil rentang tanggal dari UI ---
-    // Asumsi ID elemen di halaman Jurnal adalah #jurnal-start-date dan #jurnal-end-date
-    const startDateStr = $('#jurnal-start-date')?.value;
-    const endDateStr = $('#jurnal-end-date')?.value;
-
-    if (!startDateStr || !endDateStr) {
-        toast('error', 'Silakan tentukan rentang tanggal di bagian atas halaman Jurnal.');
-        return;
-    }
-    
-    const startDate = parseLocalDate(startDateStr);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = parseLocalDate(endDateStr);
-    endDate.setHours(23, 59, 59, 999);
-    // --- AKHIR PERUBAHAN ---
+    const { startDateStr, endDateStr, startDate, endDate } = getActiveJurnalFilterRange();
     
     // --- PERUBAHAN: Modifikasi kueri untuk menyertakan filter tanggal ---
     const recordsToPay = await localDB.attendance_records
@@ -184,20 +196,7 @@ export async function handleGenerateBillForWorker(dataset) {
         return;
     }
     
-    // --- PERUBAHAN: Ambil rentang tanggal dari UI ---
-    const startDateStr = $('#jurnal-start-date')?.value;
-    const endDateStr = $('#jurnal-end-date')?.value;
-
-    if (!startDateStr || !endDateStr) {
-        toast('error', 'Silakan tentukan rentang tanggal di bagian atas halaman Jurnal.');
-        return;
-    }
-    
-    const startDate = parseLocalDate(startDateStr);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = parseLocalDate(endDateStr);
-    endDate.setHours(23, 59, 59, 999);
-    // --- AKHIR PERUBAHAN ---
+    const { startDateStr, endDateStr, startDate, endDate } = getActiveJurnalFilterRange();
 
     // --- PERUBAHAN: Modifikasi kueri untuk menyertakan filter tanggal ---
     const recordsToPay = await localDB.attendance_records

@@ -2,6 +2,8 @@ import { appState } from "../../state/appState.js";
 import { fmtIDR, formatDate } from "../../utils/formatters.js";
 import { getJSDate, getUnreadCommentCount } from "../../utils/helpers.js";
 import { on } from "../../state/eventBus.js";
+import { buildPendingQuotaBanner } from "./pendingQuotaBanner.js";
+import { encodePayloadForDataset } from "../../services/pendingQuotaService.js";
 
 function createIcon(iconName, size = 16, classes = '') {
     const icons = {
@@ -179,12 +181,14 @@ export function createGenericCard(contentHTML, customClasses = '') {
     `;
 }
 
-export function _getMasterDataListHTML(type, items, config) {
+export function _getMasterDataListHTML(type, items, config, options = {}) {
     if (!config || !Array.isArray(items)) return '<p>Konfigurasi atau data tidak valid.</p>';
     const selectionActive = appState.selectionMode.active && (appState.selectionMode.pageContext === 'master' || appState.selectionMode.pageContext === type);
     const sortedItems = items
         .filter(item => !item.isDeleted)
         .sort((a, b) => getJSDate(b.updatedAt || b.createdAt) - getJSDate(a.updatedAt || a.createdAt));
+
+    const pendingMap = options.pendingMap || new Map();
 
     return sortedItems.map(item => {
         const itemId = item.id;
@@ -224,7 +228,10 @@ export function _getMasterDataListHTML(type, items, config) {
             title: title
         };
 
-        return createUnifiedCard({
+        const pendingLog = pendingMap.get(itemId);
+        const warningHTML = pendingLog ? buildPendingQuotaBanner(pendingLog) : '';
+
+        const cardHTML = createUnifiedCard({
             id: `master-${itemId}`,
             title: title,
             headerMeta: '',
@@ -236,6 +243,8 @@ export function _getMasterDataListHTML(type, items, config) {
             selectionEnabled: selectionActive,
             isSelected: isSelected
         });
+
+        return `${warningHTML}${cardHTML}`;
     }).join('');
 }
 
@@ -450,8 +459,11 @@ export function _createDetailContentHTML(item, type) {
 }
 
 
-export function _getBillsListHTML(items) {
+export function _getBillsListHTML(items, options = {}) {
     if (!Array.isArray(items)) return '';
+
+    const pendingBills = options.pendingBills || new Map();
+    const pendingExpenses = options.pendingExpenses || new Map();
 
     const allComments = appState.comments || [];
 
@@ -547,7 +559,10 @@ export function _getBillsListHTML(items) {
 
         const showMoreIcon = true;
 
-        return createUnifiedCard({
+        const pendingLog = isBill ? pendingBills.get(item.id) : pendingExpenses.get(item.id);
+        const warningHTML = pendingLog ? buildPendingQuotaBanner(pendingLog) : '';
+
+        const cardHTML = createUnifiedCard({
             id: uniqueDomId,
             title: title,
             headerMeta: formatDate(item.dueDate || item.date),
@@ -562,10 +577,12 @@ export function _getBillsListHTML(items) {
             isSelected: isSelected,
             unreadCount: unreadCount
         });
+
+        return `${warningHTML}${cardHTML}`;
     }).join('');
 }
 
-export function _getSinglePemasukanHTML(item, type) {
+export function _getSinglePemasukanHTML(item, type, options = {}) {
     if (!item) return '';
     const allComments = appState.comments || [];
     const isTermin = type === 'termin';
@@ -611,7 +628,10 @@ export function _getSinglePemasukanHTML(item, type) {
         'parent-type': parentType || '' // PERUBAHAN: Tambahkan parent-type
     };
 
-    return createUnifiedCard({
+    const pendingLog = options.pendingLog;
+    const warningHTML = pendingLog ? buildPendingQuotaBanner(pendingLog) : '';
+
+    const cardHTML = createUnifiedCard({
         id: domId,
         title: title, 
         headerMeta: formatDate(item.date),
@@ -626,6 +646,8 @@ export function _getSinglePemasukanHTML(item, type) {
         isSelected: isSelected,
         unreadCount: unreadCount // PERUBAHAN: Kirim unreadCount
     });
+
+    return `${warningHTML}${cardHTML}`;
 }
 
 export function _getJurnalHarianListHTML(items) {
@@ -634,11 +656,14 @@ export function _getJurnalHarianListHTML(items) {
         const title = formatDate(item.date, { weekday: 'long', day: 'numeric', month: 'long' });
         const dataset = { itemId: item.date, date: item.date, title: title, description: title };
         const showMoreIcon = true;
+        const workerCount = typeof item.workerCount === 'number'
+            ? item.workerCount
+            : (item.workerCount instanceof Set ? item.workerCount.size : 0);
 
         return createUnifiedCard({
             id: `jurnal-${itemId}`,
             title: title,
-            headerMeta: `${item.workerCount instanceof Set ? item.workerCount.size : (item.workerCount || 0)} Pekerja Hadir`,
+            headerMeta: `${workerCount} Pekerja Hadir`,
             amount: fmtIDR(item.totalPay),
             amountLabel: 'Total Upah',
             amountColorClass: 'negative',
@@ -681,14 +706,18 @@ export function _getJurnalPerPekerjaListHTML(items) {
     }).join('');
 }
 
-export function _getRekapGajiListHTML(items) {
+export function _getRekapGajiListHTML(items, options = {}) {
+    const pendingBills = options.pendingBills || new Map();
     return items.map(item => {
         const itemId = item.id;
         const title = item.description;
         const dataset = { itemId: itemId, type: 'bill', title: title, description: title };
         const showMoreIcon = true;
 
-        return createUnifiedCard({
+        const pendingLog = pendingBills.get(itemId);
+        const warningHTML = pendingLog ? buildPendingQuotaBanner(pendingLog) : '';
+
+        const cardHTML = createUnifiedCard({
             id: `bill-${itemId}`,
             title: title,
             headerMeta: formatDate(item.createdAt),
@@ -699,6 +728,8 @@ export function _getRekapGajiListHTML(items) {
             moreAction: showMoreIcon,
             actions: []
         });
+
+        return `${warningHTML}${cardHTML}`;
     }).join('');
 }
 
@@ -730,20 +761,28 @@ export function _getLogAktivitasListHTML(items) {
         const timestamp = getJSDate(log.createdAt);
         const headerMeta = timestamp.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
         const userBadge = `<span class="user-badge">${log.userName || 'Sistem'}</span>`;
-        const mainContent = `<div class="wa-card-v2__description">${userBadge}</div>`;
+        const isPendingQuota = (log.status || log.details?.status) === 'pending_quota';
+        const payloadAttr = log.dataPayload ? encodePayloadForDataset(log.dataPayload) : '';
+        const pendingActions = isPendingQuota ? `
+            <div class="pending-warning-actions">
+                <button type="button" class="btn btn-secondary" data-action="view-pending-data" data-log-id="${itemId}" data-datatype="${log.dataType || ''}" data-dataid="${log.dataId || ''}" ${payloadAttr ? `data-payload="${payloadAttr}"` : ''}>Lihat Data</button>
+            </div>
+        ` : '';
+        const pendingText = isPendingQuota ? `<div class="wa-card-v2__description">${userBadge}<br><small>Perubahan menunggu kuota server.</small></div>${pendingActions}` : `<div class="wa-card-v2__description">${userBadge}</div>`;
         const iconName = getIconForAction(log.actionType || log.action || '');
 
         return createUnifiedCard({
             id: itemId,
             title: log.action,
             headerMeta: headerMeta,
-            mainContentHTML: mainContent,
+            mainContentHTML: pendingText,
             amount: createIcon(iconName, 18),
             amountLabel: '',
             amountColorClass: '',
             dataset: { action: canOpenDetail ? 'view-log-detail' : '', ...dataset },
             moreAction: false,
-            actions: []
+            actions: [],
+            customClasses: isPendingQuota ? 'log-item-warning' : ''
         });
     }).join('');
 }

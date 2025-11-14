@@ -1,5 +1,5 @@
 import { appState } from "../state/appState.js";
-import { db, projectsCol, suppliersCol, workersCol, materialsCol, staffCol, professionsCol, opCatsCol, matCatsCol, otherCatsCol, fundingCreditorsCol, expensesCol, billsCol, incomesCol, fundingSourcesCol, attendanceRecordsCol, stockTransactionsCol, commentsCol } from "../config/firebase.js";
+import { db, projectsCol, suppliersCol, workersCol, materialsCol, staffCol, professionsCol, opCatsCol, matCatsCol, otherCatsCol, fundingCreditorsCol, expensesCol, billsCol, incomesCol, fundingSourcesCol, attendanceRecordsCol, stockTransactionsCol, commentsCol, logsCol } from "../config/firebase.js";
 import { query, getDocs, where, writeBatch, doc, runTransaction, serverTimestamp, onSnapshot, Timestamp, getDoc, collection, setDoc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { localDB } from "./localDbService.js";
 import { _uploadFileToCloudinary } from "./fileService.js";
@@ -9,6 +9,7 @@ import { emit, on } from "../state/eventBus.js";
 import { toast } from "../ui/components/toast.js";
 import { handleOpenConflictsPanel } from "../utils/sync.js";
 import { queueOutbox, takeOutboxBatch, markOutboxDone, markOutboxFailed } from "./outboxService.js";
+import { createPendingQuotaLog } from "./logService.js";
 import { addItemToListWithAnimation, removeItemFromListWithAnimation, updateItemInListWithAnimation } from "../utils/dom.js";
 import { _getBillsListHTML, _getSinglePemasukanHTML } from "../ui/components/cards.js";
 import { notify } from '../state/liveQuery.js'; // Import notify
@@ -42,6 +43,73 @@ async function retryDexieOperation(operation, maxRetries = 1, delay = 100) {
                 throw e;
             }
         }
+    }
+}
+
+const WIB_OFFSET_MINUTES = 420; // UTC+7
+const QUOTA_RETRY_STORAGE_KEY = 'quotaRetry.lastAttempt';
+
+function isQuotaError(error) {
+    if (!error) return false;
+    if (error.code === 'resource-exhausted') return true;
+    const message = (error.message || error.toString() || '').toLowerCase();
+    return message.includes('quota') || message.includes('resource exhausted');
+}
+
+function getCurrentWIBDate() {
+    const now = new Date();
+    const wibMillis = now.getTime() + (now.getTimezoneOffset() + WIB_OFFSET_MINUTES) * 60000;
+    return new Date(wibMillis);
+}
+
+function attemptQuotaRetryIfEligible() {
+    try {
+        if (!_isQuotaExceeded()) return false;
+        const nowWIB = getCurrentWIBDate();
+        if (nowWIB.getHours() < 15) return false;
+        const wibDayMarker = new Date(nowWIB.getFullYear(), nowWIB.getMonth(), nowWIB.getDate()).getTime();
+        const lastAttempt = parseInt(localStorage.getItem(QUOTA_RETRY_STORAGE_KEY) || '0', 10);
+        if (lastAttempt >= wibDayMarker) return false;
+        localStorage.setItem(QUOTA_RETRY_STORAGE_KEY, String(wibDayMarker));
+        toast('info', 'Mencoba sinkronisasi ulang setelah kuota tersedia kembali.');
+        _setQuotaExceededFlag(false);
+        requestSync({ silent: true, forceQuotaRetry: true });
+        return true;
+    } catch (err) {
+        console.error('Gagal memeriksa jadwal retry kuota:', err);
+        return false;
+    }
+}
+
+async function handleQuotaExceededForJob(job, error) {
+    _setQuotaExceededFlag(true);
+    try {
+        const existingJob = await localDB.outbox.get(job.id);
+        let quotaLogId = existingJob?.quotaLogId || null;
+        if (!quotaLogId && job.table !== 'logs') {
+            try {
+                const logEntry = await createPendingQuotaLog({
+                    dataType: job.table,
+                    dataId: job.docId,
+                    dataPayload: {
+                        op: job.op,
+                        payload: job.payload
+                    }
+                });
+                quotaLogId = logEntry?.id || null;
+            } catch (logErr) {
+                console.error('Gagal membuat log pending kuota:', logErr);
+            }
+        }
+        await localDB.outbox.update(job.id, {
+            status: 'pending',
+            quotaBlocked: 1,
+            lastError: error?.message || 'quota_exceeded',
+            lastTriedAt: Date.now(),
+            ...(quotaLogId ? { quotaLogId } : {})
+        });
+    } catch (updateErr) {
+        console.error('Gagal memperbarui status job setelah quota:', updateErr);
     }
 }
 
@@ -283,11 +351,15 @@ function currentPageMatchesContext(currentPage, collectionName, data) {
 }
 
 async function syncToServer(options = {}) {
-    const { silent = false, signal } = options;
+    const { silent = false, signal, forceQuotaRetry = false } = options;
     if (!navigator.onLine) { _scheduleSyncOnReconnect(); return; }
-    if (appState.isSyncing || _isQuotaExceeded()) {
-        if (_isQuotaExceeded()) console.error('Kuota server habis. Sinkronisasi ditunda.');
-         else console.log('Sync already in progress.');
+    if (appState.isSyncing) {
+        console.log('Sync already in progress.');
+        return;
+    }
+    if (!forceQuotaRetry && _isQuotaExceeded()) {
+        console.error('Kuota server habis. Sinkronisasi ditunda.');
+        if (!silent) toast('info', 'Sinkronisasi ditunda sampai kuota server tersedia.');
         return;
     }
      if (signal?.aborted) {
@@ -377,7 +449,7 @@ async function syncToServer(options = {}) {
             for (const [, job] of latestByKey) {
                  if (operationSignal.aborted) throw new DOMException('Sync aborted', 'AbortError');
                 try {
-                    const mapRef = { comments: commentsCol, expenses: expensesCol, bills: billsCol, attendance_records: attendanceRecordsCol, incomes: incomesCol, funding_sources: fundingSourcesCol, projects: projectsCol, suppliers: suppliersCol, workers: workersCol, materials: materialsCol, staff: staffCol, professions: professionsCol, operational_categories: opCatsCol, material_categories: matCatsCol, other_categories: otherCatsCol, funding_creditors: fundingCreditorsCol, };
+                    const mapRef = { comments: commentsCol, expenses: expensesCol, bills: billsCol, attendance_records: attendanceRecordsCol, incomes: incomesCol, funding_sources: fundingSourcesCol, projects: projectsCol, suppliers: suppliersCol, workers: workersCol, materials: materialsCol, staff: staffCol, professions: professionsCol, operational_categories: opCatsCol, material_categories: matCatsCol, other_categories: otherCatsCol, funding_creditors: fundingCreditorsCol, logs: logsCol };
                     const targetCol = mapRef[job.table];
                     if (!targetCol) { await markOutboxFailed(job.id); continue; }
                     const ref = doc(targetCol, job.docId);
@@ -434,15 +506,20 @@ async function syncToServer(options = {}) {
                     progress.completed++;
                     emit('ui.sync.updateIndicator');
                 } catch (e) {
-                     if (e.name === 'AbortError') throw e; // Propagate abort
+                    if (e.name === 'AbortError') throw e; // Propagate abort
+                    if (isQuotaError(e)) {
+                        await handleQuotaExceededForJob(job, e);
+                        e.__quotaExceeded = true;
+                        throw e;
+                    }
                     console.error('Outbox job failed:', job, e);
                     await markOutboxFailed(job.id);
-                     if (e.code === 'aborted' || e.message.toLowerCase().includes('contention')) {
-                         console.warn(`Transaction contention for ${job.table}:${job.docId}. Will likely retry.`);
-                     } else if (e.message.includes('Attachment upload failed')) {
-                          console.warn(`Attachment upload failed for outbox job ${job.id}. Will retry later.`);
-                          await markOutboxFailed(job.id); // Mark for retry
-                     }
+                    if (e.code === 'aborted' || (e.message && e.message.toLowerCase().includes('contention'))) {
+                        console.warn(`Transaction contention for ${job.table}:${job.docId}. Will likely retry.`);
+                    } else if ((e.message || '').includes('Attachment upload failed')) {
+                        console.warn(`Attachment upload failed for outbox job ${job.id}. Will retry later.`);
+                        await markOutboxFailed(job.id);
+                    }
                 }
             }
         }
@@ -456,7 +533,7 @@ async function syncToServer(options = {}) {
         } else if (error.name === 'NoDataError') {
         } else {
             console.error('Error during sync to server:', error);
-            if (error.code === 'resource-exhausted') {
+            if (error.code === 'resource-exhausted' || error.__quotaExceeded || isQuotaError(error)) {
                  _setQuotaExceededFlag(true);
                   if (!silent) toast('error', 'Kuota server habis. Sinkronisasi ditunda.');
             } else if (error.name === 'DatabaseClosedError') {
@@ -522,22 +599,10 @@ function _isQuotaExceeded() { try { return localStorage.getItem('firestoreQuotaE
 function _setQuotaExceededFlag(isExceeded) { try { if (isExceeded) { console.warn("KUOTA FIRESTORE HABIS."); localStorage.setItem('firestoreQuotaExceeded', 'true'); } else { console.log("Mereset flag kuota."); localStorage.removeItem('firestoreQuotaExceeded'); } } catch (e) { console.error("Gagal set flag kuota.", e); } }
 
 function _initQuotaResetScheduler() {
-    const CHECK_INTERVAL = 30 * 60 * 1000; const RESET_HOUR = 15;
-    setInterval(async () => {
-
-        if (!_isQuotaExceeded()) {
-            return;
-        }
-        
-        const now = new Date(); const lastResetAttempt = parseInt(localStorage.getItem('lastResetAttempt') || '0'); const todayMarker = new Date(now).setHours(0,0,0,0);
-        
-        if (now.getHours() >= RESET_HOUR && lastResetAttempt < todayMarker) { // Cek 15:00 WIB
-
-            toast('info', 'Mencoba sinkronisasi ulang...'); localStorage.setItem('lastResetAttempt', Date.now().toString()); _setQuotaExceededFlag(false); await syncToServer({ silent: true });
-        } else {
-
-        }
-    }, CHECK_INTERVAL);
+    const CHECK_INTERVAL = 30 * 60 * 1000;
+    const runCheck = () => { attemptQuotaRetryIfEligible(); };
+    runCheck();
+    setInterval(runCheck, CHECK_INTERVAL);
 }
 
 async function _forceRefreshDataFromServer() { if (!navigator.onLine) { toast('info', 'Anda offline.'); return; } try { await syncFromServer({ silent: true }); subscribeToAllRealtimeData(); } catch(err) { toast('error', 'Gagal memuat ulang data.'); console.error("Force refresh failed:", err); } }
@@ -573,7 +638,7 @@ async function requestSync(options = {}) {
     if (appState.isSyncing) { _syncAgain = true; return; } const elapsed = Date.now() - _lastSyncAt;
     if (elapsed < MIN_SYNC_INTERVAL) { if (!_syncScheduled) { _syncScheduled = true; setTimeout(async () => { _syncScheduled = false; await syncToServer({ ...options, silent: true }); }, MIN_SYNC_INTERVAL - elapsed); } return; }
 
-    return syncToServer({...options, signal: options.signal });
+    return syncToServer({ ...options, signal: options.signal, forceQuotaRetry: options.forceQuotaRetry === true });
 
 }
 

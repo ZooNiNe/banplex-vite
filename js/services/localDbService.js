@@ -1,6 +1,5 @@
 import Dexie from "https://unpkg.com/dexie@3/dist/dexie.mjs";
 import { appState } from "../state/appState.js";
-import { getLastSyncTimestamp, syncToServer } from "./syncService.js";
 import { fundingCreditorsCol } from "../config/firebase.js";
 import { getDoc, doc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { emit } from "../state/eventBus.js";
@@ -9,7 +8,7 @@ import { toast } from "../ui/components/toast.js";
 export const localDB = new Dexie('BanPlexDevLocalDB');
 
 export async function setupLocalDatabase() {
-    localDB.version(20).stores({
+    localDB.version(21).stores({
         expenses: '&id, projectId, date, type, status, isDeleted, attachmentNeedsSync, syncState, category',
         bills: '&id, expenseId, status, dueDate, type, isDeleted, syncState',
         incomes: '&id, projectId, date, isDeleted, syncState',
@@ -31,6 +30,7 @@ export async function setupLocalDatabase() {
         pending_payments: '++id, billId, workerId, date, [billId+workerId]',
         pending_logs: '++id, action, createdAt',
         pending_conflicts: '++id, table, docId',
+        logs: '&id, status, createdAt',
         outbox: '++id, table, docId, op, status, createdAt, priority'
     }).upgrade(async tx => {
         try {

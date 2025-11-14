@@ -73,6 +73,7 @@ function confirmClose(element, proceedAction) {
 export function closeModalImmediate(modalEl) {
     if (!modalEl || !modalEl.parentNode) return;
     const modalId = modalEl.id || '';
+    modalEl.dataset.closing = 'true';
 
     // --- PERUBAHAN: Tambahkan cleanup scope komentar ---
     if (modalId === 'actionsPopup-modal' && modalEl.classList.contains('is-chat-sheet')) {
@@ -98,6 +99,7 @@ export function closeModalImmediate(modalEl) {
         if (modalEl.parentNode) {
             modalEl.remove();
         }
+        delete modalEl.dataset.closing;
         emit('ui.modal.closed', modalId);
         checkAndRestoreBottomNav();
         resetFormDirty();
@@ -184,9 +186,22 @@ export function createModal(type, data = {}) {
         }
     }, { signal });
 
+    const closeModalFunc = () => {
+        if (!modalEl || modalEl.dataset.closing === 'true') return;
+        if (data.isUtility) {
+            closeModalImmediate(modalEl);
+            return;
+        }
+        modalEl.dataset.forceClose = 'true';
+        try {
+            closeModal(modalEl);
+        } finally {
+            delete modalEl.dataset.forceClose;
+        }
+    };
+
     // Pasang listener untuk tombol "Batal" / "Ya, Lanjutkan"
-    // Gunakan history.back() sebagai aksi tutup default untuk modal non-utility
-    attachModalEventListeners(type, data, () => history.back(), modalEl, signal);
+    attachModalEventListeners(type, data, closeModalFunc, modalEl, signal);
 
     const formInsideModal = modalEl.querySelector('form');
     if (formInsideModal) {
@@ -204,20 +219,21 @@ export function createModal(type, data = {}) {
 }
 
 export function closeModal(modalEl) {
-    if (!modalEl) return;
+    if (!modalEl || modalEl.dataset.closing === 'true') return;
     const modalId = modalEl.id || 'unknown';
     
     confirmClose(modalEl, () => {
+        modalEl.dataset.closing = 'true';
         if (modalEl.dataset.utilityModal === 'true') {
             closeModalImmediate(modalEl);
+            return;
+        }
+
+        if (history.state?.modal) {
+            history.back();
         } else {
             modalEl.classList.remove('show');
-            
-            if (history.state?.modal) {
-                history.back();
-            } else {
-                closeModalImmediate(modalEl);
-            }
+            closeModalImmediate(modalEl);
         }
     });
 }
@@ -661,30 +677,44 @@ export function handleDetailPaneBack() {
  * Menampilkan modal loading sederhana.
  * @param {string} [message='Mohon tunggu...'] - Pesan yang ditampilkan.
  */
-export function showLoadingModal(message = 'Mohon tunggu...') {
-    // Hapus dulu jika ada loading modal sebelumnya
+export function showLoadingModal(message = 'Mohon tunggu...', percent = null) {
     hideLoadingModal();
 
     const modalId = 'global-loading-modal';
-    
+    const percentText = (typeof percent === 'number' && percent >= 0)
+        ? ` <span class="loading-progress">${percent.toFixed(0)}%</span>`
+        : '';
+
     const modalHTML = `
     <div id="${modalId}" class="modal-bg is-open loading-modal" data-modal-type="loading">
         <div class="modal-content loading-modal-content">
             <div class="loading-spinner"></div>
-            <p class="loading-message">${message}</p>
+            <p class="loading-message">${message}${percentText}</p>
         </div>
     </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', modalHTML);
-    
-    // Paksa reflow untuk transisi 'show'
+
     const modalEl = document.getElementById(modalId);
     if (modalEl) {
         requestAnimationFrame(() => {
             modalEl.classList.add('show');
         });
     }
+}
+
+export function updateLoadingModal(message = null, percent = null) {
+    const modalEl = document.getElementById('global-loading-modal');
+    if (!modalEl) return;
+    const messageEl = modalEl.querySelector('.loading-message');
+    if (!messageEl) return;
+    const baseMessage = message || messageEl.dataset.baseMessage || messageEl.textContent || 'Mohon tunggu...';
+    messageEl.dataset.baseMessage = baseMessage;
+    const percentText = (typeof percent === 'number' && percent >= 0)
+        ? ` <span class="loading-progress">${Math.round(percent)}%</span>`
+        : '';
+    messageEl.innerHTML = `${baseMessage}${percentText}`;
 }
 
 /**

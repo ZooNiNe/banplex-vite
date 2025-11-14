@@ -27,6 +27,20 @@ function createIcon(iconName, size = 18, classes = '') {
     return icons[iconName] || '';
 }
 
+export function setManualAttendanceProject(projectId = '') {
+    const normalized = projectId && projectId !== 'all' ? projectId : '';
+    appState.manualAttendanceSelectedProjectId = normalized;
+    try { localStorage.setItem('attendance.manualSelectedProjectId', normalized); } catch (_) {}
+    return normalized;
+}
+
+function persistDefaultAttendanceProject(projectId = '') {
+    const normalized = projectId || '';
+    appState.defaultAttendanceProjectId = normalized;
+    try { localStorage.setItem('attendance.defaultProjectId', normalized); } catch (_) {}
+    return normalized;
+}
+
 export async function handleCheckIn(workerId) {
     const projectId = document.getElementById('attendance-project-id')?.value;
     if (!projectId) {
@@ -1321,7 +1335,7 @@ export async function handleOpenAttendanceSettings() {
     const activeProjects = (appState.projects || []).filter(p => p.isWageAssignable && !p.isDeleted);
     const projectOptions = activeProjects.map(p => ({ value: p.id, text: p.projectName }));
 
-    const currentDefaultProjectId = appState.defaultAttendanceProjectId || '';
+    const currentDefaultProjectId = appState.defaultAttendanceProjectId || appState.manualAttendanceSelectedProjectId || '';
     const currentDefaultDate = appState.defaultAttendanceDate || parseLocalDate(new Date().toISOString().slice(0, 10)).toISOString().slice(0, 10);
     
     const globalSettingsHTML = `
@@ -1380,8 +1394,10 @@ export async function handleOpenAttendanceSettings() {
                     try {
                         const globalSelect = form.querySelector('#global_default_project');
                         const newDefaultId = globalSelect?.value || '';
-                        try { localStorage.setItem('attendance.defaultProjectId', newDefaultId); } catch(_) {}
-                        appState.defaultAttendanceProjectId = newDefaultId;
+                        persistDefaultAttendanceProject(newDefaultId);
+                        const normalizedManualProjectId = setManualAttendanceProject(newDefaultId);
+                        appState.attendanceFilter = appState.attendanceFilter || { projectId: 'all', sortBy: 'status', sortDirection: 'desc' };
+                        appState.attendanceFilter.projectId = normalizedManualProjectId || 'all';
                         
                         const globalDateEl = form.querySelector('#global_default_date');
                         const newDefaultDate = globalDateEl?.value || '';
@@ -1417,7 +1433,7 @@ export async function _openWorkerDefaultsModal(workerId, workerName) {
         return;
     }
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
-    const currentProjectId = worker.defaultProjectId || appState.defaultAttendanceProjectId || '';
+    const currentProjectId = worker.defaultProjectId || appState.manualAttendanceSelectedProjectId || appState.defaultAttendanceProjectId || '';
     const projectOptions = appState.projects
         .filter(p => p.isWageAssignable && !p.isDeleted && worker.projectWages && worker.projectWages[p.id])
         .map(p => ({ value: p.id, text: p.projectName }));

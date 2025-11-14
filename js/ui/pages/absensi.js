@@ -14,7 +14,7 @@ import { _activateSelectionMode, deactivateSelectionMode } from '../components/s
 import { createListSkeletonHTML } from '../components/skeleton.js';
 import { createModal, closeModal, closeModalImmediate } from '../components/modal.js';
 import { toast } from '../components/toast.js';
-import { handleSaveAllPendingAttendance } from '../../services/data/attendanceService.js';
+import { handleSaveAllPendingAttendance, setManualAttendanceProject } from '../../services/data/attendanceService.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
 import { projectsCol, workersCol, professionsCol, attendanceRecordsCol } from '../../config/firebase.js';
 
@@ -92,9 +92,19 @@ async function _renderWorkerListForManualAttendance() {
         }
     });
     
-    const { professionId = 'all', sortBy = 'status', sortDirection = 'desc' } = appState.attendanceFilter || {};
-    if (professionId && professionId !== 'all') { 
-        workersToShow = workersToShow.filter(w => w.professionId === professionId); 
+    const attendanceFilter = appState.attendanceFilter || {};
+    appState.attendanceFilter = attendanceFilter;
+    const fallbackProjectFilter = attendanceFilter.projectId || appState.manualAttendanceSelectedProjectId || appState.defaultAttendanceProjectId || 'all';
+    attendanceFilter.projectId = fallbackProjectFilter;
+    const { sortBy = 'status', sortDirection = 'desc' } = attendanceFilter;
+
+    if (fallbackProjectFilter && fallbackProjectFilter !== 'all') {
+        workersToShow = workersToShow.filter(w => {
+            if (w.defaultProjectId) {
+                return w.defaultProjectId === fallbackProjectFilter;
+            }
+            return !!(w.projectWages && w.projectWages[fallbackProjectFilter]);
+        });
     }
 
     workersToShow.sort((a, b) => {
@@ -229,7 +239,7 @@ async function _renderWorkerListForManualAttendance() {
                 const activeProjects = appState.projects.filter(p => p.status === 'active' && !p.isDeleted);
                 if (activeProjects.length > 0) {
                     defaultProjectId = activeProjects[0].id;
-                    appState.manualAttendanceSelectedProjectId = defaultProjectId;
+                    setManualAttendanceProject(defaultProjectId);
                 }
             }
 
@@ -289,7 +299,11 @@ async function renderAttendanceList(signal) {
     container.innerHTML = createListSkeletonHTML(5);
 
     try {
-        const { professionId = 'all', sortBy = 'status', sortDirection = 'desc' } = appState.attendanceFilter || {};
+        const attendanceFilter = appState.attendanceFilter || {};
+        appState.attendanceFilter = attendanceFilter;
+        const resolvedProjectFilter = attendanceFilter.projectId || appState.manualAttendanceSelectedProjectId || appState.defaultAttendanceProjectId || 'all';
+        attendanceFilter.projectId = resolvedProjectFilter;
+        const { sortBy = 'status', sortDirection = 'desc' } = attendanceFilter;
         const selectedDateStr = appState.defaultAttendanceDate || new Date().toISOString().slice(0,10);
         
         const { startOfDay, endOfDay } = getLocalDayBounds(selectedDateStr);
@@ -304,8 +318,13 @@ async function renderAttendanceList(signal) {
         const attendanceMap = new Map(attendanceRecords.map(rec => [rec.workerId, rec]));
 
         let activeWorkers = (appState.workers || []).filter(w => w.status === 'active' && !w.isDeleted);
-        if (professionId && professionId !== 'all') {
-            activeWorkers = activeWorkers.filter(w => w.professionId === professionId);
+        if (resolvedProjectFilter && resolvedProjectFilter !== 'all') {
+            activeWorkers = activeWorkers.filter(w => {
+                if (w.defaultProjectId) {
+                    return w.defaultProjectId === resolvedProjectFilter;
+                }
+                return !!(w.projectWages && w.projectWages[resolvedProjectFilter]);
+            });
         }
 
         activeWorkers.sort((a, b) => {
@@ -703,7 +722,17 @@ function initAbsensiPage() {
 
     const initialView = appState.activeSubPage.get('absensi') || 'manual';
     appState.activeSubPage.set('absensi', initialView);
-    appState.attendanceFilter = appState.attendanceFilter || { professionId: 'all', sortBy: 'status', sortDirection: 'desc' };
+    const defaultProjectFilter = appState.manualAttendanceSelectedProjectId || appState.defaultAttendanceProjectId || 'all';
+    if (!appState.manualAttendanceSelectedProjectId && defaultProjectFilter && defaultProjectFilter !== 'all') {
+        setManualAttendanceProject(defaultProjectFilter);
+    }
+    if (!appState.attendanceFilter) {
+        appState.attendanceFilter = { projectId: defaultProjectFilter, sortBy: 'status', sortDirection: 'desc' };
+    } else {
+        appState.attendanceFilter.projectId = appState.attendanceFilter.projectId || defaultProjectFilter;
+        appState.attendanceFilter.sortBy = appState.attendanceFilter.sortBy || 'status';
+        appState.attendanceFilter.sortDirection = appState.attendanceFilter.sortDirection || 'desc';
+    }
 
     if (initialView === 'manual') {
         _activateSelectionMode('absensi');

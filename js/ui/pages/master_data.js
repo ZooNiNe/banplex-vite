@@ -26,6 +26,7 @@ import { isViewer } from '../../utils/helpers.js';
 import { masterDataConfig, TEAM_ID } from '../../config/constants.js';
 import { db, projectsCol, suppliersCol, workersCol, materialsCol, staffCol, professionsCol, opCatsCol, matCatsCol, otherCatsCol, fundingCreditorsCol } from '../../config/firebase.js';
 import { checkFormDirty, resetFormDirty } from '../components/modal.js';
+import { getPendingQuotaMaps } from '../../services/pendingQuotaService.js';
 
 // Map untuk koleksi Firestore (disalin dari masterDataService)
 const COLLECTIONS = {
@@ -121,9 +122,11 @@ async function renderTabContent(tabId) {
         contentContainer.innerHTML = createMasterDataListSkeletonHTML();
         await fetchAndCacheData(config.stateKey, COLLECTIONS[type], config.nameField, pageAbortController?.signal);
         const items = (appState[config.stateKey] || []);
+        const pendingMaps = await getPendingQuotaMaps([config.dbTable || config.stateKey || type]);
+        const pendingMap = pendingMaps.get(config.dbTable || config.stateKey || type) || new Map();
 
         if (items.filter(item => !item.isDeleted).length > 0) {
-             contentContainer.innerHTML = `<div class="wa-card-list-wrapper master-data-list">${_getMasterDataListHTML(type, items, config)}</div>`;
+             contentContainer.innerHTML = `<div class="wa-card-list-wrapper master-data-list">${_getMasterDataListHTML(type, items, config, { pendingMap })}</div>`;
         } else {
              contentContainer.innerHTML = getEmptyStateHTML({
                 icon: 'database',

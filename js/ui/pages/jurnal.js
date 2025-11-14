@@ -8,12 +8,14 @@ import { formatDate, fmtIDR } from '../../utils/formatters.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
 import { createListSkeletonHTML } from '../components/skeleton.js';
+import { toast } from '../components/toast.js';
 // --- PERUBAHAN: Menambahkan parseLocalDate ---
 import { getJSDate, parseLocalDate } from '../../utils/helpers.js';
 import { localDB } from '../../services/localDbService.js';
 import { openDailyProjectPickerForEdit } from '../../services/data/jurnalService.js';
 import { openDailyAttendanceEditorPanel } from '../../services/data/attendanceService.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
+import { getPendingQuotaMaps } from '../../services/pendingQuotaService.js';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -42,6 +44,120 @@ function createIcon(iconName, size = 18, classes = '') {
         settings: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings ${classes}"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1 0-2l.15-.1a2 2 0 0 0 .73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
     };
     return icons[iconName] || '';
+}
+
+const JURNAL_SORT_OPTIONS = {
+    harian: [
+        { value: 'date_desc', label: 'Tanggal Terbaru' },
+        { value: 'workers_desc', label: 'Paling Banyak Pekerja' },
+        { value: 'wage_desc', label: 'Total Upah Tertinggi' }
+    ],
+    riwayat_rekap: [
+        { value: 'date_desc', label: 'Tanggal Terbaru' },
+        { value: 'amount_desc', label: 'Nominal Tertinggi' },
+        { value: 'workers_desc', label: 'Paling Banyak Pekerja' }
+    ]
+};
+
+function getDefaultJurnalFilterStrings() {
+    const today = new Date();
+    return {
+        startDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10),
+        endDate: today.toISOString().slice(0, 10)
+    };
+}
+
+function getAppliedJurnalFilterStrings() {
+    const stored = appState.jurnalFilters || {};
+    const defaults = getDefaultJurnalFilterStrings();
+    return {
+        startDate: stored.startDate || defaults.startDate,
+        endDate: stored.endDate || defaults.endDate
+    };
+}
+
+function persistJurnalFilters(startDate, endDate) {
+    appState.jurnalFilters = { startDate, endDate };
+    try { localStorage.setItem('jurnal.filters', JSON.stringify(appState.jurnalFilters)); } catch (_) {}
+}
+
+function getAppliedJurnalDateRange() {
+    const { startDate, endDate } = getAppliedJurnalFilterStrings();
+    const startDateObj = parseLocalDate(startDate);
+    startDateObj.setHours(0, 0, 0, 0);
+    const endDateObj = parseLocalDate(endDate);
+    endDateObj.setHours(23, 59, 59, 999);
+    return { startDate, endDate, startDateObj, endDateObj };
+}
+
+function getJurnalSortValue(tab) {
+    const options = JURNAL_SORT_OPTIONS[tab];
+    const defaultValue = options ? options[0].value : '';
+    appState.jurnalSort = appState.jurnalSort || {};
+    return appState.jurnalSort[tab] || defaultValue;
+}
+
+function setJurnalSortValue(tab, value) {
+    appState.jurnalSort = appState.jurnalSort || {};
+    appState.jurnalSort[tab] = value;
+    try { localStorage.setItem('jurnal.sort', JSON.stringify(appState.jurnalSort)); } catch (_) {}
+}
+
+function updateJurnalSortControl() {
+    if (typeof document === 'undefined') return;
+    const sortBar = document.getElementById('jurnal-sort-bar');
+    const select = document.getElementById('jurnal-sort-select');
+    if (!sortBar || !select) return;
+    const activeTab = appState.activeSubPage.get('jurnal') || 'harian';
+    const options = JURNAL_SORT_OPTIONS[activeTab];
+    if (!options) {
+        sortBar.style.display = 'none';
+        return;
+    }
+    sortBar.style.display = '';
+    select.innerHTML = options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+    select.value = getJurnalSortValue(activeTab);
+}
+
+function sortJurnalItems(activeTab, items) {
+    const sortValue = getJurnalSortValue(activeTab);
+    const sorted = [...items];
+    if (activeTab === 'harian') {
+        if (sortValue === 'workers_desc') {
+            return sorted.sort((a, b) => {
+                const diff = (b.workerCount || 0) - (a.workerCount || 0);
+                if (diff !== 0) return diff;
+                return getJSDate(b.date) - getJSDate(a.date);
+            });
+        }
+        if (sortValue === 'wage_desc') {
+            return sorted.sort((a, b) => {
+                const diff = (b.totalPay || 0) - (a.totalPay || 0);
+                if (diff !== 0) return diff;
+                return getJSDate(b.date) - getJSDate(a.date);
+            });
+        }
+        return sorted.sort((a, b) => getJSDate(b.date) - getJSDate(a.date));
+    }
+    if (activeTab === 'riwayat_rekap') {
+        const getWorkerCount = (item) => Array.isArray(item.workerDetails) ? item.workerDetails.length : (item.workerCount || 0);
+        if (sortValue === 'amount_desc') {
+            return sorted.sort((a, b) => {
+                const diff = (b.amount || 0) - (a.amount || 0);
+                if (diff !== 0) return diff;
+                return getJSDate(b.createdAt || b.date) - getJSDate(a.createdAt || a.date);
+            });
+        }
+        if (sortValue === 'workers_desc') {
+            return sorted.sort((a, b) => {
+                const diff = getWorkerCount(b) - getWorkerCount(a);
+                if (diff !== 0) return diff;
+                return getJSDate(b.createdAt || b.date) - getJSDate(a.createdAt || a.date);
+            });
+        }
+        return sorted.sort((a, b) => getJSDate(b.createdAt || b.date) - getJSDate(a.createdAt || a.date));
+    }
+    return items;
 }
 
 
@@ -76,7 +192,7 @@ function groupItemsByProfession(items) {
     return grouped;
 }
 
-function _renderGroupedListItems(groupedData, type) {
+function _renderGroupedListItems(groupedData, type, options = {}) {
     let html = '';
     
     let sortedGroupKeys;
@@ -101,7 +217,7 @@ function _renderGroupedListItems(groupedData, type) {
         if (type === 'harian') {
             groupHTML = _getJurnalHarianListHTML(sortedItemsInGroup);
         } else if (type === 'riwayat_rekap') { // Nama tab baru
-            groupHTML = _getRekapGajiListHTML(sortedItemsInGroup);
+            groupHTML = _getRekapGajiListHTML(sortedItemsInGroup, options.rekapPendingOptions || {});
         } else if (type === 'per_pekerja') {
             groupHTML = _getJurnalPerPekerjaListHTML(sortedItemsInGroup);
         }
@@ -122,35 +238,26 @@ async function renderJurnalContent(append = false) {
         container.innerHTML = createListSkeletonHTML(5);
     }
 
-    // --- PERUBAHAN: Logika filter tanggal dipindahkan ke sini ---
     const activeTab = appState.activeSubPage.get('jurnal') || 'harian';
-    let startDate, endDate;
-
-    // Hanya terapkan filter tanggal jika BUKAN tab 'harian'
+    let startDate;
+    let endDate;
     if (activeTab === 'per_pekerja' || activeTab === 'riwayat_rekap') {
-        const startDateStr = $('#jurnal-start-date')?.value;
-        const endDateStr = $('#jurnal-end-date')?.value;
-        
-        startDate = startDateStr ? parseLocalDate(startDateStr) : new Date('2000-01-01');
-        if (startDateStr) startDate.setHours(0, 0, 0, 0);
-        
-        endDate = endDateStr ? parseLocalDate(endDateStr) : new Date('2100-01-01');
-        if (endDateStr) endDate.setHours(23, 59, 59, 999);
+        const { startDateObj, endDateObj } = getAppliedJurnalDateRange();
+        startDate = startDateObj;
+        endDate = endDateObj;
     } else {
-        // Untuk tab 'harian', gunakan rentang "all time"
         startDate = new Date('2000-01-01');
         endDate = new Date('2100-01-01');
     }
-    // --- AKHIR PERUBAHAN ---
 
     let sourceItems = [];
+    let rekapPendingOptions = null;
 
     if (activeTab === 'harian') {
+        const allowedStatuses = new Set(['full_day', 'half_day', 'absent']);
         const groupedByDate = (appState.attendanceRecords || []).reduce((acc, record) => {
             if (record.isDeleted) return acc;
             const recDate = getJSDate(record.date);
-
-            // Terapkan filter tanggal (akan lolos jika tab 'harian' krn rentang all-time)
             if (recDate < startDate || recDate > endDate) return acc;
 
             const y = recDate.getFullYear();
@@ -158,13 +265,21 @@ async function renderJurnalContent(append = false) {
             const d = String(recDate.getDate()).padStart(2, '0');
             const date = `${y}-${m}-${d}`;
 
-            if (!acc[date]) acc[date] = { date, totalPay: 0, workerCount: new Set() };
+            if (!acc[date]) {
+                acc[date] = { date, totalPay: 0, workerIds: new Set() };
+            }
             acc[date].totalPay += record.totalPay || 0;
-            acc[date].workerCount.add(record.workerId);
+            if (allowedStatuses.has(record.attendanceStatus)) {
+                acc[date].workerIds.add(record.workerId);
+            }
             return acc;
         }, {});
-        sourceItems = Object.values(groupedByDate).sort((a, b) => getJSDate(b.date) - getJSDate(a.date));
-        
+        sourceItems = Object.values(groupedByDate).map(item => ({
+            date: item.date,
+            totalPay: item.totalPay,
+            workerCount: item.workerIds.size
+        }));
+
     } else if (activeTab === 'per_pekerja') {
         // Filter absensi berdasarkan rentang tanggal
         const attendance = (appState.attendanceRecords || []).filter(r => {
@@ -210,12 +325,18 @@ async function renderJurnalContent(append = false) {
                 const billDate = getJSDate(b.createdAt); 
                 return billDate >= startDate && billDate <= endDate;
             })
-            .sort((a, b) => getJSDate(b.createdAt) - getJSDate(a.createdAt));
-        
-        sourceItems.forEach(item => {
-            item.date = item.createdAt; 
-        });
+            .map(item => ({
+                ...item,
+                date: item.createdAt,
+                workerCount: Array.isArray(item.workerDetails) ? item.workerDetails.length : 0
+            }));
+        const pendingMaps = await getPendingQuotaMaps(['bills']);
+        rekapPendingOptions = {
+            pendingBills: pendingMaps.get('bills') || new Map()
+        };
     }
+
+    sourceItems = sortJurnalItems(activeTab, sourceItems);
 
     if (signal?.aborted) throw new DOMException('Operation aborted', 'AbortError');
 
@@ -258,7 +379,7 @@ async function renderJurnalContent(append = false) {
         const dateField = (activeTab === 'harian') ? 'date' : 'createdAt';
         groupedData = groupItemsByMonth(itemsToDisplay, dateField);
     }
-    const listHTML = _renderGroupedListItems(groupedData, activeTab);
+    const listHTML = _renderGroupedListItems(groupedData, activeTab, { rekapPendingOptions });
     
     let listWrapper = container.querySelector('#journal-grouped-wrapper');
     let newlyAddedElements = [];
@@ -385,26 +506,17 @@ function initJurnalHeroCarousel() {
 
     // --- PERUBAHAN: Pisahkan buildSlides agar bisa dipanggil ulang ---
     const buildSlides = async () => {
-        // --- PERUBAHAN: Logika filter tanggal dipindahkan ke sini ---
         const activeTab = appState.activeSubPage.get('jurnal') || 'harian';
-        let startDate, endDate;
-
-        // Hanya terapkan filter tanggal jika BUKAN tab 'harian'
+        let startDate;
+        let endDate;
         if (activeTab === 'per_pekerja' || activeTab === 'riwayat_rekap') {
-            const startDateStr = $('#jurnal-start-date')?.value;
-            const endDateStr = $('#jurnal-end-date')?.value;
-            
-            startDate = startDateStr ? parseLocalDate(startDateStr) : new Date('2000-01-01');
-            if (startDateStr) startDate.setHours(0, 0, 0, 0);
-            
-            endDate = endDateStr ? parseLocalDate(endDateStr) : new Date('2100-01-01');
-            if (endDateStr) endDate.setHours(23, 59, 59, 999);
+            const { startDateObj, endDateObj } = getAppliedJurnalDateRange();
+            startDate = startDateObj;
+            endDate = endDateObj;
         } else {
-            // Untuk tab 'harian', statistik hero adalah "all time"
             startDate = new Date('2000-01-01');
             endDate = new Date('2100-01-01');
         }
-        // --- AKHIR PERUBAHAN ---
 
         // --- PERUBAHAN: Filter data berdasarkan rentang tanggal ---
         const attendance = (appState.attendanceRecords || []).filter(r => {
@@ -429,6 +541,13 @@ function initJurnalHeroCarousel() {
 
         const totalWagesPaid = salaryBills.filter(b => b.status === 'paid').reduce((sum, b) => sum + (b.amount || 0), 0);
         const totalWagesUnpaid = salaryBills.filter(b => b.status === 'unpaid').reduce((sum, b) => sum + Math.max(0, (b.amount || 0) - (b.paidAmount || 0)), 0);
+        const totalUnrecapped = attendance.reduce((sum, rec) => {
+            const isPaid = rec.isPaid === true || rec.isPaid === 1;
+            if (!isPaid) {
+                return sum + (rec.totalPay || 0);
+            }
+            return sum;
+        }, 0);
 
         // --- PERUBAHAN: Judul slide diubah untuk menandakan data difilter/all-time ---
         const titleSuffix = (activeTab === 'harian') ? '(Semua Waktu)' : '(Filter)';
@@ -449,6 +568,14 @@ function initJurnalHeroCarousel() {
                     `Belum Lunas: ${fmtIDR(totalWagesUnpaid)}`,
                 ]
             },
+            {
+                title: `Upah Belum Direkap ${titleSuffix}`,
+                tone: 'danger',
+                lines: [
+                    `${fmtIDR(totalUnrecapped)} belum dibayar`,
+                    `${attendance.filter(rec => !(rec.isPaid === true || rec.isPaid === 1)).length} catatan`
+                ]
+            }
         ];
         // --- AKHIR PERUBAHAN ---
 
@@ -552,18 +679,27 @@ function initJurnalPage() {
         </div>`;
 
     // --- PERUBAHAN: Filter Tanggal (Labels Dihapus) ---
-    const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
-    const todayStr = today.toISOString().slice(0, 10);
+    const { startDate: initialStartDate, endDate: initialEndDate } = getAppliedJurnalFilterStrings();
 
     const dateFilterHTML = `
         <div class="jurnal-date-filter-bar rekap-filters" id="jurnal-date-filters">
             <div class="form-group">
-                <input type="date" id="jurnal-start-date" value="${firstDayOfMonth}">
+                <input type="date" id="jurnal-start-date" value="${initialStartDate}">
             </div>
             <div class="form-group">
-                <input type="date" id="jurnal-end-date" value="${todayStr}">
+                <input type="date" id="jurnal-end-date" value="${initialEndDate}">
             </div>
+            <div class="jurnal-filter-actions">
+                <button type="button" class="btn btn-secondary" id="jurnal-filter-reset">Reset</button>
+                <button type="button" class="btn btn-primary" id="jurnal-filter-apply">Terapkan</button>
+            </div>
+        </div>
+    `;
+
+    const sortBarHTML = `
+        <div class="jurnal-sort-bar" id="jurnal-sort-bar">
+            <label for="jurnal-sort-select">Urutkan</label>
+            <select id="jurnal-sort-select"></select>
         </div>
     `;
     // --- AKHIR PERUBAHAN ---
@@ -576,6 +712,7 @@ function initJurnalPage() {
                 <div id="jurnal-filter-container">
                     ${dateFilterHTML}
                 </div>
+                ${sortBarHTML}
                 ${tabsHTML}
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content"></div>
@@ -606,6 +743,7 @@ function initJurnalPage() {
                 
                 renderJurnalContent(false); // Muat ulang konten (yang kini punya logika filter)
                 initJurnalHeroCarousel(); // Muat ulang hero (yang kini punya logika filter)
+                updateJurnalSortControl();
             }
         }, { signal: listenerSignal });
     }
@@ -617,18 +755,9 @@ function initJurnalPage() {
     // --- AKHIR PERUBAHAN ---
 
 
-    // --- PERUBAHAN: Pastikan listener tanggal me-render ulang KEDUA bagian ---
-    const dateFiltersContainer = container.querySelector('#jurnal-date-filters');
-    if (dateFiltersContainer) {
-        dateFiltersContainer.addEventListener('change', (e) => {
-            const target = e.target;
-            if (target.type === 'date') {
-                renderJurnalContent(false); 
-                initJurnalHeroCarousel(); // Ini sudah benar
-            }
-        }, { signal: listenerSignal });
-    }
-    // --- AKHIR PERUBAHAN ---
+    setupJurnalFilterControls(listenerSignal);
+    setupJurnalSortControl(listenerSignal);
+    updateJurnalSortControl();
 
     journalObserverInstance = initInfiniteScroll('#sub-page-content');
     
@@ -681,3 +810,46 @@ function initJurnalPage() {
 }
 
 export { initJurnalPage };
+
+function setupJurnalFilterControls(listenerSignal) {
+    const startInput = document.getElementById('jurnal-start-date');
+    const endInput = document.getElementById('jurnal-end-date');
+    const applyBtn = document.getElementById('jurnal-filter-apply');
+    const resetBtn = document.getElementById('jurnal-filter-reset');
+    if (!startInput || !endInput) return;
+
+    applyBtn?.addEventListener('click', () => {
+        const startVal = startInput.value;
+        const endVal = endInput.value;
+        if (!startVal || !endVal) {
+            toast('error', 'Rentang tanggal harus diisi.');
+            return;
+        }
+        if (new Date(startVal) > new Date(endVal)) {
+            toast('error', 'Tanggal mulai tidak boleh melebihi tanggal akhir.');
+            return;
+        }
+        persistJurnalFilters(startVal, endVal);
+        renderJurnalContent(false);
+        initJurnalHeroCarousel();
+    }, { signal: listenerSignal });
+
+    resetBtn?.addEventListener('click', () => {
+        const defaults = getDefaultJurnalFilterStrings();
+        startInput.value = defaults.startDate;
+        endInput.value = defaults.endDate;
+        persistJurnalFilters(defaults.startDate, defaults.endDate);
+        renderJurnalContent(false);
+        initJurnalHeroCarousel();
+    }, { signal: listenerSignal });
+}
+
+function setupJurnalSortControl(listenerSignal) {
+    const select = document.getElementById('jurnal-sort-select');
+    if (!select) return;
+    select.addEventListener('change', (e) => {
+        const activeTab = appState.activeSubPage.get('jurnal') || 'harian';
+        setJurnalSortValue(activeTab, e.target.value);
+        renderJurnalContent(false);
+    }, { signal: listenerSignal });
+}

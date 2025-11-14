@@ -64,6 +64,64 @@ body.page-laporan::before { background: var(--panel) !important; background-imag
   flex-grow: 1;
 }
 
+.jurnal-date-filter-bar {
+  width: 100%;
+}
+
+.jurnal-filter-actions {
+  width: 100%;
+  display: flex;
+  gap: .5rem;
+  margin-top: .35rem;
+}
+
+.jurnal-filter-actions .btn {
+  flex: 1;
+  min-height: 36px;
+}
+
+@media (min-width: 640px) {
+  .jurnal-filter-actions {
+    justify-content: flex-end;
+    gap: .75rem;
+  }
+  .jurnal-filter-actions .btn {
+    flex: 0;
+    min-width: auto;
+  }
+}
+
+.jurnal-sort-bar {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-top: .5rem;
+}
+
+.jurnal-sort-bar label {
+  font-size: .8rem;
+  color: var(--text-dim);
+}
+
+.jurnal-sort-bar select {
+  flex: 1;
+  min-width: 160px;
+  padding: .4rem .5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+@media (max-width: 599px) {
+  .jurnal-sort-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .jurnal-sort-bar select {
+    width: 100%;
+  }
+}
+
 .rekap-results {
   margin-top: 1.5rem;
 }

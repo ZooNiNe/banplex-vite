@@ -15,6 +15,7 @@ import { TEAM_ID } from '../../config/constants.js';
 import { db, billsCol, logsCol } from '../../config/firebase.js';
 import { getDocs, collection, doc, query, orderBy, startAfter, limit, onSnapshot, where } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js';
 import { showPaymentSuccessPreviewPanel } from '../../services/data/uiInteractionService.js';
+import { createModal } from '../components/modal.js';
 
 function createIcon(iconName, size = 16, classes = '') {
     const icons = {
@@ -108,15 +109,29 @@ async function fetchLogsPage() {
         logsPagination.hasMore = false;
     }
 
-    // Tambahkan pending logs lokal di awal page pertama
     if (logsPagination.page < 0) {
+        const localEntries = [];
+        try {
+            const localQuota = await localDB.logs.where('status').equals('pending_quota').toArray();
+            localQuota.sort((a,b) => getJSDate(b.createdAt) - getJSDate(a.createdAt));
+            localEntries.push(...localQuota.map(log => ({ id: log.id || `local-log-${log.createdAt?.getTime?.() || Math.random()}`, ...log })));
+        } catch(_) {}
+
         try {
             const pending = await localDB.pending_logs.toArray();
             pending.sort((a,b) => getJSDate(b.createdAt) - getJSDate(a.createdAt));
-            const normalized = pending.map(p => ({ id: `pending-${p.createdAt?.getTime?.() || Math.random()}`, ...p }));
-            // pending muncul di paling atas (terbaru)
-            return [...normalized, ...results];
+            localEntries.push(...pending.map(p => ({ id: `pending-${p.createdAt?.getTime?.() || Math.random()}`, ...p })));
         } catch(_) {}
+
+        if (localEntries.length > 0) {
+            const seen = new Set(results.map(item => item.id));
+            const filteredLocal = localEntries.filter(entry => {
+                if (!entry.id || seen.has(entry.id)) return false;
+                seen.add(entry.id);
+                return true;
+            });
+            return [...filteredLocal, ...results];
+        }
     }
     return results;
 }

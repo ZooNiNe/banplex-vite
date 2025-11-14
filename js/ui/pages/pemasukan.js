@@ -14,6 +14,7 @@ import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infinit
 import { createListSkeletonHTML } from '../components/skeleton.js';
 import { createModal, closeModal } from '../components/modal.js';
 import { ensureMasterDataFresh } from '../../services/data/ensureMasters.js';
+import { getPendingQuotaMaps } from '../../services/pendingQuotaService.js';
 
 const ITEMS_PER_PAGE = 15;
 const INITIAL_LOAD_THRESHOLD = 20;
@@ -73,7 +74,7 @@ function groupItemsByDate(items, dateField = 'date') {
     return grouped;
 }
 
-function renderGroupedList(groupedData, type) {
+function renderGroupedList(groupedData, type, pendingMaps = {}) {
     let html = '';
     const sortedGroupLabels = Object.keys(groupedData).sort((a, b) => {
         if (a === "Hari Ini") return -1;
@@ -90,13 +91,15 @@ function renderGroupedList(groupedData, type) {
 
     sortedGroupLabels.forEach(label => {
         html += `<div class="date-group-header">${label}</div>`;
-        html += `<div class="date-group-body">${groupedData[label].map(item => _getSinglePemasukanHTML(item, type)).join('')}</div>`;
+        html += `<div class="date-group-body">${groupedData[label].map(item => {
+            const pendingLog = type === 'termin'
+                ? pendingMaps.incomes?.get(item.id)
+                : pendingMaps.funding?.get(item.id);
+            return _getSinglePemasukanHTML(item, type, { pendingLog });
+        }).join('')}</div>`;
     });
     
-    // --- PERBAIKAN DI SINI ---
-    // Hapus wrapper div dari return statement ini
     return html;
-    // --- AKHIR PERBAIKAN ---
 }
 
 
@@ -199,9 +202,15 @@ async function renderPemasukanContent(append = false) {
             return;
         }
 
+        const pendingMaps = await getPendingQuotaMaps(['incomes', 'funding_sources']);
+        const pendingOptions = {
+            incomes: pendingMaps.get('incomes') || new Map(),
+            funding: pendingMaps.get('funding_sources') || new Map()
+        };
+
         // listHTML sekarang HANYA berisi grup-grup
         const groupedData = groupItemsByDate(itemsToDisplay, 'date');
-        const listHTML = renderGroupedList(groupedData, activeTab);
+        const listHTML = renderGroupedList(groupedData, activeTab, pendingOptions);
         
         if (signal?.aborted) return; 
 

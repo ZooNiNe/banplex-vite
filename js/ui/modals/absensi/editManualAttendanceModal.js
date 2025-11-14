@@ -6,6 +6,7 @@ import { createMasterDataSelect, initCustomSelects, formatNumberInput } from "..
 import { emit } from "../../../state/eventBus.js";
 import { toast } from "../../components/toast.js";
 import { getJSDate, getLocalDayBounds, parseLocalDate } from "../../../utils/helpers.js";
+import { setManualAttendanceProject } from "../../../services/data/attendanceService.js";
 
 // ... (State lokal dan fungsi createIcon tidak berubah) ...
 // State lokal khusus untuk modal ini
@@ -459,17 +460,22 @@ export function handleOpenManualAttendanceModal(context) {
 
 export async function _showAttendanceFilterModal(onApply) {
     // ... (fungsi tidak berubah) ...
-    const { professions = [] } = appState;
-    const { professionId = 'all' } = appState.attendanceFilter || {};
+    const { projects = [] } = appState;
+    const attendanceFilter = appState.attendanceFilter || {};
+    appState.attendanceFilter = attendanceFilter;
+    const defaultProjectFilter = attendanceFilter.projectId || appState.manualAttendanceSelectedProjectId || appState.defaultAttendanceProjectId || 'all';
+    attendanceFilter.projectId = defaultProjectFilter;
 
-    const professionOptions = [
-        { value: 'all', text: 'Semua Profesi' },
-        ...professions.filter(p => !p.isDeleted).map(p => ({ value: p.id, text: p.professionName }))
+    const projectOptions = [
+        { value: 'all', text: 'Semua Proyek Aktif' },
+        ...projects
+            .filter(p => p.isWageAssignable && !p.isDeleted)
+            .map(p => ({ value: p.id, text: p.projectName }))
     ];
 
     const content = `
         <form id="attendance-filter-form">
-            ${createMasterDataSelect('filter-profession-id', 'Filter Berdasarkan Profesi', professionOptions, professionId, 'professions')}
+            ${createMasterDataSelect('filter-project-id', 'Filter Berdasarkan Proyek', projectOptions, defaultProjectFilter, null)}
         </form>
     `;
 
@@ -492,15 +498,20 @@ export async function _showAttendanceFilterModal(onApply) {
 
     modalEl.querySelector('#attendance-filter-form').addEventListener('submit', (e) => {
         e.preventDefault();
+        const selectedProjectId = modalEl.querySelector('#filter-project-id')?.value || 'all';
         appState.attendanceFilter = appState.attendanceFilter || {};
-        appState.attendanceFilter.professionId = modalEl.querySelector('#filter-profession-id').value;
+        appState.attendanceFilter.projectId = selectedProjectId;
+        setManualAttendanceProject(selectedProjectId);
         if (typeof onApply === 'function') onApply();
         closeModalImmediate(modalEl);
     });
 
     modalEl.querySelector('#reset-filter-btn').addEventListener('click', () => {
         appState.attendanceFilter = appState.attendanceFilter || {};
-        appState.attendanceFilter.professionId = 'all';
+        const fallbackProjectId = appState.defaultAttendanceProjectId || '';
+        const resolvedFilterValue = fallbackProjectId || 'all';
+        setManualAttendanceProject(fallbackProjectId);
+        appState.attendanceFilter.projectId = resolvedFilterValue;
         if (typeof onApply === 'function') onApply();
         closeModalImmediate(modalEl);
     });

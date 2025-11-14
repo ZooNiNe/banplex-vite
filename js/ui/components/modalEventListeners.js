@@ -119,7 +119,7 @@ export function attachModalEventListeners(type, data, closeModalFunc, contextEle
                     }
                 }
 
-                closeModalImmediate(contextElement);
+                closeModalFunc();
 
             }, { signal });
         }

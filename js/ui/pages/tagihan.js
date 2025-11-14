@@ -16,6 +16,7 @@ import { loadDataForPage } from '../../services/localDbService.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
 import { initPullToRefresh, destroyPullToRefresh } from "../components/pullToRefresh.js";
 import { showLoadingModal, hideLoadingModal } from "../components/modal.js";
+import { getPendingQuotaMaps } from '../../services/pendingQuotaService.js';
 
 const ITEMS_PER_PAGE = 15;
 const INITIAL_LOAD_THRESHOLD = 20;
@@ -92,7 +93,7 @@ function groupItemsByDate(items, dateField = 'dueDate') {
     return grouped;
 }
 
-function renderGroupedList(groupedData, dateField = 'dueDate') {
+function renderGroupedList(groupedData, dateField = 'dueDate', pendingOptions = {}) {
     let html = '';
     const sortedGroupLabels = Object.keys(groupedData).sort((a, b) => {
         if (a === "Hari Ini") return -1;
@@ -110,7 +111,7 @@ function renderGroupedList(groupedData, dateField = 'dueDate') {
 
     sortedGroupLabels.forEach(label => {
         html += `<div class="date-group-header">${label}</div>`;
-        html += `<div class="date-group-body">${_getBillsListHTML(groupedData[label])}</div>`;
+        html += `<div class="date-group-body">${_getBillsListHTML(groupedData[label], pendingOptions)}</div>`;
     });
     return `<div class="wa-card-list-wrapper grouped" id="bills-grouped-wrapper">${html}</div>`;
 }
@@ -243,6 +244,12 @@ async function renderTagihanContent(append = false) {
 
         appState.tagihan.currentList = items;
 
+        const pendingMaps = await getPendingQuotaMaps(['bills', 'expenses']);
+        const pendingOptions = {
+            pendingBills: pendingMaps.get('bills') || new Map(),
+            pendingExpenses: pendingMaps.get('expenses') || new Map()
+        };
+
         const paginationKey = `bills_${activeTab}`;
         if (!appState.pagination[paginationKey]) {
            appState.pagination[paginationKey] = { isLoading: false, hasMore: true, page: -1 };
@@ -306,14 +313,14 @@ async function renderTagihanContent(append = false) {
 
         if (append) {
             if (!billsGroupedWrapper) {
-                container.innerHTML = renderGroupedList(groupedData, dateField);
+                container.innerHTML = renderGroupedList(groupedData, dateField, pendingOptions);
                 billsGroupedWrapper = container.querySelector('#bills-grouped-wrapper');
                 if (billsGroupedWrapper) {
                      newlyAddedElements = Array.from(billsGroupedWrapper.querySelectorAll('.wa-card-v2-wrapper'));
                 }
             } else {
                 const tempDiv = document.createElement('div');
-                const newItemsHtml = _getBillsListHTML(itemsToDisplay);
+                const newItemsHtml = _getBillsListHTML(itemsToDisplay, pendingOptions);
                 tempDiv.innerHTML = newItemsHtml; 
                 newlyAddedElements = Array.from(tempDiv.children); 
 
@@ -339,7 +346,7 @@ async function renderTagihanContent(append = false) {
                 }
             }
         } else {
-            container.innerHTML = renderGroupedList(groupedData, dateField);
+            container.innerHTML = renderGroupedList(groupedData, dateField, pendingOptions);
             billsGroupedWrapper = container.querySelector('#bills-grouped-wrapper');
             container.scrollTop = 0;
             if (billsGroupedWrapper) {
