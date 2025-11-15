@@ -1,12 +1,17 @@
 import { emit, on } from "../../state/eventBus.js";
 import { appState } from "../../state/appState.js";
 import { db, materialsCol, stockTransactionsCol } from "../../config/firebase.js";
-import { doc, runTransaction, increment, serverTimestamp, Timestamp, collection, getDocs, where, query } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+import { doc, runTransaction, increment, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { toast } from "../../ui/components/toast.js";
 import { startGlobalLoading } from "../../ui/components/modal.js";
 import { _logActivity } from "../logService.js";
 import { parseFormattedNumber } from "../../utils/formatters.js";
 import { apiRequest, mapDeleteEndpoint } from "../../utils/formPersistence.js";
+import { localDB, loadAllLocalDataToState } from "../localDbService.js";
+import { queueOutbox } from "../outboxService.js";
+import { _isQuotaExceeded, requestSync } from "../syncService.js";
+import { generateUUID } from "../../utils/helpers.js";
+import { fetchAndCacheData } from "./fetch.js";
 
 export async function processStokIn(form) {
     const materialId = form.dataset.id;
@@ -46,6 +51,7 @@ export async function processStokIn(form) {
             _logActivity('Mencatat Stok Masuk (Lokal)', { materialId, quantity });
             await loadAllLocalDataToState(); // Muat ulang state
             emit('ui.page.render'); // Render ulang halaman stok
+            emit('ui.stok.renderContent');
             requestSync({ silent: true });
             return;
         } catch (error) {
@@ -79,6 +85,7 @@ export async function processStokIn(form) {
             quantity
         });
         emit('ui.page.render');
+        await refreshStockDataCaches();
     } catch (error) {
         console.error(error);
         throw error;
@@ -126,6 +133,7 @@ export async function processStokOut(form) {
             _logActivity('Mencatat Stok Keluar (Lokal)', { materialId, quantity, projectId });
             await loadAllLocalDataToState(); // Muat ulang state
             emit('ui.page.render'); // Render ulang halaman stok
+            emit('ui.stok.renderContent');
             requestSync({ silent: true });
             return;
         } catch (error) {
@@ -169,10 +177,143 @@ export async function processStokOut(form) {
             projectId
         });
         emit('ui.page.render');
+        await refreshStockDataCaches();
     } catch (error) {
         console.error(error);
         throw error;
     }
+}
+
+export async function processBatchStockOut(materialId, transactions = [], dateStr) {
+    const normalizedTx = Array.isArray(transactions)
+        ? transactions
+            .map(tx => ({
+                projectId: tx?.projectId,
+                quantity: Number(tx?.quantity) || 0
+            }))
+            .filter(tx => tx.projectId && tx.quantity > 0)
+        : [];
+
+    if (!materialId) throw new Error('Material tidak valid.');
+    if (normalizedTx.length === 0) throw new Error('Tidak ada alokasi stok yang valid.');
+
+    const material = appState.materials.find(m => m.id === materialId);
+    if (!material) throw new Error('Data material tidak ditemukan.');
+
+    const totalQuantity = normalizedTx.reduce((sum, tx) => sum + tx.quantity, 0);
+    if (totalQuantity <= 0) throw new Error('Total stok keluar harus lebih dari 0.');
+
+    const usageDate = dateStr ? new Date(dateStr) : new Date();
+    if (Number.isNaN(usageDate.getTime())) {
+        throw new Error('Tanggal penyaluran tidak valid.');
+    }
+
+    if (!navigator.onLine || _isQuotaExceeded()) {
+        try {
+            const currentStock = material?.currentStock || 0;
+            if (currentStock < totalQuantity) {
+                throw new Error('Stok lokal tidak mencukupi.');
+            }
+            const newStock = currentStock - totalQuantity;
+            await localDB.transaction('rw', localDB.materials, localDB.stock_transactions, localDB.outbox, async () => {
+                await localDB.materials.update(materialId, {
+                    currentStock: newStock,
+                    syncState: 'pending_update',
+                    updatedAt: new Date()
+                });
+
+                for (const tx of normalizedTx) {
+                    const newTxId = generateUUID();
+                    const record = {
+                        id: newTxId,
+                        materialId,
+                        quantity: tx.quantity,
+                        date: usageDate,
+                        type: 'out',
+                        projectId: tx.projectId,
+                        createdAt: new Date(),
+                        syncState: 'pending_create',
+                        isDeleted: 0
+                    };
+                    await localDB.stock_transactions.add(record);
+                    await queueOutbox({
+                        table: 'stock_transactions',
+                        docId: newTxId,
+                        op: 'upsert',
+                        payload: record,
+                        priority: 7
+                    });
+                }
+
+                await queueOutbox({
+                    table: 'materials',
+                    docId: materialId,
+                    op: 'upsert',
+                    payload: { id: materialId, currentStock: newStock },
+                    priority: 6
+                });
+            });
+
+        _logActivity('Mencatat Penyaluran Stok (Lokal)', {
+            materialId,
+            totalQuantity,
+            detailCount: normalizedTx.length
+        });
+        await loadAllLocalDataToState();
+        emit('ui.page.render');
+        emit('ui.stok.renderContent');
+        requestSync({ silent: true });
+        toast('success', 'Penyaluran stok tersimpan offline.');
+        return;
+        } catch (error) {
+            console.error('Gagal memproses batch stok keluar (offline):', error);
+            throw error;
+        }
+    }
+
+    try {
+        const materialRef = doc(materialsCol, materialId);
+        await runTransaction(db, async (transaction) => {
+            const matSnapshot = await transaction.get(materialRef);
+            if (!matSnapshot.exists()) {
+                throw new Error('Material tidak ditemukan.');
+            }
+            const currentStock = matSnapshot.data().currentStock || 0;
+            if (currentStock < totalQuantity) {
+                throw new Error('Stok tidak mencukupi!');
+            }
+            const currentRev = matSnapshot.data().rev || 0;
+            transaction.update(materialRef, {
+                currentStock: increment(-totalQuantity),
+                rev: currentRev + 1,
+                updatedAt: serverTimestamp()
+            });
+
+            for (const tx of normalizedTx) {
+                const txRef = doc(stockTransactionsCol);
+                transaction.set(txRef, {
+                    materialId,
+                    quantity: tx.quantity,
+                    date: Timestamp.fromDate(usageDate),
+                    type: 'out',
+                    projectId: tx.projectId,
+                    createdAt: serverTimestamp()
+                });
+            }
+        });
+
+    _logActivity('Mencatat Penyaluran Stok', {
+        materialId,
+        totalQuantity,
+        detailCount: normalizedTx.length
+    });
+    emit('ui.page.render');
+    await refreshStockDataCaches();
+    toast('success', 'Penyaluran stok berhasil.');
+} catch (error) {
+    console.error('Gagal memproses batch stok keluar:', error);
+    throw error;
+}
 }
 
 export async function handleEditStockTransaction(dataset) {
@@ -185,6 +326,18 @@ export async function handleDeleteStockTransaction(dataset) {
         onConfirm: () => _processStockTransactionDelete(dataset)
     });
 } 
+
+async function refreshStockDataCaches() {
+    try {
+        await Promise.all([
+            fetchAndCacheData('materials', materialsCol, 'materialName'),
+            fetchAndCacheData('stockTransactions', stockTransactionsCol, 'date')
+        ]);
+        emit('ui.stok.renderContent');
+    } catch (error) {
+        console.error('Gagal menyegarkan cache stok:', error);
+    }
+}
 
 async function _processStockTransactionUpdate(form) {
     const { id, type, oldQty, materialId } = form.dataset;

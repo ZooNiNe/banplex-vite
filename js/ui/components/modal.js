@@ -150,6 +150,9 @@ export function createModal(type, data = {}) {
     if (data.isUtility) {
          modalEl.dataset.utilityModal = 'true';
     }
+    if (data.allowContentOverflow) {
+        modalEl.dataset.allowContentOverflow = 'true';
+    }
 
     const controller = new AbortController();
     modalEl.__controller = controller;

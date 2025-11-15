@@ -36,11 +36,35 @@
   margin: 0 0 0.3rem 0;
   color: var(--hero-text);
 }
+.hero-content .hero-kicker {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 0.2rem 0;
+  color: color-mix(in srgb, var(--hero-text) 60%, transparent);
+}
+.hero-content .hero-subtitle {
+  margin: 0 0 0.6rem 0;
+  font-size: clamp(0.85rem, 2.2vw, 0.95rem);
+  color: color-mix(in srgb, var(--hero-text) 80%, transparent);
+}
 .hero-content p {
   font-size: clamp(0.9rem, 2.5vw, 1rem); /* Ukuran font adaptif */
   color: color-mix(in srgb, var(--hero-text) 75%, transparent);
   margin: 0;
   max-width: 90%; /* Batasi lebar teks di mobile */
+}
+.hero-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: clamp(0.85rem, 2.2vw, 0.95rem);
+  color: color-mix(in srgb, var(--hero-text) 85%, transparent);
+}
+.hero-metrics span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 .hero-illustration {
   position: absolute;
@@ -229,6 +253,37 @@
 @keyframes fadeIn {
 from { opacity: 0; }
 to { opacity: 1; }
+}
+
+.page-jurnal .dashboard-hero-carousel {
+  margin-top: 0.5rem;
+}
+.page-jurnal .hero-slide {
+  padding: 1.15rem 1.25rem;
+  min-height: 160px;
+}
+.page-jurnal .hero-slide h1 {
+  font-size: 1.2rem;
+  margin-bottom: 0.35rem;
+}
+.page-jurnal .hero-slide p {
+  font-size: 0.95rem;
+}
+
+@media (max-width: 599px) {
+  .page-jurnal .hero-slide {
+    min-height: 140px;
+    padding: 0.85rem 1rem;
+  }
+  .page-jurnal .hero-slide h1 {
+    font-size: 1.05rem;
+  }
+  .page-jurnal .hero-slide p {
+    font-size: 0.85rem;
+  }
+  .page-jurnal .hero-indicators {
+    bottom: 0.3rem;
+  }
 }
 
 

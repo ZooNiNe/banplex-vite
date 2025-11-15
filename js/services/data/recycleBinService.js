@@ -11,6 +11,7 @@ import { _logActivity } from "../logService.js";
 import { deactivateSelectionMode } from "../../ui/components/selection.js";
 import { _safeFirestoreWrite } from "./adminService.js";
 import { _performSoftDelete } from "./utils/deleteUtils.js";
+import { queueOutbox } from "../outboxService.js";
 
 export async function _handleEmptyRecycleBin() {
     try {
@@ -150,54 +151,66 @@ async function executePermanentDeletion(items) {
     const localDeletions = new Map(); 
 
     try {
-        const tablesToModify = [...new Set(items.map(item => item.table))];
-        
-        if (tablesToModify.includes('bills') && !tablesToModify.includes('expenses')) {
-            tablesToModify.push('expenses');
-        }
-        if (tablesToModify.includes('expenses') && !tablesToModify.includes('bills')) {
-            tablesToModify.push('bills');
-        }
+        const enrichedItems = await Promise.all(items.map(async (item) => {
+            if (item.table === 'bills') {
+                const bill = await localDB.bills.get(item.id);
+                return { ...item, bill };
+            }
+            return item;
+        }));
+
+        const tablesToModify = [...new Set(enrichedItems.map(item => item.table))];
+        if (tablesToModify.includes('bills') && !tablesToModify.includes('expenses')) tablesToModify.push('expenses');
+        if (tablesToModify.includes('expenses') && !tablesToModify.includes('bills')) tablesToModify.push('bills');
+        if (tablesToModify.includes('bills')) tablesToModify.push('attendance_records');
         const dexieTables = tablesToModify.map(name => localDB[name]).filter(Boolean);
 
         await localDB.transaction('rw', dexieTables, async () => {
-            for (const item of items) {
+            const now = new Date();
+            for (const item of enrichedItems) {
                 const { id, table } = item;
                 if (!table || !id) continue;
                 const dexieTable = localDB[table];
-                if (dexieTable) {
-                    try {
-                        
-                        if (table === 'bills') {
-                            const bill = await localDB.bills.get(id);
-                            if (bill && bill.expenseId && bill.type !== 'gaji' && bill.type !== 'fee') {
-                                await localDB.expenses.delete(bill.expenseId);
-                                if (!localDeletions.has('expenses')) localDeletions.set('expenses', []);
-                                localDeletions.get('expenses').push(bill.expenseId);
-                            }
-                        } else if (table === 'expenses') {
-                            const bill = await localDB.bills.where('expenseId').equals(id).first();
-                            if (bill) {
-                                await localDB.bills.delete(bill.id);
-                                if (!localDeletions.has('bills')) localDeletions.set('bills', []);
-                                localDeletions.get('bills').push(bill.id);
-                            }
-                        }
-                        await dexieTable.delete(id);
-                        if (!localDeletions.has(table)) {
-                            localDeletions.set(table, []);
-                        }
-                        localDeletions.get(table).push(id);
-                        successCount++;
-                         const domId = `trash-${id}`; 
-                        emit('ui.animate.removeItem', domId);
-                        processedItemIds.push(id); 
-                    } catch (localError) {
-                        console.error(`Gagal menghapus lokal item ${id} dari tabel ${table}:`, localError);
-                        failedItems.push(id);
-                    }
-                } else {
+                if (!dexieTable) {
                     console.warn(`Tabel Dexie tidak ditemukan untuk: ${table}. Item ID: ${id}`);
+                    failedItems.push(id);
+                    continue;
+                }
+                try {
+                    if (table === 'bills') {
+                        const bill = item.bill || await localDB.bills.get(id);
+                        if (bill && bill.recordIds && bill.type === 'gaji') {
+                            const attUpdate = { isPaid: false, billId: null, syncState: 'pending_update', updatedAt: now };
+                            await localDB.attendance_records.where('id').anyOf(bill.recordIds).modify(attUpdate);
+                            if (!localDeletions.has('attendance_records')) localDeletions.set('attendance_records', []);
+                            localDeletions.get('attendance_records').push(...bill.recordIds);
+                            for (const rid of bill.recordIds) {
+                                try { await queueOutbox({ table: 'attendance_records', docId: rid, op: 'upsert', payload: { id: rid, isPaid: false, billId: null }, priority: 6 }); } catch (_) {}
+                            }
+                        }
+                        if (bill && bill.expenseId && bill.type !== 'gaji' && bill.type !== 'fee') {
+                            await localDB.expenses.delete(bill.expenseId);
+                            if (!localDeletions.has('expenses')) localDeletions.set('expenses', []);
+                            localDeletions.get('expenses').push(bill.expenseId);
+                        }
+                    } else if (table === 'expenses') {
+                        const bill = await localDB.bills.where('expenseId').equals(id).first();
+                        if (bill) {
+                            await localDB.bills.delete(bill.id);
+                            if (!localDeletions.has('bills')) localDeletions.set('bills', []);
+                            localDeletions.get('bills').push(bill.id);
+                        }
+                    }
+
+                    await dexieTable.delete(id);
+                    if (!localDeletions.has(table)) localDeletions.set(table, []);
+                    localDeletions.get(table).push(id);
+                    successCount++;
+                    const domId = `trash-${id}`; 
+                    emit('ui.animate.removeItem', domId);
+                    processedItemIds.push(id); 
+                } catch (localError) {
+                    console.error(`Gagal menghapus lokal item ${id} dari tabel ${table}:`, localError);
                     failedItems.push(id);
                 }
             }

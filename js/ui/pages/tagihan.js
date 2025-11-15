@@ -47,73 +47,80 @@ function createIcon(iconName, size = 18, classes = '') {
     return icons[iconName] || '';
 }
 function groupItemsByDate(items, dateField = 'dueDate') {
-    const grouped = {};
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const yesterdayKey = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const groups = new Map();
 
     items.forEach(item => {
-        let sortDateValue, displayDateValue;
+        let primaryDate;
         try {
-            sortDateValue = getJSDate(item.createdAt || item[dateField] || item.date);
-            displayDateValue = getJSDate(item[dateField] || item.date);
-            if (isNaN(sortDateValue.getTime()) || isNaN(displayDateValue.getTime())) {
-                throw new Error("Invalid date");
-            }
-        } catch (e) {
-            sortDateValue = new Date();
-            displayDateValue = new Date();
+            primaryDate = getJSDate(item[dateField] || item.date || item.createdAt);
+            if (isNaN(primaryDate.getTime())) throw new Error('invalid date');
+        } catch (_) {
+            primaryDate = new Date();
         }
-
-        const displayDateKey = displayDateValue.toISOString().slice(0, 10);
-
+        const normalized = new Date(primaryDate);
+        normalized.setHours(0, 0, 0, 0);
+        const groupKey = normalized.toISOString().slice(0, 10);
         let groupLabel;
-        if (displayDateKey === today) {
-            groupLabel = "Hari Ini";
-        } else if (displayDateKey === yesterday) {
-            groupLabel = "Kemarin";
-        } else {
-            groupLabel = formatDate(displayDateKey, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-        }
+        if (groupKey === todayKey) groupLabel = "Hari Ini";
+        else if (groupKey === yesterdayKey) groupLabel = "Kemarin";
+        else groupLabel = formatDate(normalized, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-        if (!grouped[groupLabel]) {
-            grouped[groupLabel] = [];
+        if (!groups.has(groupKey)) {
+            groups.set(groupKey, { key: groupKey, label: groupLabel, sortDate: primaryDate, items: [] });
         }
-        grouped[groupLabel].push(item);
+        groups.get(groupKey).items.push(item);
     });
 
-    for (const label in grouped) {
-        grouped[label].sort((a, b) => {
-             let dateA, dateB;
-             try { dateA = getJSDate(a.createdAt || a.dueDate || a.date); if(isNaN(dateA.getTime())) throw Error();} catch(e){ dateA = new Date(0);}
-             try { dateB = getJSDate(b.createdAt || b.dueDate || b.date); if(isNaN(dateB.getTime())) throw Error();} catch(e){ dateB = new Date(0);}
-             return dateB - dateA;
+    groups.forEach(group => {
+        group.items.sort((a, b) => {
+            const dateA = getJSDate(a.createdAt || a[dateField] || a.date);
+            const dateB = getJSDate(b.createdAt || b[dateField] || b.date);
+            return dateB - dateA;
         });
-    }
+    });
 
-    return grouped;
+    return Array.from(groups.values()).sort((a, b) => b.sortDate - a.sortDate);
 }
 
-function renderGroupedList(groupedData, dateField = 'dueDate', pendingOptions = {}) {
-    let html = '';
-    const sortedGroupLabels = Object.keys(groupedData).sort((a, b) => {
-        if (a === "Hari Ini") return -1;
-        if (b === "Hari Ini") return 1;
-        if (a === "Kemarin") return -1;
-        if (b === "Kemarin") return 1;
-        const firstItemA = groupedData[a]?.[0];
-        const firstItemB = groupedData[b]?.[0];
-        if (!firstItemA || !firstItemB) return 0;
-        let dateA, dateB;
-        try { dateA = getJSDate(firstItemA[dateField] || firstItemA.date); if(isNaN(dateA.getTime())) throw Error();} catch(e){ dateA = new Date(0);}
-        try { dateB = getJSDate(firstItemB[dateField] || firstItemB.date); if(isNaN(dateB.getTime())) throw Error();} catch(e){ dateB = new Date(0);}
-        return dateB - dateA;
-    });
-
-    sortedGroupLabels.forEach(label => {
-        html += `<div class="date-group-header">${label}</div>`;
-        html += `<div class="date-group-body">${_getBillsListHTML(groupedData[label], pendingOptions)}</div>`;
-    });
+function renderGroupedList(groupedData, pendingOptions = {}) {
+    const html = groupedData.map(group => {
+        const bodyHTML = _getBillsListHTML(group.items, pendingOptions);
+        return `
+            <section class="date-group" data-group-key="${group.key}">
+                <div class="date-group-header">${group.label}</div>
+                <div class="date-group-body">${bodyHTML}</div>
+            </section>
+        `;
+    }).join('');
     return `<div class="wa-card-list-wrapper grouped" id="bills-grouped-wrapper">${html}</div>`;
+}
+
+function appendGroupedSections(wrapper, groups, pendingOptions = {}) {
+    const insertedNodes = [];
+    groups.forEach(group => {
+        const existingSection = wrapper.querySelector(`.date-group[data-group-key="${group.key}"]`);
+        const bodyHTML = _getBillsListHTML(group.items, pendingOptions);
+        if (existingSection) {
+            const body = existingSection.querySelector('.date-group-body');
+            if (!body) return;
+            const temp = document.createElement('div');
+            temp.innerHTML = bodyHTML;
+            Array.from(temp.children).forEach(node => {
+                body.appendChild(node);
+                if (node.classList?.contains('wa-card-v2-wrapper')) insertedNodes.push(node);
+            });
+        } else {
+            const section = document.createElement('section');
+            section.className = 'date-group';
+            section.dataset.groupKey = group.key;
+            section.innerHTML = `<div class="date-group-header">${group.label}</div><div class="date-group-body">${bodyHTML}</div>`;
+            wrapper.appendChild(section);
+            section.querySelectorAll('.wa-card-v2-wrapper')?.forEach(node => insertedNodes.push(node));
+        }
+    });
+    return insertedNodes;
 }
 
 
@@ -148,7 +155,7 @@ async function renderTagihanContent(append = false) {
 
         const activeTab = appState.activeSubPage.get('tagihan') || 'tagihan';
         const dateField = (activeTab === 'surat_jalan') ? 'date' : 'dueDate';
-        const { searchTerm, category, status, supplierId, dateStart, dateEnd, sortBy, sortDirection } = appState.billsFilter || {};
+        const { searchTerm, category, status, supplierId, projectId, dateStart, dateEnd, sortBy, sortDirection } = appState.billsFilter || {};
         const lowerSearchTerm = (searchTerm || '').toLowerCase();
 
         const categoryNav = document.getElementById('category-sub-nav-container');
@@ -185,6 +192,14 @@ async function renderTagihanContent(append = false) {
             items = items.filter(item => {
                 const expense = activeTab === 'surat_jalan' ? item : allExpenses.find(e => e.id === item.expenseId);
                 return expense && expense.supplierId === supplierId;
+            });
+        }
+
+        if (projectId && projectId !== 'all') {
+            items = items.filter(item => {
+                const expense = activeTab === 'surat_jalan' ? item : allExpenses.find(e => e.id === item.expenseId);
+                const sourceProjectId = expense?.projectId || item.projectId;
+                return sourceProjectId === projectId;
             });
         }
 
@@ -308,50 +323,19 @@ async function renderTagihanContent(append = false) {
 
         const groupedData = groupItemsByDate(itemsToDisplay, dateField);
         let newlyAddedElements = []; 
-
         let billsGroupedWrapper = container.querySelector('#bills-grouped-wrapper');
 
-        if (append) {
-            if (!billsGroupedWrapper) {
-                container.innerHTML = renderGroupedList(groupedData, dateField, pendingOptions);
-                billsGroupedWrapper = container.querySelector('#bills-grouped-wrapper');
-                if (billsGroupedWrapper) {
-                     newlyAddedElements = Array.from(billsGroupedWrapper.querySelectorAll('.wa-card-v2-wrapper'));
-                }
-            } else {
-                const tempDiv = document.createElement('div');
-                const newItemsHtml = _getBillsListHTML(itemsToDisplay, pendingOptions);
-                tempDiv.innerHTML = newItemsHtml; 
-                newlyAddedElements = Array.from(tempDiv.children); 
-
-                const firstNewItemDateLabel = Object.keys(groupedData)[0]; 
-                const lastExistingHeader = [...billsGroupedWrapper.querySelectorAll('.date-group-header')].pop();
-                let targetBody;
-
-                if (lastExistingHeader && lastExistingHeader.textContent === firstNewItemDateLabel) {
-                    targetBody = lastExistingHeader.nextElementSibling;
-                } else {
-                    const newHeader = document.createElement('div');
-                    newHeader.className = 'date-group-header';
-                    newHeader.textContent = firstNewItemDateLabel;
-                    billsGroupedWrapper.appendChild(newHeader);
-                    targetBody = document.createElement('div');
-                    targetBody.className = 'date-group-body';
-                    billsGroupedWrapper.appendChild(targetBody);
-                }
-
-                if (targetBody) {
-                    newlyAddedElements.forEach(el => targetBody.appendChild(el)); 
-                } else {
-                }
+        if (!append || !billsGroupedWrapper) {
+            container.innerHTML = renderGroupedList(groupedData, pendingOptions);
+            billsGroupedWrapper = container.querySelector('#bills-grouped-wrapper');
+            if (!append) {
+                container.scrollTop = 0;
+            }
+            if (billsGroupedWrapper) {
+                newlyAddedElements = Array.from(billsGroupedWrapper.querySelectorAll('.wa-card-v2-wrapper'));
             }
         } else {
-            container.innerHTML = renderGroupedList(groupedData, dateField, pendingOptions);
-            billsGroupedWrapper = container.querySelector('#bills-grouped-wrapper');
-            container.scrollTop = 0;
-            if (billsGroupedWrapper) {
-                 newlyAddedElements = Array.from(billsGroupedWrapper.querySelectorAll('.wa-card-v2-wrapper'));
-            }
+            newlyAddedElements = appendGroupedSections(billsGroupedWrapper, groupedData, pendingOptions);
         }
 
         newlyAddedElements.forEach((el, idx) => {

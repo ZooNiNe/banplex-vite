@@ -1,5 +1,6 @@
 export * from './htmlGenerators.js';
 export * from './customSelect.js';
+export * from './modalSelect.js';
 export * from './inputFormatters.js';
 export * from './formListeners.js';
 export * from './attachmentManager.js';

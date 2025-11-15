@@ -12,6 +12,7 @@ import { handleNavigation } from '../mainUI.js';
 import { FIELD_KEYS } from './fileStorageFieldMap.js';
 import { normalizeDistanceToMeters } from '../../utils/helpers.js';
 import * as XLSX from 'xlsx';
+import { downloadCustomTablePdf } from '../../services/reportService.js';
 
 const TABLE_COLUMNS = [
     { key: 'select', label: '', className: 'col-select' },
@@ -169,8 +170,9 @@ function renderPageShell() {
                     </div>
                     <div class="summary-actions">
                         <div class="template-downloads">
-                            <button type="button" class="btn btn-ghost" data-action="fs-download-template" data-format="xlsx">Unduh XLSX</button>
-                            <button type="button" class="btn btn-ghost" data-action="fs-download-template" data-format="csv">Unduh CSV</button>
+                            <button type="button" class="btn btn-ghost" data-action="fs-export-data" data-format="xlsx">Ekspor XLSX</button>
+                            <button type="button" class="btn btn-ghost" data-action="fs-export-data" data-format="csv">Ekspor CSV</button>
+                            <button type="button" class="btn btn-secondary" data-action="fs-export-pdf">Unduh PDF</button>
                         </div>
                         <button type="button" class="btn btn-primary" id="file-storage-create-btn">Input Data</button>
                     </div>
@@ -250,12 +252,19 @@ function attachEventListeners() {
         cleanupFns.push(() => createBtn.removeEventListener('click', handler));
     }
 
-    const templateButtons = container?.querySelectorAll?.('[data-action="fs-download-template"]') || [];
-    templateButtons.forEach(button => {
-        const handler = () => handleTemplateDownload(button.dataset.format || 'xlsx');
+    const exportButtons = container?.querySelectorAll?.('[data-action="fs-export-data"]') || [];
+    exportButtons.forEach(button => {
+        const handler = () => exportFileStorageData(button.dataset.format || 'xlsx');
         button.addEventListener('click', handler);
         cleanupFns.push(() => button.removeEventListener('click', handler));
     });
+
+    const pdfButton = container?.querySelector?.('[data-action="fs-export-pdf"]');
+    if (pdfButton) {
+        const handler = () => handleFileStoragePdfExport();
+        pdfButton.addEventListener('click', handler);
+        cleanupFns.push(() => pdfButton.removeEventListener('click', handler));
+    }
 
     const tableContainer = $('#file-storage-table');
     if (tableContainer) {
@@ -802,26 +811,84 @@ function renderPaginationControls({ perPage, currentPage, totalPages, totalItems
     `;
 }
 
-function handleTemplateDownload(format = 'xlsx') {
+function exportFileStorageData(format = 'xlsx') {
+    const { headers, rows, total } = collectFileStorageExportData();
+    if (total === 0) {
+        toast('info', 'Tidak ada data yang cocok dengan filter saat ini.');
+        return;
+    }
     const normalizedFormat = format === 'csv' ? 'csv' : 'xlsx';
-    const headers = DOWNLOADABLE_COLUMNS.map(col => col.label);
     if (normalizedFormat === 'csv') {
-        const csvContent = `${headers.join(',')}\n`;
-        const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
-        downloadBlob(blob, 'file_storage_template.csv');
-        toast('success', 'Template CSV berhasil dibuat.');
+        const csvRows = [headers.join(',')].concat(
+            rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
+        );
+        const blob = new Blob([`\uFEFF${csvRows.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
+        downloadBlob(blob, `file_storage_export_${new Date().toISOString().slice(0,10)}.csv`);
+        toast('success', 'CSV berhasil diunduh.');
         return;
     }
     try {
         const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.aoa_to_sheet([headers]);
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
-        XLSX.writeFile(workbook, 'file_storage_template.xlsx');
-        toast('success', 'Template XLSX berhasil dibuat.');
+        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
+        XLSX.writeFile(workbook, `file_storage_export_${new Date().toISOString().slice(0,10)}.xlsx`);
+        toast('success', 'XLSX berhasil diunduh.');
     } catch (error) {
-        console.error('[FileStorage] Gagal membuat template XLSX:', error);
-        toast('error', 'Gagal membuat template XLSX.');
+        console.error('[FileStorage] Gagal mengekspor XLSX:', error);
+        toast('error', 'Gagal membuat file XLSX.');
     }
+}
+
+async function handleFileStoragePdfExport() {
+    const { headers, rows, total } = collectFileStorageExportData();
+    if (total === 0) {
+        toast('info', 'Tidak ada data yang cocok dengan filter saat ini.');
+        return;
+    }
+    const filterSummary = getFileStorageFilterSummary();
+    try {
+        await downloadCustomTablePdf({
+            title: 'Rekap Database File Storage',
+            subtitle: `Total data: ${total} • Filter: ${filterSummary}`,
+            filename: `file_storage_${new Date().toISOString().slice(0,10)}.pdf`,
+            sections: [{ headers, body: rows }]
+        });
+        toast('success', 'PDF berhasil dibuat.');
+    } catch (error) {
+        console.error('[FileStorage] Gagal membuat PDF:', error);
+        toast('error', 'Gagal membuat PDF.');
+    }
+}
+
+function collectFileStorageExportData() {
+    const filtered = getFilteredList();
+    const headers = DOWNLOADABLE_COLUMNS.map(col => col.label);
+    const rows = filtered.map(item => DOWNLOADABLE_COLUMNS.map(col => formatExportValue(col.key, item)));
+    return { headers, rows, total: rows.length };
+}
+
+function formatExportValue(key, item) {
+    const raw = pickValue(item, key);
+    if (!raw) return '';
+    if (key === 'tanggalLahir') {
+        try {
+            return formatDate(raw, { day: '2-digit', month: '2-digit', year: 'numeric' });
+        } catch {
+            return getSafeString(raw);
+        }
+    }
+    if (key === 'jarak') {
+        const meters = normalizeDistanceToMeters(raw, { allowZero: true });
+        return meters === null ? getSafeString(raw) : meters.toString();
+    }
+    return getSafeString(raw);
+}
+
+function getFileStorageFilterSummary() {
+    const { gender = 'all', jenjang = 'all' } = getFilters();
+    const genderLabel = gender === 'all' ? 'Semua Jenis Kelamin' : gender;
+    const jenjangLabel = jenjang === 'all' ? 'Semua Jenjang' : jenjang;
+    return `${genderLabel} | ${jenjangLabel}`;
 }
 
 function downloadBlob(blob, filename) {

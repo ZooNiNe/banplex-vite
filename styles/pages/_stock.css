@@ -268,3 +268,42 @@
  padding: 0rem 1.5rem .5rem 0rem;
  border-bottom: 1px solid var(--line);
 }
+
+@media (max-width: 640px) {
+  .page-stok .tabs-underline {
+    padding-bottom: 0.25rem;
+    overflow-x: auto;
+    gap: 0.5rem;
+  }
+
+  #stock-usage-form .detail-summary-grid.stock-usage {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .project-stock-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .project-stock-row .project-name {
+    font-size: 0.9rem;
+  }
+
+  .project-stock-row .stepper {
+    width: 100%;
+    grid-template-columns: 36px 1fr 36px;
+    gap: 0.5rem;
+  }
+
+  .project-stock-row .qty-input {
+    height: 34px;
+    font-size: 0.95rem;
+  }
+
+  .page-stok .wa-card-v2-wrapper {
+    padding: 0.75rem;
+  }
+}

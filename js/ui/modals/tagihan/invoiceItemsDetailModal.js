@@ -98,7 +98,7 @@ export function openInvoiceItemsDetailModal(expenseInput) {
     const content = getInvoiceItemsDetailHTML(expense);
     const footerHTML = `
         <button type="button" class="btn btn-ghost" data-action="close">Tutup</button>
-        <button type="button" class="btn btn-primary" data-action="print-pdf">Cetak PDF Rincian Material</button>
+        <button type="button" class="btn btn-primary" data-action="download-invoice-pdf">Unduh PDF Rincian</button>
     `;
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
     const modal = isMobile
@@ -115,20 +115,12 @@ export function openInvoiceItemsDetailModal(expenseInput) {
                 // PERBAIKAN: Gunakan closeModalImmediate
                 try { closeModalImmediate(modal); } catch(_) {}
             }
-            if (act === 'print-pdf') {
+            if (act === 'download-invoice-pdf') {
                 try {
-                    const { handleDownloadReport } = await import('../../../services/reportService.js');
-                    const d = getJSDate(expense.date);
-                    const ymd = isNaN(d.getTime()) ? new Date().toISOString().slice(0,10) : d.toISOString().slice(0,10);
-                    // Inject temporary filters
-                    const start = document.createElement('input'); start.type='hidden'; start.id='report-start-date'; start.value = ymd;
-                    const end = document.createElement('input'); end.type='hidden'; end.id='report-end-date'; end.value = ymd;
-                    const sup = document.createElement('input'); sup.type='hidden'; sup.id='report-supplier-id'; sup.value = expense.supplierId || 'all';
-                    document.body.append(start, end, sup);
-                    await handleDownloadReport('pdf', 'material_supplier');
-                    start.remove(); end.remove(); sup.remove();
+                    const { downloadInvoiceDetailPdf } = await import('../../../services/reportService.js');
+                    await downloadInvoiceDetailPdf(expense);
                 } catch (err) {
-                    console.error('Failed generating PDF:', err);
+                    console.error('Failed generating invoice PDF:', err);
                 }
             }
         });

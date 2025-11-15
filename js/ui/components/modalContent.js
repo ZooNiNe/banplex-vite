@@ -109,6 +109,15 @@ function getModalLayout(type, data = {}) {
         'payment': () => _getModalWithHeader(data.title, data.content, data.footer),
         'imageView': () => _getImageViewerHTML(data.src),
         'invoiceItemsDetail': () => _getInvoiceItemsDetailHTML(data),
+        'welcomeModal': () => {
+            const dialog = _getSimpleDialogHTML(
+                data.title || 'Informasi',
+                data.content || '<p>Konten tidak ditemukan.</p>',
+                data.footer
+            );
+            dialog.layoutClass = [dialog.layoutClass, data.layoutClass].filter(Boolean).join(' ').trim();
+            return dialog;
+        },
         'welcomeOnboarding': () => _getWelcomeOnboardingHTML(data),
         'actionsMenu': () => ({ layoutClass: 'is-actions-menu', contentHTML: data.content }),
         'infoSheet': () => _getInfoSheetContent(data)

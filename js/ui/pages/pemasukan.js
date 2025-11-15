@@ -45,61 +45,90 @@ function createIcon(iconName, size = 18, classes = '') {
     return icons[iconName] || '';
 }
 function groupItemsByDate(items, dateField = 'date') {
-    const grouped = {};
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const yesterdayKey = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const groups = new Map();
 
     items.forEach(item => {
-        const sortDate = getJSDate(item.createdAt || item[dateField]);
-        const displayDateKey = getJSDate(item[dateField]).toISOString().slice(0, 10);
+        let primaryDate;
+        try {
+            primaryDate = getJSDate(item[dateField] || item.createdAt);
+            if (isNaN(primaryDate.getTime())) throw new Error('invalid');
+        } catch (_) {
+            primaryDate = new Date();
+        }
+        const normalized = new Date(primaryDate);
+        normalized.setHours(0, 0, 0, 0);
+        const groupKey = normalized.toISOString().slice(0, 10);
+        let label;
+        if (groupKey === todayKey) label = "Hari Ini";
+        else if (groupKey === yesterdayKey) label = "Kemarin";
+        else label = formatDate(normalized, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-        let groupLabel;
-        if (displayDateKey === today) {
-            groupLabel = "Hari Ini";
-        } else if (displayDateKey === yesterday) {
-            groupLabel = "Kemarin";
-        } else {
-            groupLabel = formatDate(displayDateKey, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        if (!groups.has(groupKey)) {
+            groups.set(groupKey, { key: groupKey, label, sortDate: primaryDate, items: [] });
         }
-        if (!grouped[groupLabel]) {
-            grouped[groupLabel] = [];
-        }
-        grouped[groupLabel].push(item);
+        groups.get(groupKey).items.push(item);
     });
 
-    for (const label in grouped) {
-        grouped[label].sort((a, b) => getJSDate(b.createdAt || b.date) - getJSDate(a.createdAt || a.date));
-    }
+    groups.forEach(group => {
+        group.items.sort((a, b) => getJSDate(b.createdAt || b[dateField]) - getJSDate(a.createdAt || a[dateField]));
+    });
 
-    return grouped;
+    return Array.from(groups.values()).sort((a, b) => b.sortDate - a.sortDate);
 }
 
 function renderGroupedList(groupedData, type, pendingMaps = {}) {
-    let html = '';
-    const sortedGroupLabels = Object.keys(groupedData).sort((a, b) => {
-        if (a === "Hari Ini") return -1;
-        if (b === "Hari Ini") return 1;
-        if (a === "Kemarin") return -1;
-        if (b === "Kemarin") return 1;
-        const firstItemA = groupedData[a]?.[0];
-        const firstItemB = groupedData[b]?.[0];
-        if (!firstItemA || !firstItemB) return 0;
-        const dateA = getJSDate(firstItemA.date);
-        const dateB = getJSDate(firstItemB.date);
-        return dateB - dateA;
-    });
-
-    sortedGroupLabels.forEach(label => {
-        html += `<div class="date-group-header">${label}</div>`;
-        html += `<div class="date-group-body">${groupedData[label].map(item => {
+    return groupedData.map(group => {
+        const body = group.items.map(item => {
             const pendingLog = type === 'termin'
                 ? pendingMaps.incomes?.get(item.id)
                 : pendingMaps.funding?.get(item.id);
             return _getSinglePemasukanHTML(item, type, { pendingLog });
-        }).join('')}</div>`;
+        }).join('');
+        return `
+            <section class="date-group" data-group-key="${group.key}">
+                <div class="date-group-header">${group.label}</div>
+                <div class="date-group-body">${body}</div>
+            </section>
+        `;
+    }).join('');
+}
+
+function appendIncomeGroups(wrapper, groups, type, pendingMaps = {}) {
+    const inserted = [];
+    groups.forEach(group => {
+        const section = wrapper.querySelector(`.date-group[data-group-key="${group.key}"]`);
+        if (section) {
+            const body = section.querySelector('.date-group-body');
+            if (!body) return;
+            const temp = document.createElement('div');
+            temp.innerHTML = group.items.map(item => {
+                const pendingLog = type === 'termin'
+                    ? pendingMaps.incomes?.get(item.id)
+                    : pendingMaps.funding?.get(item.id);
+                return _getSinglePemasukanHTML(item, type, { pendingLog });
+            }).join('');
+            Array.from(temp.children).forEach(node => {
+                body.appendChild(node);
+                if (node.classList?.contains('wa-card-v2-wrapper')) inserted.push(node);
+            });
+        } else {
+            const sectionEl = document.createElement('section');
+            sectionEl.className = 'date-group';
+            sectionEl.dataset.groupKey = group.key;
+            const entries = group.items.map(item => {
+                const pendingLog = type === 'termin'
+                    ? pendingMaps.incomes?.get(item.id)
+                    : pendingMaps.funding?.get(item.id);
+                return _getSinglePemasukanHTML(item, type, { pendingLog });
+            }).join('');
+            sectionEl.innerHTML = `<div class="date-group-header">${group.label}</div><div class="date-group-body">${entries}</div>`;
+            wrapper.appendChild(sectionEl);
+            sectionEl.querySelectorAll('.wa-card-v2-wrapper')?.forEach(node => inserted.push(node));
+        }
     });
-    
-    return html;
+    return inserted;
 }
 
 
@@ -210,34 +239,23 @@ async function renderPemasukanContent(append = false) {
 
         // listHTML sekarang HANYA berisi grup-grup
         const groupedData = groupItemsByDate(itemsToDisplay, 'date');
-        const listHTML = renderGroupedList(groupedData, activeTab, pendingOptions);
-        
         if (signal?.aborted) return; 
 
         let newlyAddedElements = [];
         let listWrapper = container.querySelector('#income-grouped-wrapper');
 
-        if (append) {
-            if (!listWrapper) {
-                // --- PERBAIKAN: Tambahkan wrapper di sini ---
-                container.innerHTML = `<div class="wa-card-list-wrapper grouped" id="income-grouped-wrapper">${listHTML}</div>`;
-                listWrapper = container.querySelector('#income-grouped-wrapper');
-            } else {
-                // --- PERBAIKAN: Logika ini sekarang sudah benar ---
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = listHTML; // listHTML HANYA berisi grup
-                newlyAddedElements = Array.from(tempDiv.children); // elemen adalah grup
-                newlyAddedElements.forEach(el => listWrapper.appendChild(el)); // Menambahkan grup ke wrapper
-            }
-        } else {
-            // --- PERBAIKAN: Tambahkan wrapper di sini ---
+        if (!append || !listWrapper) {
+            const listHTML = renderGroupedList(groupedData, activeTab, pendingOptions);
             container.innerHTML = `<div class="wa-card-list-wrapper grouped" id="income-grouped-wrapper">${listHTML}</div>`;
             listWrapper = container.querySelector('#income-grouped-wrapper');
-            container.scrollTop = 0;
-        }
-        
-        if (listWrapper && !append) {
-            newlyAddedElements = Array.from(listWrapper.querySelectorAll('.wa-card-v2-wrapper'));
+            if (!append) {
+                container.scrollTop = 0;
+            }
+            if (listWrapper) {
+                newlyAddedElements = Array.from(listWrapper.querySelectorAll('.wa-card-v2-wrapper'));
+            }
+        } else {
+            newlyAddedElements = appendIncomeGroups(listWrapper, groupedData, activeTab, pendingOptions);
         }
 
         newlyAddedElements.forEach((el, idx) => {

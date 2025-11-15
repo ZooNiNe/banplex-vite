@@ -66,29 +66,56 @@ body.page-laporan::before { background: var(--panel) !important; background-imag
 
 .jurnal-date-filter-bar {
   width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.jurnal-date-filter-bar .form-group {
+  margin: 0;
+  min-width: 0;
+}
+
+.jurnal-date-filter-bar .form-group.compact input[type="date"] {
+  padding: 0.4rem 0.55rem;
+  font-size: 0.9rem;
+}
+
+.jurnal-date-filter-bar input[type="date"]::-webkit-calendar-picker-indicator {
+  margin: 0;
 }
 
 .jurnal-filter-actions {
-  width: 100%;
+  width: auto;
   display: flex;
-  gap: .5rem;
-  margin-top: .35rem;
+  gap: .3rem;
+  justify-content: flex-end;
 }
 
 .jurnal-filter-actions .btn {
-  flex: 1;
-  min-height: 36px;
+  min-height: 34px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
 }
 
 @media (min-width: 640px) {
   .jurnal-filter-actions {
     justify-content: flex-end;
-    gap: .75rem;
+    gap: .35rem;
   }
   .jurnal-filter-actions .btn {
-    flex: 0;
-    min-width: auto;
+    flex: 0 0 auto;
   }
+}
+
+@media (max-width: 639px) {
+  .jurnal-filter-actions .btn {
+    width: 100%;
+  }
+}
+
+.jurnal-filter-actions .btn.icon-only svg {
+  margin: 0;
 }
 
 .jurnal-sort-bar {
@@ -96,29 +123,39 @@ body.page-laporan::before { background: var(--panel) !important; background-imag
   align-items: center;
   gap: .5rem;
   margin-top: .5rem;
+  flex-wrap: wrap;
 }
 
-.jurnal-sort-bar label {
-  font-size: .8rem;
-  color: var(--text-dim);
-}
-
-.jurnal-sort-bar select {
+.jurnal-sort-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   flex: 1;
-  min-width: 160px;
-  padding: .4rem .5rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: var(--panel);
+  min-width: 220px;
+}
+
+.sort-inline-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.jurnal-sort-inline .modal-select-field {
+  flex: 1;
+}
+
+.jurnal-sort-inline .modal-select-field label {
+  display: none;
+}
+
+.jurnal-sort-inline .modal-select-field .modal-select-trigger {
+  width: 100%;
 }
 
 @media (max-width: 599px) {
-  .jurnal-sort-bar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .jurnal-sort-bar select {
-    width: 100%;
+  .jurnal-date-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

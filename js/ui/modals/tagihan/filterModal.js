@@ -1,7 +1,5 @@
 import { appState } from "../../../state/appState.js";
-import { localDB } from "../../../services/localDbService.js";
-// PERBAIKAN: Impor closeModalImmediate
-import { createModal, closeModal, closeModalImmediate, handleDetailPaneBack } from "../../components/modal.js";
+import { createModal, closeModalImmediate } from "../../components/modal.js";
 import { createMasterDataSelect, initCustomSelects } from "../../components/forms/index.js";
 
 function createIcon(iconName, size = 18, classes = '') {
@@ -15,48 +13,66 @@ function createIcon(iconName, size = 18, classes = '') {
 }
 
 
-async function _showBillsFilterModal(onApply) {
-  const allBillsEver = await localDB.bills.toArray();
-  const allExpenses = await localDB.expenses.where('isDeleted').notEqual(1).toArray();
-  const allSuppliers = await localDB.suppliers.toArray();
+function buildFilterOptions() {
+  const activeTab = appState.activeSubPage.get('tagihan') || 'tagihan';
+  const bills = Array.isArray(appState.bills) ? appState.bills : [];
+  const expenses = Array.isArray(appState.expenses) ? appState.expenses : [];
+  const suppliers = Array.isArray(appState.suppliers) ? appState.suppliers : [];
+  const projects = Array.isArray(appState.projects) ? appState.projects : [];
 
-  const expenseMap = new Map(allExpenses.map(e => [e.id, e]));
+  const expenseMap = new Map(expenses.map(exp => [exp.id, exp]));
+  let relevantItems = [];
+  if (activeTab === 'surat_jalan') {
+      relevantItems = expenses.filter(exp => exp.status === 'delivery_order' && !exp.isDeleted);
+  } else if (activeTab === 'lunas') {
+      relevantItems = bills.filter(bill => bill.status === 'paid' && !bill.isDeleted);
+  } else {
+      relevantItems = bills.filter(bill => bill.status === 'unpaid' && !bill.isDeleted);
+  }
 
-  const relevantSupplierIds = new Set();
-  allBillsEver.forEach(bill => {
-    const expense = expenseMap.get(bill.expenseId);
-    if (expense && expense.supplierId) {
-      relevantSupplierIds.add(expense.supplierId);
-    }
+  const supplierIds = new Set();
+  const projectIds = new Set();
+  const categoryIds = new Set();
+
+  relevantItems.forEach(item => {
+      const sourceExpense = activeTab === 'surat_jalan' ? item : expenseMap.get(item.expenseId);
+      const supplierId = sourceExpense?.supplierId;
+      const projectId = sourceExpense?.projectId || item.projectId;
+      const category = (item.type || sourceExpense?.type || '').toLowerCase();
+      if (supplierId) supplierIds.add(supplierId);
+      if (projectId) projectIds.add(projectId);
+      if (category) categoryIds.add(category);
   });
 
-  const projectOptions = [{ value: 'all', text: 'Semua Proyek' }, ...appState.projects.map(p => ({ value: p.id, text: p.projectName }))];
-
-  const supplierOptions = [{ value: 'all', text: 'Semua Supplier' },
-    ...allSuppliers
-      .filter(s => relevantSupplierIds.has(s.id))
-      .map(s => ({ value: s.id, text: s.supplierName }))
-  ];
-  const statusOptions = [
-    { value: 'all', text: 'Semua Status' },
-    { value: 'unpaid', text: 'Belum Lunas' },
-    { value: 'paid', text: 'Lunas' },
-    { value: 'delivery_order', text: 'Delivery Order' },
+  const supplierOptions = [
+      { value: 'all', text: 'Semua Supplier' },
+      ...suppliers.filter(s => supplierIds.has(s.id)).map(s => ({ value: s.id, text: s.supplierName }))
   ];
 
+  const projectOptions = [
+      { value: 'all', text: 'Semua Proyek' },
+      ...projects.filter(p => projectIds.has(p.id)).map(p => ({ value: p.id, text: p.projectName }))
+  ];
+
+  const categoryBase = [
+      { value: 'all', text: 'Semua Kategori' },
+      { value: 'gaji', text: 'Gaji' },
+      { value: 'material', text: 'Material' },
+      { value: 'operasional', text: 'Operasional' },
+      { value: 'lainnya', text: 'Lainnya' }
+  ];
+  const categoryOptions = categoryBase.filter(opt => opt.value === 'all' || categoryIds.has(opt.value));
+
+  return { supplierOptions, projectOptions, categoryOptions };
+}
+
+async function _showBillsFilterModal(onApply) {
+  const { supplierOptions, projectOptions, categoryOptions } = buildFilterOptions();
   const content = `
         <form id="bills-filter-form">
-            <div class="form-group">
-                <label>Cari</label>
-                <input type="search" id="search-term" placeholder="Ketik kata kunci..." value="${appState.billsFilter.searchTerm || ''}" autocomplete="off">
-            </div>
-            ${createMasterDataSelect('filter-project-id', 'Filter Berdasarkan Proyek', projectOptions, appState.billsFilter.projectId, 'projects')}
-            ${createMasterDataSelect('filter-supplier-id', 'Filter Berdasarkan Supplier', supplierOptions, appState.billsFilter.supplierId, 'suppliers')}
-            ${createMasterDataSelect('search-status', 'Status', statusOptions, appState.billsFilter.status || 'all')}
-            <div class="rekap-filters" style="padding:0; margin-top:1rem;">
-                <div class="form-group"><label>Dari Tanggal</label><input type="date" id="search-start-date" value="${appState.billsFilter.dateStart || ''}"></div>
-                <div class="form-group"><label>Sampai Tanggal</label><input type="date" id="search-end-date" value="${appState.billsFilter.dateEnd || ''}"></div>
-            </div>
+            ${createMasterDataSelect('filter-project-id', 'Filter Proyek', projectOptions, appState.billsFilter.projectId || 'all', 'projects')}
+            ${createMasterDataSelect('filter-supplier-id', 'Filter Supplier', supplierOptions, appState.billsFilter.supplierId || 'all', 'suppliers')}
+            ${createMasterDataSelect('filter-category', 'Kategori', categoryOptions, appState.billsFilter.category || 'all', null, false, false)}
         </form>
     `;
 
@@ -65,34 +81,45 @@ async function _showBillsFilterModal(onApply) {
         <button type="submit" class="btn btn-primary" form="bills-filter-form">Terapkan</button>
     `;
 
-  // PERBAIKAN: Tambahkan isUtility: true
-  const modalEl = createModal('formView', { title: 'Filter Tagihan', content, footer, isUtility: true });
+  const modalEl = createModal('formView', { title: 'Filter Tagihan', content, footer, isUtility: true, allowContentOverflow: true });
   if (!modalEl) return;
 
   initCustomSelects(modalEl);
 
-  modalEl.querySelector('#bills-filter-form').addEventListener('submit', (e) => {
+  const form = modalEl.querySelector('#bills-filter-form');
+  form.addEventListener('submit', (e) => {
     e.preventDefault();
-    appState.billsFilter.searchTerm = modalEl.querySelector('#search-term').value.trim();
-    appState.billsFilter.projectId = modalEl.querySelector('#filter-project-id').value;
-    appState.billsFilter.supplierId = modalEl.querySelector('#filter-supplier-id').value;
-    appState.billsFilter.status = modalEl.querySelector('#search-status').value || 'all';
-    appState.billsFilter.dateStart = modalEl.querySelector('#search-start-date').value || '';
-    appState.billsFilter.dateEnd = modalEl.querySelector('#search-end-date').value || '';
+    const nextFilters = {
+      projectId: form.querySelector('#filter-project-id')?.value || 'all',
+      supplierId: form.querySelector('#filter-supplier-id')?.value || 'all',
+      category: form.querySelector('#filter-category')?.value || 'all'
+    };
+    appState.billsFilter = {
+      ...appState.billsFilter,
+      projectId: nextFilters.projectId,
+      supplierId: nextFilters.supplierId,
+      category: nextFilters.category,
+      searchTerm: '',
+      status: 'all',
+      dateStart: '',
+      dateEnd: ''
+    };
     if (typeof onApply === 'function') onApply();
-    // PERBAIKAN: Gunakan closeModalImmediate
     closeModalImmediate(modalEl);
   });
 
-  modalEl.querySelector('.modal-footer #reset-filter-btn').addEventListener('click', () => {
-    appState.billsFilter.searchTerm = '';
-    appState.billsFilter.projectId = 'all';
-    appState.billsFilter.supplierId = 'all';
-    appState.billsFilter.status = 'all';
-    appState.billsFilter.dateStart = '';
-    appState.billsFilter.dateEnd = '';
+  modalEl.querySelector('#reset-filter-btn').addEventListener('click', () => {
+    appState.billsFilter = {
+      ...appState.billsFilter,
+      projectId: 'all',
+      supplierId: 'all',
+      category: 'all',
+      searchTerm: '',
+      status: 'all',
+      dateStart: '',
+      dateEnd: ''
+    };
     if (typeof onApply === 'function') onApply();
-    // PERBAIKAN: Gunakan closeModalImmediate
     closeModalImmediate(modalEl);
   });
 }

@@ -22,6 +22,7 @@ import { handleViewWorkerRecapModal } from "../modals/jurnal/viewWorkerRecapModa
 import { handleOpenMassAttendanceModal } from "../modals/absensi/setMassAttendanceModal.js";
 import { handleOpenManualAttendanceModal } from "../modals/absensi/editManualAttendanceModal.js";
 import { handleOpenStockUsageModal } from "../modals/stok/stockUsageModal.js";
+import { processBatchStockOut } from "../../services/data/stockService.js";
 import { downloadUniversalKwitansiAsImage, downloadUniversalKwitansiAsPDF } from '../../services/receiptService.js';
 import { downloadAttachment } from '../../services/fileService.js';
 
@@ -123,6 +124,7 @@ export function initServiceUIBridge() {
           await processBatchStockOut(materialId, transactions, dateStr);
       } catch(e) {
           console.error("Gagal memproses batch stok keluar:", e);
+          toast('error', e?.message || 'Gagal memproses penyaluran stok.');
       }
   });
   on('ui.modal.fixStuckAttendance', async () => {

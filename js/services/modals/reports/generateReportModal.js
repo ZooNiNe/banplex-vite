@@ -44,13 +44,6 @@ async function handleGenerateReportModal() {
     );
   }).join('');
 
-  const content = `
-    <form id="report-generator-form">
-      <div class="picker-grid" id="report-type-actions">${optionsHTML}</div>
-      <div id="report-dynamic-filters"></div>
-    </form>
-  `;
-
   const footer = `
     <button id="download-report-btn" class="btn btn-primary" disabled>
       <span>Unduh</span>
@@ -58,10 +51,18 @@ async function handleGenerateReportModal() {
 
   const isMobile = window.matchMedia('(max-width: 599px)').matches;
   const title = 'Pilih Jenis Laporan';
+
+  const filtersBlock = `<div id="report-dynamic-filters"></div>`;
+  const pickerBlock = `<div class="picker-grid" id="report-type-actions">${optionsHTML}</div>`;
+  const content = `
+    <form id="report-generator-form">
+      ${isMobile ? `${filtersBlock}${pickerBlock}` : `${pickerBlock}${filtersBlock}`}
+    </form>
+  `;
   
   let rootEl = isMobile
-    ? createModal('actionsPopup', { title, content, footer, layoutClass: 'is-bottom-sheet' })
-    : createModal('dataDetail', { title, content: `<div class="scrollable-content">${content}</div>`, footer });
+    ? createModal('actionsPopup', { title, content, footer, layoutClass: 'is-bottom-sheet', allowContentOverflow: true })
+    : createModal('dataDetail', { title, content: `<div class="scrollable-content">${content}</div>`, footer, allowContentOverflow: true });
 
   if (!rootEl) {
     console.error("Gagal membuat modal atau detail pane.");

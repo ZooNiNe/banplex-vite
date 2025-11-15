@@ -60,6 +60,15 @@
   opacity: .12;
 }
 
+.modal-bg[data-allow-content-overflow="true"] .modal-content {
+  overflow: visible;
+}
+
+.modal-bg[data-allow-content-overflow="true"] .modal-body {
+  overflow: visible;
+  overflow-y: auto;
+}
+
 .modal-bg.show .modal-content {
   transform: scale(1);
   opacity: 1;

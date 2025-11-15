@@ -34,6 +34,36 @@ export function setManualAttendanceProject(projectId = '') {
     return normalized;
 }
 
+function resolveWorkerProjectContext(worker = {}, explicitProjectId = '') {
+    const wagesByProject = worker.projectWages || {};
+    let projectId = explicitProjectId && explicitProjectId !== 'all' ? explicitProjectId : '';
+    if (!projectId) {
+        projectId = worker.defaultProjectId
+            || appState.manualAttendanceSelectedProjectId
+            || appState.defaultAttendanceProjectId
+            || Object.keys(wagesByProject)[0]
+            || '';
+    }
+    const wageConfig = wagesByProject[projectId];
+    let role = worker.defaultRole || '';
+    let dailyWage = 0;
+    if (wageConfig && typeof wageConfig === 'object' && !Array.isArray(wageConfig)) {
+        if (!role || !wageConfig[role]) {
+            role = Object.keys(wageConfig)[0] || '';
+        }
+        dailyWage = Number(wageConfig?.[role] || 0);
+    } else if (typeof wageConfig === 'number') {
+        dailyWage = Number(wageConfig);
+    }
+    return { projectId, role, dailyWage };
+}
+
+function buildDateWithCurrentTime(dateStr, baseTime = new Date()) {
+    const date = parseLocalDate(dateStr);
+    date.setHours(baseTime.getHours(), baseTime.getMinutes(), baseTime.getSeconds(), baseTime.getMilliseconds());
+    return date;
+}
+
 function persistDefaultAttendanceProject(projectId = '') {
     const normalized = projectId || '';
     appState.defaultAttendanceProjectId = normalized;
@@ -42,18 +72,19 @@ function persistDefaultAttendanceProject(projectId = '') {
 }
 
 export async function handleCheckIn(workerId) {
-    const projectId = document.getElementById('attendance-project-id')?.value;
-    if (!projectId) {
-        toast('error', 'Silakan pilih proyek terlebih dahulu.');
-        return;
-    }
-
     const loader = startGlobalLoading('Mencatat jam masuk lokal...');
     try {
         const worker = appState.workers.find(w => w.id === workerId);
         if (!worker) throw new Error('Pekerja tidak ditemukan');
 
-        const { startOfDay, endOfDay } = getLocalDayBounds(now.toISOString().slice(0, 10));
+        const now = new Date();
+        const targetDateStr = appState.defaultAttendanceDate || now.toISOString().slice(0, 10);
+        const { startOfDay, endOfDay } = getLocalDayBounds(targetDateStr);
+        const { projectId, role, dailyWage } = resolveWorkerProjectContext(worker);
+        if (!projectId) {
+            toast('error', 'Setelan proyek default pekerja belum diisi.');
+            return;
+        }
 
         const existingRecord = await localDB.attendance_records
             .where('workerId').equals(workerId)
@@ -68,16 +99,16 @@ export async function handleCheckIn(workerId) {
             return;
         }
 
-
-        const dailyWage = worker.projectWages?.[projectId] || 0;
-        const hourlyWage = dailyWage / 8;
+        const hourlyWage = dailyWage > 0 ? dailyWage / 8 : 0;
+        const checkInTime = buildDateWithCurrentTime(targetDateStr, now);
         const attendanceData = {
             workerId,
-            projectId,
             workerName: worker.workerName,
+            projectId,
+            jobRole: role,
             hourlyWage,
-            date: now,
-            checkIn: now,
+            date: checkInTime,
+            checkIn: checkInTime,
             status: 'checked_in',
             type: 'timestamp',
             syncState: 'pending_create',
@@ -121,7 +152,14 @@ export async function handleCheckOut(recordId) {
         const normalHours = Math.min(hours, 8);
         const overtimeHours = Math.max(0, hours - 8);
 
-        const hourlyWage = record.hourlyWage || 0;
+        let hourlyWage = record.hourlyWage || 0;
+        if (!hourlyWage) {
+            const worker = appState.workers.find(w => w.id === record.workerId);
+            if (worker) {
+                const { dailyWage } = resolveWorkerProjectContext(worker, record.projectId);
+                hourlyWage = dailyWage > 0 ? dailyWage / 8 : 0;
+            }
+        }
         const normalPay = normalHours * hourlyWage;
         const overtimePay = overtimeHours * hourlyWage * 1.5;
         const totalPay = normalPay + overtimePay;
@@ -165,6 +203,10 @@ export async function handleUpdateAttendance(form) {
         toast('error', 'Data absensi asli tidak ditemukan.');
         return;
     }
+    if (record.billId) {
+        toast('error', 'Data ini sudah direkap. Hapus dari invoice terlebih dahulu.');
+        return;
+    }
 
     const attendanceDate = getJSDate(record.date);
     if (isNaN(attendanceDate.getTime())) {
@@ -184,21 +226,15 @@ export async function handleUpdateAttendance(form) {
     }
 
     let bill = null;
-    let paymentForWorker = null;
+    let pendingPaymentsForWorker = [];
+    let billWasPaid = false;
     if (record.billId) {
         bill = appState.bills.find(b => b.id === record.billId) || await localDB.bills.get(record.billId);
-        if (bill?.status === 'paid') {
-            toast('error', 'Tidak dapat mengedit absensi. Rekap gaji terkait sudah lunas.');
-            return;
-        }
+        billWasPaid = bill?.status === 'paid';
         if (bill) {
-            paymentForWorker = await localDB.pending_payments
+            pendingPaymentsForWorker = await localDB.pending_payments
                 .where({ billId: record.billId, workerId: record.workerId })
-                .first();
-            if (paymentForWorker) {
-                toast('error', 'Tidak dapat mengedit absensi. Sudah ada pembayaran individual untuk pekerja ini di rekap terkait.');
-                return;
-            }
+                .toArray();
         }
     }
 
@@ -264,26 +300,54 @@ export async function handleUpdateAttendance(form) {
         }
 
         const deltaPay = newTotalPay - (record.totalPay || 0);
+        const pendingPaymentIds = pendingPaymentsForWorker.map(p => p.id);
+        const recordUpdatePayload = { ...dataToUpdate, syncState: 'pending_update', updatedAt: new Date() };
+        let billStatusAfterUpdate = bill?.status;
 
-        if (bill && deltaPay !== 0) {
-            await localDB.transaction('rw', localDB.attendance_records, localDB.bills, localDB.outbox, async () => {
-                await localDB.attendance_records.update(recordId, { ...dataToUpdate, syncState: 'pending_update', updatedAt: new Date() });
-                await queueOutbox({ table: 'attendance_records', docId: recordId, op: 'upsert', payload: { id: recordId, ...dataToUpdate }, priority: 6 });
-                
-                const newBillAmount = (bill.amount || 0) + deltaPay;
-                const workerDetails = bill.workerDetails.map(w => {
-                    if (w.id === record.workerId || w.workerId === record.workerId) {
-                        return { ...w, amount: (w.amount || 0) + deltaPay };
+        if (bill || pendingPaymentIds.length) {
+            await localDB.transaction('rw', localDB.attendance_records, localDB.bills, localDB.pending_payments, localDB.outbox, async () => {
+                await localDB.attendance_records.update(recordId, recordUpdatePayload);
+                await queueOutbox({ table: 'attendance_records', docId: recordId, op: 'upsert', payload: { id: recordId, ...recordUpdatePayload }, priority: 6 });
+
+                if (bill && deltaPay !== 0) {
+                    const newBillAmount = Math.max(0, (bill.amount || 0) + deltaPay);
+                    const workerDetails = (bill.workerDetails || []).map(w => {
+                        if (w.id === record.workerId || w.workerId === record.workerId) {
+                            const nextAmount = (w.amount || 0) + deltaPay;
+                            return { ...w, amount: Math.max(0, nextAmount) };
+                        }
+                        return w;
+                    }).filter(w => (w.amount || 0) > 0 || (w.id !== record.workerId && w.workerId !== record.workerId));
+
+                    const newPaidAmount = Math.min(bill.paidAmount || 0, newBillAmount);
+                    const newStatus = newBillAmount === 0 ? 'paid' : (newPaidAmount >= newBillAmount ? 'paid' : 'unpaid');
+                    const billUpdate = {
+                        amount: newBillAmount,
+                        workerDetails,
+                        syncState: 'pending_update',
+                        updatedAt: new Date()
+                    };
+                    if (bill.recordIds) {
+                        billUpdate.recordIds = bill.recordIds;
                     }
-                    return w;
-                });
-                const billUpdate = { amount: newBillAmount, workerDetails, syncState: 'pending_update', updatedAt: new Date() };
-                await localDB.bills.update(bill.id, billUpdate);
-                await queueOutbox({ table: 'bills', docId: bill.id, op: 'upsert', payload: { id: bill.id, ...billUpdate }, priority: 6 });
+                    if (typeof bill.paidAmount === 'number' || bill.paidAmount === 0) {
+                        billUpdate.paidAmount = newPaidAmount;
+                    }
+                    if (bill.status !== newStatus) {
+                        billUpdate.status = newStatus;
+                    }
+                    await localDB.bills.update(bill.id, billUpdate);
+                    await queueOutbox({ table: 'bills', docId: bill.id, op: 'upsert', payload: { id: bill.id, ...billUpdate }, priority: 6 });
+                    billStatusAfterUpdate = newStatus;
+                }
+
+                if (pendingPaymentIds.length) {
+                    await localDB.pending_payments.where('id').anyOf(pendingPaymentIds).delete();
+                }
             });
         } else {
-            await localDB.attendance_records.update(recordId, { ...dataToUpdate, syncState: 'pending_update', updatedAt: new Date() });
-            await queueOutbox({ table: 'attendance_records', docId: recordId, op: 'upsert', payload: { id: recordId, ...dataToUpdate }, priority: 6 });
+            await localDB.attendance_records.update(recordId, recordUpdatePayload);
+            await queueOutbox({ table: 'attendance_records', docId: recordId, op: 'upsert', payload: { id: recordId, ...recordUpdatePayload }, priority: 6 });
         }
 
         await _logActivity('Mengedit Absensi', { recordId, ...dataToUpdate });
@@ -299,6 +363,13 @@ export async function handleUpdateAttendance(form) {
             emit('jurnal.viewHarian', getJSDate(record.date).toISOString().slice(0, 10));
         } else {
             emit('ui.page.render');
+        }
+
+        if (billWasPaid && billStatusAfterUpdate !== 'paid') {
+            toast('info', 'Rekap gaji terkait dikembalikan ke status belum lunas karena ada perubahan absensi.');
+        }
+        if (pendingPaymentIds.length) {
+            toast('info', 'Catatan pembayaran tertunda untuk pekerja ini dibatalkan karena data absensi diperbarui.');
         }
 
         requestSync({ silent: true });
@@ -667,57 +738,88 @@ export async function handleDeleteSingleAttendance(recordId) {
     emit('ui.modal.create', 'confirmDelete', {
         message,
         onConfirm: async () => {
+            if (record.billId) {
+                toast('error', 'Data ini sudah direkap. Hapus dari invoice terlebih dahulu.');
+                return;
+            }
             let bill = null;
-            let paymentForWorker = null;
+            let pendingPaymentsForWorker = [];
+            let billWasPaid = false;
             if (record.billId) {
                 bill = appState.bills.find(b => b.id === record.billId) || await localDB.bills.get(record.billId);
-                if (bill?.status === 'paid') {
-                    toast('error', 'Tidak dapat menghapus absensi. Rekap gaji terkait sudah lunas.');
-                    return;
-                }
+                billWasPaid = bill?.status === 'paid';
                 if (bill) {
-                    paymentForWorker = await localDB.pending_payments
+                    pendingPaymentsForWorker = await localDB.pending_payments
                         .where({ billId: record.billId, workerId: record.workerId })
-                        .first();
-                    if (paymentForWorker) {
-                        toast('error', 'Tidak dapat menghapus absensi. Sudah ada pembayaran individual untuk pekerja ini di rekap terkait.');
-                        return;
-                    }
+                        .toArray();
                 }
             }
 
             try {
+                const pendingPaymentIds = pendingPaymentsForWorker.map(p => p.id);
+                let billStatusAfterUpdate = bill?.status;
+
                 if (bill) {
                     const deltaPay = -(record.totalPay || 0);
-                    await localDB.transaction('rw', localDB.attendance_records, localDB.bills, localDB.outbox, async () => {
-                    await localDB.attendance_records.update(recordId, { isDeleted: 1, syncState: 'pending_update', updatedAt: new Date() });
-                    await queueOutbox({ table: 'attendance_records', docId: recordId, op: 'upsert', payload: { id: recordId, isDeleted: 1 }, priority: 5 });
+                    await localDB.transaction('rw', localDB.attendance_records, localDB.bills, localDB.pending_payments, localDB.outbox, async () => {
+                        await localDB.attendance_records.update(recordId, { isDeleted: 1, syncState: 'pending_update', updatedAt: new Date() });
+                        await queueOutbox({ table: 'attendance_records', docId: recordId, op: 'upsert', payload: { id: recordId, isDeleted: 1 }, priority: 5 });
 
-                        const newBillAmount = (bill.amount || 0) + deltaPay;
-                        const workerDetails = bill.workerDetails.map(w => {
+                        const newBillAmount = Math.max(0, (bill.amount || 0) + deltaPay);
+                        const workerDetails = (bill.workerDetails || []).map(w => {
                             if (w.id === record.workerId || w.workerId === record.workerId) {
-                                const newWorkerAmount = (w.amount || 0) + deltaPay;
+                                const newWorkerAmount = Math.max(0, (w.amount || 0) + deltaPay);
                                 const newRecordIds = (w.recordIds || []).filter(id => id !== recordId);
                                 return { ...w, amount: newWorkerAmount, recordIds: newRecordIds };
                             }
                             return w;
-                        }).filter(w => (w.amount > 0 || w.recordIds.length > 0) || (w.id !== record.workerId && w.workerId !== record.workerId));
+                        }).filter(w => (w.amount > 0 || (w.recordIds || []).length > 0) || (w.id !== record.workerId && w.workerId !== record.workerId));
 
                         const newBillRecordIds = (bill.recordIds || []).filter(id => id !== recordId);
+                        const newPaidAmount = Math.min(bill.paidAmount || 0, newBillAmount);
+                        const newStatus = newBillAmount === 0 ? 'paid' : (newPaidAmount >= newBillAmount ? 'paid' : 'unpaid');
 
-                        const billUpdate = { amount: newBillAmount, workerDetails, recordIds: newBillRecordIds, syncState: 'pending_update', updatedAt: new Date() };
+                        const billUpdate = {
+                            amount: newBillAmount,
+                            workerDetails,
+                            recordIds: newBillRecordIds,
+                            syncState: 'pending_update',
+                            updatedAt: new Date()
+                        };
+                        if (typeof bill.paidAmount === 'number' || bill.paidAmount === 0) {
+                            billUpdate.paidAmount = newPaidAmount;
+                        }
+                        if (bill.status !== newStatus) {
+                            billUpdate.status = newStatus;
+                        }
                         await localDB.bills.update(bill.id, billUpdate);
                         await queueOutbox({ table: 'bills', docId: bill.id, op: 'upsert', payload: { id: bill.id, ...billUpdate }, priority: 5 });
+                        billStatusAfterUpdate = newStatus;
+
+                        if (pendingPaymentIds.length) {
+                            await localDB.pending_payments.where('id').anyOf(pendingPaymentIds).delete();
+                        }
                     });
                 } else {
-                    await localDB.attendance_records.update(recordId, { isDeleted: 1, syncState: 'pending_update', updatedAt: new Date() });
-                    await queueOutbox({ table: 'attendance_records', docId: recordId, op: 'upsert', payload: { id: recordId, isDeleted: 1 }, priority: 5 });
+                    await localDB.transaction('rw', localDB.attendance_records, localDB.pending_payments, localDB.outbox, async () => {
+                        await localDB.attendance_records.update(recordId, { isDeleted: 1, syncState: 'pending_update', updatedAt: new Date() });
+                        await queueOutbox({ table: 'attendance_records', docId: recordId, op: 'upsert', payload: { id: recordId, isDeleted: 1 }, priority: 5 });
+                        if (pendingPaymentIds.length) {
+                            await localDB.pending_payments.where('id').anyOf(pendingPaymentIds).delete();
+                        }
+                    });
                 }
-
 
                 emit('ui.animate.removeItem', `att-${record.workerId}`);
                 await loadAllLocalDataToState();
                 emit('ui.page.recalcDashboardTotals');
+
+                if (billWasPaid && billStatusAfterUpdate !== 'paid') {
+                    toast('info', 'Perubahan ini membuat rekap gaji terkait kembali berstatus belum lunas.');
+                }
+                if (pendingPaymentIds.length) {
+                    toast('info', 'Catatan pembayaran tertunda untuk pekerja ini dibatalkan karena absensi dihapus.');
+                }
 
                 const detailPane = document.querySelector('#detail-pane.detail-view-active, #detail-pane.detail-pane-open');
                 if (detailPane) {
@@ -1044,135 +1146,155 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
 
 // Ganti juga fungsi ini di attendanceService.js
 export async function handleSaveManualAttendance(attendanceData) {
-    const { date, projectId, entries } = attendanceData;
-
+    const { date, projectId, entries } = attendanceData || {};
     if (!projectId) {
-        console.error('handleSaveManualAttendance dipanggil tanpa projectId.');
         toast('error', 'Kesalahan Kritis: ID Proyek tidak terdefinisi saat menyimpan.');
-        return { success: false, skipped: entries ? entries.length : 0 };
+        return { success: false, skipped: entries ? entries.length : 0, summary: null };
     }
 
+    const normalizedEntries = Array.isArray(entries) ? entries : [];
     const dateObj = parseLocalDate(date);
     const { startOfDay, endOfDay } = getLocalDayBounds(date);
-    let success = false;
-    let skippedWorkers = new Set(); 
+    const skippedWorkers = new Set();
+    const processedEntries = [];
 
     try {
-        await localDB.transaction('rw', localDB.attendance_records, localDB.outbox, async () => {
-            
-            // --- GUARD CANGGIH 1: PENGAMBILAN DATA ANTI-BUG ---
-            const allDbRecords = await localDB.attendance_records
-                .where('isDeleted').notEqual(1) 
-                .toArray();
-            
-            // Filter tanggal secara manual di JavaScript
-            const allRecordsOnDate = allDbRecords.filter(rec => {
-                if (!rec.date) return false;
-                const recDate = getJSDate(rec.date); 
-                if (isNaN(recDate.getTime())) return false; 
-                return recDate >= startOfDay && recDate <= endOfDay;
-            });
-            // --- AKHIR GUARD 1 ---
+        const allDbRecords = await localDB.attendance_records.where('isDeleted').notEqual(1).toArray();
+        const recordsOnDate = allDbRecords.filter(rec => {
+            if (!rec.date) return false;
+            const recDate = getJSDate(rec.date);
+            if (isNaN(recDate.getTime())) return false;
+            return recDate >= startOfDay && recDate <= endOfDay;
+        });
 
-            // --- GUARD CANGGIH 2: Pemetaan Cerdas ---
-            // Pisahkan rekaman untuk proyek ini DAN proyek lain
-            const recordsForThisProjectByWorker = new Map(); 
-            const recordsElsewhere = new Map(); 
+        const recordsForProject = new Map();
+        const recordsElsewhere = new Map();
 
-            allRecordsOnDate.forEach(rec => {
-                if (rec.projectId === projectId) {
-                    // Simpan SEMUA record untuk proyek ini
-                    const list = recordsForThisProjectByWorker.get(rec.workerId) || [];
-                    list.push(rec);
-                    recordsForThisProjectByWorker.set(rec.workerId, list);
-                } else if (rec.attendanceStatus !== 'absent') {
-                    // Catat jika pekerja hadir di proyek lain
-                    recordsElsewhere.set(rec.workerId, rec);
-                }
-            });
-
-            const dbIdsToSoftDelete = new Set();
-            const recordsToSave = [];
-
-            // --- LOGIKA "NUKE AND PAVE" (Pemusnahan dan Pembangunan Ulang) ---
-            for (const entry of entries) {
-                const { id: entryId, workerId, workerName, status, role, pay, customWage, projectId: entryProjectId } = entry;
-                
-                const attendanceStatus = (status === 'Hadir' || status === 'full_day') ? 'full_day' 
-                                       : (status === '1/2 Hari' || status === 'half_day') ? 'half_day' 
-                                       : 'absent';
-
-                // --- GUARD CANGGIH 3: Pengecekan Lintas Proyek ---
-                if (attendanceStatus !== 'absent' && recordsElsewhere.has(workerId)) {
-                    skippedWorkers.add(workerName);
-                    continue; // Lewati, jangan simpan. Dia sudah diabsen di tempat lain.
-                }
-
-                // Ambil SEMUA rekaman lama untuk worker ini DI PROYEK INI
-                const oldRecords = recordsForThisProjectByWorker.get(workerId) || [];
-                
-                // Tandai SEMUA untuk dihapus (Nuke)
-                oldRecords.forEach(r => dbIdsToSoftDelete.add(r.id));
-                
-                // Buat SATU rekaman baru (Pave)
-                const newRecord = {
-                    id: generateUUID(),
-                    workerId,
-                    workerName,
-                    projectId: attendanceStatus === 'absent' ? null : entryProjectId,
-                    jobRole: attendanceStatus === 'absent' ? null : role,
-                    date: dateObj,
-                    attendanceStatus: attendanceStatus,
-                    totalPay: attendanceStatus === 'absent' ? 0 : pay,
-                    customWage: attendanceStatus === 'absent' ? null : (customWage || null),
-                    isPaid: false,
-                    type: 'manual',
-                    status: 'completed',
-                    createdAt: new Date(),
-                    isDeleted: 0,
-                    syncState: 'pending_create'
-                };
-                recordsToSave.push(newRecord);
-            }
-            
-            // Eksekusi Transaksi Nuke and Pave
-            if (dbIdsToSoftDelete.size > 0) {
-                const ids = Array.from(dbIdsToSoftDelete);
-                const deleteUpdate = { isDeleted: 1, syncState: 'pending_update', updatedAt: new Date() };
-                await localDB.attendance_records.where('id').anyOf(ids).modify(deleteUpdate);
-                for (const id of ids) {
-                    await queueOutbox({ table: 'attendance_records', docId: id, op: 'upsert', payload: { id, isDeleted: 1 }, priority: 5 });
-                }
-            }
-            
-            if (recordsToSave.length > 0) {
-                await localDB.attendance_records.bulkAdd(recordsToSave);
-                for (const record of recordsToSave) {
-                    await queueOutbox({ table: 'attendance_records', docId: record.id, op: 'upsert', payload: record, priority: 6 });
-                }
+        recordsOnDate.forEach(rec => {
+            if (rec.projectId === projectId) {
+                const list = recordsForProject.get(rec.workerId) || [];
+                list.push(rec);
+                recordsForProject.set(rec.workerId, list);
+            } else if (rec.attendanceStatus !== 'absent') {
+                recordsElsewhere.set(rec.workerId, rec);
             }
         });
 
-        _logActivity(`Menyimpan Absensi Manual (Lokal)`, { date, count: entries.length });
-        await loadAllLocalDataToState();
+        const recordIdsToDelete = [];
+        const recordsToInsert = [];
+        const recordsToUpdate = [];
 
-        if (navigator.onLine) {
-            requestSync({ silent: true });
+        normalizedEntries.forEach(entry => {
+            const workerId = entry.workerId;
+            if (!workerId) return;
+            const workerName = entry.workerName || (appState.workers.find(w => w.id === workerId)?.workerName) || 'Pekerja';
+            const rawStatus = entry.status || 'absent';
+            const attendanceStatus = rawStatus === 'full_day' || rawStatus === 'Hadir'
+                ? 'full_day'
+                : (rawStatus === 'half_day' || rawStatus === '1/2 Hari' ? 'half_day' : 'absent');
+
+            if (attendanceStatus !== 'absent' && recordsElsewhere.has(workerId)) {
+                skippedWorkers.add(workerName);
+                return;
+            }
+
+            const entryProjectId = entry.projectId || projectId;
+            const pay = attendanceStatus === 'absent' ? 0 : (entry.pay || 0);
+            const customWage = attendanceStatus === 'absent' ? null : (entry.customWage || null);
+            const role = attendanceStatus === 'absent' ? null : (entry.role || '');
+            const oldRecords = recordsForProject.get(workerId) || [];
+            const matchingRecord = entry.id ? oldRecords.find(r => r.id === entry.id) : oldRecords[0];
+
+            if (matchingRecord?.billId) {
+                skippedWorkers.add(workerName);
+                return;
+            }
+
+            if (attendanceStatus === 'absent') {
+                oldRecords.forEach(r => recordIdsToDelete.push(r.id));
+                processedEntries.push({ workerId, projectId: null, attendanceStatus, totalPay: 0 });
+                return;
+            }
+
+            const basePayload = {
+                workerId,
+                workerName,
+                projectId: entryProjectId,
+                jobRole: role,
+                date: dateObj,
+                attendanceStatus,
+                totalPay: pay,
+                customWage,
+                isPaid: matchingRecord?.isPaid || false,
+                type: 'manual',
+                status: 'completed'
+            };
+
+            if (matchingRecord) {
+                recordsToUpdate.push({ id: matchingRecord.id, payload: basePayload });
+                oldRecords.filter(r => r.id !== matchingRecord.id).forEach(r => recordIdsToDelete.push(r.id));
+            } else {
+                recordsToInsert.push({ id: generateUUID(), payload: basePayload });
+            }
+
+            processedEntries.push({ workerId, projectId: entryProjectId, attendanceStatus, totalPay: pay });
+        });
+
+        const hasChanges = recordIdsToDelete.length || recordsToInsert.length || recordsToUpdate.length;
+        if (!hasChanges) {
+            return { success: false, skipped: skippedWorkers.size, summary: null };
         }
+
+        const now = new Date();
+        await localDB.transaction('rw', localDB.attendance_records, localDB.outbox, async () => {
+            if (recordIdsToDelete.length) {
+                const deleteUpdate = { isDeleted: 1, syncState: 'pending_update', updatedAt: now };
+                await localDB.attendance_records.where('id').anyOf(recordIdsToDelete).modify(deleteUpdate);
+                for (const id of recordIdsToDelete) {
+                    await queueOutbox({ table: 'attendance_records', docId: id, op: 'upsert', payload: { id, isDeleted: 1 }, priority: 5 });
+                }
+            }
+
+            for (const update of recordsToUpdate) {
+                const payload = { ...update.payload, syncState: 'pending_update', updatedAt: now };
+                await localDB.attendance_records.update(update.id, payload);
+                await queueOutbox({ table: 'attendance_records', docId: update.id, op: 'upsert', payload: { id: update.id, ...payload }, priority: 6 });
+            }
+
+            for (const insert of recordsToInsert) {
+                const newRecord = { id: insert.id, ...insert.payload, createdAt: now, updatedAt: now, isDeleted: 0, syncState: 'pending_create' };
+                await localDB.attendance_records.add(newRecord);
+                await queueOutbox({ table: 'attendance_records', docId: newRecord.id, op: 'upsert', payload: newRecord, priority: 6 });
+            }
+        });
+
+        _logActivity('Menyimpan Absensi Manual (Editor Harian)', { date, projectId, count: processedEntries.length });
+        await loadAllLocalDataToState();
+        requestSync({ silent: true });
 
         if (skippedWorkers.size > 0) {
-             toast('warn', `Absensi untuk ${Array.from(skippedWorkers).join(', ')} dilewati karena sudah ada data di proyek lain.`);
+            toast('warn', `Absensi untuk ${Array.from(skippedWorkers).join(', ')} dilewati karena sudah ada di proyek lain.`);
         }
-        
-        success = true;
 
+        const productiveEntries = processedEntries.filter(entry => entry.attendanceStatus !== 'absent');
+        const totalPay = productiveEntries.reduce((sum, entry) => sum + (entry.totalPay || 0), 0);
+        const workerCount = new Set(productiveEntries.map(entry => entry.workerId)).size;
+        const projectSet = new Set(productiveEntries.map(entry => entry.projectId).filter(Boolean));
+        const singleProjectId = projectSet.size === 1 ? [...projectSet][0] : null;
+        const summary = {
+            totalPay,
+            workerCount,
+            singleProjectId,
+            dateStr: date,
+            productiveEntries
+        };
+
+        return { success: true, skipped: skippedWorkers.size, summary };
     } catch (error) {
-        console.error("Gagal menyimpan absensi manual (v3):", error);
+        console.error("Gagal menyimpan absensi manual (editor harian):", error);
         toast('error', `Gagal menyimpan absensi: ${error.message}`);
-        return { success: false, skipped: entries ? entries.length : 0 };
+        return { success: false, skipped: normalizedEntries.length, summary: null };
     }
-
-    return { success: success, skipped: skippedWorkers.size };
 }
 
 export async function openManualAbsenceStatusPanel(selectedWorkerIds = []) {

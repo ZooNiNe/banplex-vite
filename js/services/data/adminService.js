@@ -8,6 +8,8 @@ import { _isQuotaExceeded, _setQuotaExceededFlag, syncFromServer, requestSync } 
 import { localDB, loadAllLocalDataToState } from "../localDbService.js";
 import { fetchAndCacheData } from "./fetch.js";
 import { showDetailPane, startGlobalLoading } from "../../ui/components/modal.js";
+import { getJSDate } from "../../utils/helpers.js";
+import { queueOutbox } from "../outboxService.js";
 
 function createIcon(iconName, size = 18, classes = '') {
     const icons = {
@@ -510,12 +512,79 @@ export async function deleteBeneficiary(docId) {
     await deleteDoc(doc(db, BENEFICIARY_COLLECTION, docId));
 }
 
+export async function runAttendanceInvoiceIntegrityCheck({ autoFix = true } = {}) {
+    const loader = startGlobalLoading('Memeriksa integritas absensi & rekap gaji...');
+    try {
+        const salaryBills = await localDB.bills.where('type').equals('gaji').toArray();
+        const attendanceRecords = await localDB.attendance_records.toArray();
+        const attendanceMap = new Map(attendanceRecords.map(r => [r.id, r]));
+
+        let orphanedCount = 0;
+        let asyncIssues = 0;
+        let fixedCount = 0;
+
+        for (const bill of salaryBills) {
+            const recordIds = Array.isArray(bill.recordIds) ? bill.recordIds : [];
+            const missingIds = recordIds.filter(id => {
+                const rec = attendanceMap.get(id);
+                return !rec || rec.isDeleted;
+            });
+
+            if (missingIds.length > 0) {
+                orphanedCount += 1;
+                if (autoFix) {
+                    const keptIds = recordIds.filter(id => !missingIds.includes(id));
+                    const billUpdate = {
+                        recordIds: keptIds,
+                        integrityFlag: 'orphaned_attendance',
+                        syncState: 'pending_update',
+                        updatedAt: new Date()
+                    };
+                    await localDB.bills.update(bill.id, billUpdate);
+                    await queueOutbox({ table: 'bills', docId: bill.id, op: 'upsert', payload: { id: bill.id, ...billUpdate }, priority: 5 });
+                    fixedCount += 1;
+                }
+            }
+
+            const billUpdatedAt = getJSDate(bill.updatedAt || bill.createdAt || bill.date || new Date(0));
+            for (const rid of recordIds) {
+                const rec = attendanceMap.get(rid);
+                if (!rec || rec.isDeleted) continue;
+                const recUpdatedAt = getJSDate(rec.updatedAt || rec.createdAt || rec.date || 0);
+                const changedAfterInvoice = recUpdatedAt > billUpdatedAt;
+                if (changedAfterInvoice) {
+                    asyncIssues += 1;
+                    if (autoFix) {
+                        const recUpdate = { integrityFlag: 'updated_after_invoice', syncState: 'pending_update', updatedAt: new Date() };
+                        await localDB.attendance_records.update(rec.id, recUpdate);
+                        await queueOutbox({ table: 'attendance_records', docId: rec.id, op: 'upsert', payload: { id: rec.id, ...recUpdate }, priority: 6 });
+                        fixedCount += 1;
+                    }
+                }
+            }
+        }
+
+        await loadAllLocalDataToState();
+        requestSync({ silent: true });
+
+        toast('info', `Pemeriksaan selesai: ${orphanedCount} tagihan yatim, ${asyncIssues} rekaman tidak sinkron, ${fixedCount} perbaikan dikirim.`);
+        return { orphanedCount, asyncIssues, fixedCount };
+    } catch (err) {
+        console.error('[AdminService] Integrity check failed:', err);
+        toast('error', 'Gagal memeriksa integritas data absensi/rekap.');
+        return { orphanedCount: 0, asyncIssues: 0, fixedCount: 0, error: err };
+    } finally {
+        loader.close();
+    }
+}
+
 export const adminPanelService = {
     getBeneficiaries,
     batchImportBeneficiaries,
     addBeneficiary,
     updateBeneficiary,
     deleteBeneficiary,
+    runAttendanceInvoiceIntegrityCheck,
 };
 
 if (typeof window !== 'undefined') {

@@ -17,6 +17,7 @@ import { handleServerCleanUp, resolveConflict, handleRecalculateUsageCount, hand
 import { handleDeleteStockTransaction } from "../services/data/stockService.js";
 import { handlePostComment, handleDeleteComment } from "../services/data/commentService.js";
 import { handleGenerateReportModal } from "../services/modals/reports/generateReportModal.js";
+import { openWorkerReportModal } from "../services/modals/jurnal/workerReportModal.js";
 import { downloadAttachment } from "../services/fileService.js";
 import { handleOpenConflictsPanel, handleOpenStorageStats } from "../utils/sync.js";
 import { isViewer } from "../utils/helpers.js";
@@ -72,6 +73,8 @@ export const clickActions = {
     'open-master-data-grid': () => { openMasterDataGrid(); },
     'open-tools-grid': () => { openToolsGrid(); },
     'open-report-generator': () => { handleGenerateReportModal(); },
+    'open-worker-report-modal': () => { openWorkerReportModal(); },
+    'open-jurnal-filter-modal': () => { emit('ui.jurnal.openFilterModal'); },
     'empty-recycle-bin': () => { _handleEmptyRecycleBin(); },
     'open-global-search': (ctx) => { emit('ui.search.open', { target: ctx.target }); },
     'open-comments-search': () => { emit('ui.comments.openSearch'); },
@@ -353,7 +356,7 @@ export const clickActions = {
     'open-attendance-settings': () => { handleOpenAttendanceSettings(); },
     'set-attendance-shortcut': (ctx) => {
         const { workerId, status, role, pay, projectId } = ctx;
-        if (!workerId || !status || !projectId) {
+        if (!workerId || !projectId) {
             toast('error', 'Konteks untuk pintasan absensi tidak lengkap.');
             return;
         }
@@ -368,26 +371,24 @@ export const clickActions = {
              return;
         }
         
+        const safeRole = role || worker.defaultRole || Object.keys(worker.projectWages?.[projectId] || {})[0] || '';
+        const basePay = parseFloat(pay) || (worker.projectWages?.[projectId]?.[safeRole] || 0);
+        const resolvedStatus = status || 'full_day';
+
         let entry;
-        if (status === 'absent') {
-            entry = { 
-                status: 'absent',
-                pay: 0,
-                role: '',
-                projectId: projectId // Tetap simpan projectId untuk referensi
-            };
+        if (resolvedStatus === 'absent') {
+            entry = { status: 'absent', pay: 0, role: '', projectId };
             toast('info', `${worker.workerName} ditandai Absen.`);
         } else {
-             const finalPay = parseFloat(pay) || 0;
-             if (finalPay === 0) {
-                 toast('error', `Tidak ada tarif upah untuk peran default "${role}" di proyek ini.`);
+             if (basePay === 0) {
+                 toast('error', `Tidak ada tarif upah untuk peran default "${safeRole || 'peran?'}" di proyek ini.`);
                  return;
              }
              entry = {
-                status: status, // 'full_day'
-                role: role,
-                pay: finalPay,
-                projectId: projectId
+                status: resolvedStatus,
+                role: safeRole,
+                pay: basePay,
+                projectId
              };
              toast('success', `${worker.workerName} ditandai Hadir.`);
         }

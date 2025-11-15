@@ -16,6 +16,7 @@ import { formatDate } from '../../utils/formatters.js';
 import { handleNavigation } from '../mainUI.js';
 import { APPLICANT_FIELD_KEYS as FIELD_KEYS } from './jobApplicantFieldMap.js';
 import * as XLSX from 'xlsx';
+import { downloadCustomTablePdf } from '../../services/reportService.js';
 
 const TABLE_COLUMNS = [
     { key: 'select', label: '', className: 'col-select' },
@@ -213,8 +214,9 @@ function renderPageShell() {
                     </div>
                     <div class="summary-actions">
                         <div class="template-downloads">
-                            <button type="button" class="btn btn-ghost" data-action="fs-download-template" data-format="xlsx">Template XLSX</button>
-                            <button type="button" class="btn btn-ghost" data-action="fs-download-template" data-format="csv">Template CSV</button>
+                            <button type="button" class="btn btn-ghost" data-action="hrd-export-data" data-format="xlsx">Ekspor XLSX</button>
+                            <button type="button" class="btn btn-ghost" data-action="hrd-export-data" data-format="csv">Ekspor CSV</button>
+                            <button type="button" class="btn btn-secondary" data-action="hrd-export-pdf">Unduh PDF</button>
                         </div>
                         <button type="button" class="btn btn-primary" id="hrd-applicants-create-btn">
                             ${createIcon('user-plus', 16)}
@@ -298,12 +300,19 @@ function attachEventListeners() {
         cleanupFns.push(() => createBtn.removeEventListener('click', handler));
     }
 
-    const templateButtons = container?.querySelectorAll?.('[data-action="fs-download-template"]') || [];
-    templateButtons.forEach(button => {
-        const handler = () => handleTemplateDownload(button.dataset.format || 'xlsx');
+    const exportButtons = container?.querySelectorAll?.('[data-action="hrd-export-data"]') || [];
+    exportButtons.forEach(button => {
+        const handler = () => exportApplicantsData(button.dataset.format || 'xlsx');
         button.addEventListener('click', handler);
         cleanupFns.push(() => button.removeEventListener('click', handler));
     });
+
+    const exportPdfButton = container?.querySelector?.('[data-action="hrd-export-pdf"]');
+    if (exportPdfButton) {
+        const handler = () => handleApplicantsPdfExport();
+        exportPdfButton.addEventListener('click', handler);
+        cleanupFns.push(() => exportPdfButton.removeEventListener('click', handler));
+    }
 
     const tableContainer = $('#hrd-applicants-table');
     if (tableContainer) {
@@ -835,30 +844,84 @@ function renderPaginationControls({ perPage, currentPage, totalPages, totalItems
     `;
 }
 
-// --- handleTemplateDownload Dirombak ---
-function handleTemplateDownload(format = 'xlsx') {
+// --- Export helpers ---
+function exportApplicantsData(format = 'xlsx') {
+    const { headers, rows, total } = collectApplicantExportData();
+    if (total === 0) {
+        toast('info', 'Tidak ada data yang cocok dengan filter saat ini.');
+        return;
+    }
     const normalizedFormat = format === 'csv' ? 'csv' : 'xlsx';
-    
-    // Menggunakan DOWNLOADABLE_COLUMNS baru
-    const headers = DOWNLOADABLE_COLUMNS.map(col => col.label);
-    
     if (normalizedFormat === 'csv') {
-        const csvContent = `${headers.join(',')}\n`;
-        const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
-        downloadBlob(blob, 'hrd_applicants_template.csv');
-        toast('success', 'Template CSV berhasil dibuat.');
+        const csvRows = [headers.join(',')].concat(
+            rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
+        );
+        const blob = new Blob([`\uFEFF${csvRows.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
+        downloadBlob(blob, `hrd_applicants_${new Date().toISOString().slice(0,10)}.csv`);
+        toast('success', 'CSV berhasil diunduh.');
         return;
     }
     try {
         const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.aoa_to_sheet([headers]);
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
-        XLSX.writeFile(workbook, 'hrd_applicants_template.xlsx');
-        toast('success', 'Template XLSX berhasil dibuat.');
+        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Pelamar');
+        XLSX.writeFile(workbook, `hrd_applicants_${new Date().toISOString().slice(0,10)}.xlsx`);
+        toast('success', 'XLSX berhasil diunduh.');
     } catch (error) {
-        console.error('[HrdApplicants] Gagal membuat template XLSX:', error);
-        toast('error', 'Gagal membuat template XLSX.');
+        console.error('[HrdApplicants] Gagal mengekspor XLSX:', error);
+        toast('error', 'Gagal membuat file XLSX.');
     }
+}
+
+async function handleApplicantsPdfExport() {
+    const { headers, rows, total } = collectApplicantExportData();
+    if (total === 0) {
+        toast('info', 'Tidak ada data yang cocok dengan filter saat ini.');
+        return;
+    }
+    const summary = getApplicantFilterSummary();
+    try {
+        await downloadCustomTablePdf({
+            title: 'Rekap Database Pelamar HRD',
+            subtitle: `Total data: ${total} • Filter: ${summary}`,
+            filename: `hrd_applicants_${new Date().toISOString().slice(0,10)}.pdf`,
+            sections: [{ headers, body: rows }]
+        });
+        toast('success', 'PDF berhasil dibuat.');
+    } catch (error) {
+        console.error('[HrdApplicants] Gagal membuat PDF:', error);
+        toast('error', 'Gagal membuat PDF.');
+    }
+}
+
+function collectApplicantExportData() {
+    const filtered = getFilteredList();
+    const headers = DOWNLOADABLE_COLUMNS.map(col => col.label);
+    const rows = filtered.map(item => DOWNLOADABLE_COLUMNS.map(col => formatApplicantExportValue(col.key, item)));
+    return { headers, rows, total: rows.length };
+}
+
+function formatApplicantExportValue(key, item) {
+    const raw = pickValue(item, key);
+    if (!raw) return '';
+    if (key === 'tanggalLahir') {
+        try {
+            return formatDate(raw, { day: '2-digit', month: '2-digit', year: 'numeric' });
+        } catch {
+            return getSafeString(raw);
+        }
+    }
+    if (Array.isArray(raw)) {
+        return raw.join(', ');
+    }
+    return getSafeString(raw);
+}
+
+function getApplicantFilterSummary() {
+    const { gender = 'all', statusAplikasi = 'all' } = getFilters();
+    const genderLabel = gender === 'all' ? 'Semua Jenis Kelamin' : gender;
+    const statusLabel = statusAplikasi === 'all' ? 'Semua Status' : statusAplikasi;
+    return `${genderLabel} | ${statusLabel}`;
 }
 
 function downloadBlob(blob, filename) {

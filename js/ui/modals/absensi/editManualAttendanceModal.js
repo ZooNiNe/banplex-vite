@@ -2,11 +2,12 @@ import { appState } from "../../../state/appState.js";
 import { $, $$ } from "../../../utils/dom.js";
 import { fmtIDR, parseFormattedNumber } from "../../../utils/formatters.js";
 import { createModal, closeModal, showDetailPane, closeModalImmediate } from "../../components/modal.js";
-import { createMasterDataSelect, initCustomSelects, formatNumberInput } from "../../components/forms/index.js";
+import { createMasterDataSelect, initCustomSelects, createModalSelectField, initModalSelects, formatNumberInput } from "../../components/forms/index.js";
 import { emit } from "../../../state/eventBus.js";
 import { toast } from "../../components/toast.js";
 import { getJSDate, getLocalDayBounds, parseLocalDate } from "../../../utils/helpers.js";
 import { setManualAttendanceProject } from "../../../services/data/attendanceService.js";
+import { openAttendanceGuidanceModal } from "../../../services/modals/absensi/guidanceModal.js";
 
 // ... (State lokal dan fungsi createIcon tidak berubah) ...
 // State lokal khusus untuk modal ini
@@ -361,6 +362,7 @@ function attachEntryListeners(modal) {
 export function handleOpenManualAttendanceModal(context) {
     // ... (fungsi tidak berubah) ...
     if (!setupModalState(context)) return; // Setup state
+    openAttendanceGuidanceModal();
 
     const date = parseLocalDate(modalState.date);
     const formattedDate = date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -467,15 +469,21 @@ export async function _showAttendanceFilterModal(onApply) {
     attendanceFilter.projectId = defaultProjectFilter;
 
     const projectOptions = [
-        { value: 'all', text: 'Semua Proyek Aktif' },
+        { value: 'all', label: 'Semua Proyek Aktif' },
         ...projects
             .filter(p => p.isWageAssignable && !p.isDeleted)
-            .map(p => ({ value: p.id, text: p.projectName }))
+            .map(p => ({ value: p.id, label: p.projectName }))
     ];
 
     const content = `
         <form id="attendance-filter-form">
-            ${createMasterDataSelect('filter-project-id', 'Filter Berdasarkan Proyek', projectOptions, defaultProjectFilter, null)}
+            ${createModalSelectField({
+                id: 'filter-project-id',
+                label: 'Filter Berdasarkan Proyek',
+                options: projectOptions,
+                value: defaultProjectFilter || 'all',
+                placeholder: 'Semua Proyek'
+            })}
         </form>
     `;
 
@@ -490,11 +498,12 @@ export async function _showAttendanceFilterModal(onApply) {
         content, 
         footer, 
         isUtility: true,
+        allowContentOverflow: true,
         layoutClass: isMobile ? 'is-bottom-sheet' : 'is-simple-dialog' // Responsif
     });
     if (!modalEl) return;
 
-    initCustomSelects(modalEl);
+    initModalSelects(modalEl);
 
     modalEl.querySelector('#attendance-filter-form').addEventListener('submit', (e) => {
         e.preventDefault();

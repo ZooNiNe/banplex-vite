@@ -213,6 +213,55 @@ async function generatePdfReport(config) {
     }
 }
 
+function normalizeDailyAttendanceRecords(records = []) {
+    const grouped = new Map();
+    const keyOrder = [];
+
+    records.forEach(rec => {
+        if (!rec || !rec.workerId) return;
+        const recDate = getJSDate(rec.date);
+        if (!(recDate instanceof Date) || Number.isNaN(recDate)) return;
+        const dayKey = `${rec.workerId}__${recDate.toISOString().slice(0, 10)}`;
+        if (!grouped.has(dayKey)) {
+            grouped.set(dayKey, []);
+            keyOrder.push(dayKey);
+        }
+        grouped.get(dayKey).push(rec);
+    });
+
+    const normalized = [];
+    keyOrder.forEach(key => {
+        const group = grouped.get(key);
+        if (!group || group.length === 0) return;
+        const isAllHalfDay = group.every(g => g.attendanceStatus === 'half_day');
+        if (isAllHalfDay) {
+            group.forEach(rec => normalized.push(rec));
+            return;
+        }
+        const prioritized =
+            group.find(rec => rec.attendanceStatus === 'full_day') ||
+            group.find(rec => rec.type === 'timestamp' && rec.status === 'completed') ||
+            group.find(rec => rec.type === 'timestamp') ||
+            group.reduce((best, rec) => ((rec.totalPay || 0) > (best?.totalPay || 0) ? rec : best), null) ||
+            group[0];
+        if (prioritized) normalized.push(prioritized);
+    });
+
+    return normalized;
+}
+
+function getRecordDayValue(rec) {
+    if (!rec) return 0;
+    if (rec.attendanceStatus === 'full_day') return 1;
+    if (rec.attendanceStatus === 'half_day') return 0.5;
+    if (rec.type === 'timestamp') {
+        const hours = parseFloat(rec.workHours);
+        if (!Number.isFinite(hours) || hours <= 0) return 0;
+        return Math.min(1, hours / 8);
+    }
+    return rec.attendanceStatus && rec.attendanceStatus !== 'absent' ? 1 : 0;
+}
+
 async function _prepareUpahPekerjaDataForPdf() {
     // --- PERUBAHAN: Mengambil filter dari DOM, sesuai file asli Anda ---
     const startDateStr = $('#report-start-date')?.value;
@@ -242,6 +291,7 @@ async function _prepareUpahPekerjaDataForPdf() {
         recordsInRange = recordsInRange.filter(rec => rec.workerId === workerId);
     }
     
+    recordsInRange = normalizeDailyAttendanceRecords(recordsInRange);
     recordsInRange.sort((a,b) => getJSDate(a.date) - getJSDate(b.date));
 
     if (recordsInRange.length === 0) return null;
@@ -582,6 +632,133 @@ export async function handleDownloadReport(format, reportType) {
         return;
     }
     await generatePdfReport(reportConfig);
+}
+
+export async function downloadInvoiceDetailPdf(expenseInput) {
+    const expense = typeof expenseInput === 'string'
+        ? (appState.expenses || []).find(exp => exp.id === expenseInput)
+        : expenseInput;
+    if (!expense) {
+        toast('error', 'Data faktur tidak ditemukan.');
+        return;
+    }
+    if (!Array.isArray(expense.items) || expense.items.length === 0) {
+        toast('info', 'Faktur ini belum memiliki rincian item.');
+        return;
+    }
+
+    const supplier = (appState.suppliers || []).find(s => s.id === expense.supplierId);
+    const project = (appState.projects || []).find(p => p.id === expense.projectId);
+    const dateObj = getJSDate(expense.date);
+    const dateLabel = isNaN(dateObj.getTime()) ? '-' : dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    const subtitleParts = [];
+    if (supplier?.supplierName) subtitleParts.push(supplier.supplierName);
+    if (project?.projectName) subtitleParts.push(project.projectName);
+    if (dateLabel !== '-') subtitleParts.push(dateLabel);
+
+    const materialMap = new Map((appState.materials || []).map(mat => [mat.id, mat.materialName]));
+    const bodyRows = expense.items.map(item => {
+        const qty = item.quantity ?? item.qty ?? 0;
+        const unit = item.unit || '';
+        const price = item.price || 0;
+        const materialName = item.name || item.itemName || materialMap.get(item.materialId || item.itemId || item.id) || 'Item';
+        return [
+            materialName,
+            `${qty} ${unit}`.trim(),
+            fmtIDRFormat(price),
+            fmtIDRFormat(qty * price)
+        ];
+    });
+
+    const sections = [{
+        sectionTitle: 'Rincian Item Faktur',
+        headers: ['Item', 'Qty', 'Harga', 'Subtotal'],
+        body: bodyRows,
+        foot: [['Total Faktur', '', '', fmtIDRFormat(expense.amount || 0)]]
+    }];
+
+    await generatePdfReport({
+        title: expense.description || 'Faktur Material',
+        subtitle: subtitleParts.join(' • '),
+        filename: `Faktur-${(supplier?.supplierName || 'Material').replace(/\s+/g, '-')}-${(dateLabel || '').replace(/\s+/g, '-')}.pdf`,
+        sections
+    });
+}
+
+export async function downloadWorkerAttendanceReport({ workerId, startDate, endDate }) {
+    if (!workerId || !startDate || !endDate) {
+        toast('error', 'Pilih pekerja dan rentang tanggal untuk laporan.');
+        return;
+    }
+
+    const worker = (appState.workers || []).find(w => w.id === workerId);
+    if (!worker) {
+        toast('error', 'Data pekerja tidak ditemukan.');
+        return;
+    }
+
+    const startDateObj = parseLocalDate(startDate);
+    const endDateObj = parseLocalDate(endDate);
+    if (startDateObj > endDateObj) {
+        toast('error', 'Tanggal mulai tidak boleh melebihi tanggal akhir.');
+        return;
+    }
+    endDateObj.setHours(23, 59, 59, 999);
+
+    let records = (appState.attendanceRecords || []).filter(rec => {
+        if (rec.isDeleted || rec.workerId !== workerId) return false;
+        const recDate = getJSDate(rec.date);
+        if (isNaN(recDate.getTime())) return false;
+        return recDate >= startDateObj && recDate <= endDateObj;
+    });
+
+    records = normalizeDailyAttendanceRecords(records);
+    records.sort((a, b) => getJSDate(a.date) - getJSDate(b.date));
+
+    if (records.length === 0) {
+        toast('info', 'Tidak ada data absensi pada rentang tanggal tersebut.');
+        return;
+    }
+
+    const projectMap = new Map((appState.projects || []).map(p => [p.id, p.projectName]));
+    const totalPay = records.reduce((sum, rec) => sum + (rec.totalPay || 0), 0);
+    const totalDays = records.reduce((sum, rec) => sum + getRecordDayValue(rec), 0);
+    const detailRows = records.map(rec => {
+        const recDate = getJSDate(rec.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+        const projectName = projectMap.get(rec.projectId) || '-';
+        const statusLabel = rec.attendanceStatus === 'full_day' ? 'Hadir' :
+            (rec.attendanceStatus === 'half_day' ? '1/2 Hari' : 'Absen');
+        const role = rec.jobRole || '-';
+        return [recDate, projectName, statusLabel, role, fmtIDRFormat(rec.totalPay || 0)];
+    });
+
+    const summarySection = {
+        sectionTitle: 'Ringkasan Kehadiran',
+        headers: ['Metrik', 'Nilai'],
+        body: [
+            ['Pekerja', worker.workerName],
+            ['Rentang Tanggal', `${startDate} s.d. ${endDate}`],
+            ['Total Hari Aktif', `${totalDays} hari`],
+            ['Total Upah', fmtIDRFormat(totalPay)]
+        ]
+    };
+
+    const detailSection = {
+        sectionTitle: 'Rincian Kehadiran',
+        headers: ['Tanggal', 'Proyek', 'Status', 'Peran', 'Nominal'],
+        body: detailRows
+    };
+
+    await generatePdfReport({
+        title: `Laporan Kehadiran ${worker.workerName}`,
+        subtitle: `${startDate} - ${endDate}`,
+        filename: `Laporan-${worker.workerName.replace(/\s+/g, '-')}-${startDate}-${endDate}.pdf`,
+        sections: [summarySection, detailSection]
+    });
+}
+
+export async function downloadCustomTablePdf(config = {}) {
+    await generatePdfReport(config);
 }
 
 function _prepareSimulasiData() {

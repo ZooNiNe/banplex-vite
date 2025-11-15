@@ -217,6 +217,67 @@ select,
   font-weight: 600;
 }
 
+.modal-select-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.modal-select-field label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.modal-select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background-color: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+  gap: 0.5rem;
+}
+
+.modal-select-trigger .modal-select-value {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-select-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.modal-select-option {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background-color: var(--panel);
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.modal-select-option.is-active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background-color: color-mix(in srgb, var(--primary) 12%, transparent);
+  font-weight: 600;
+}
+
 
 /* --- Master Data Select Combination --- */
 .master-data-select {
@@ -253,7 +314,7 @@ select,
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  z-index: 2000; /* Must be above other form elements */
+  z-index: 2200; /* Must be above other form elements */
   background-color: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);

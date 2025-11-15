@@ -15,6 +15,7 @@ import { createListSkeletonHTML } from '../components/skeleton.js';
 import { createModal, closeModal, closeModalImmediate } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { handleSaveAllPendingAttendance, setManualAttendanceProject } from '../../services/data/attendanceService.js';
+import { openAttendanceGuidanceModal } from '../../services/modals/absensi/guidanceModal.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
 import { projectsCol, workersCol, professionsCol, attendanceRecordsCol } from '../../config/firebase.js';
 
@@ -288,6 +289,10 @@ async function _renderWorkerListForManualAttendance() {
         
         card.classList.toggle('selected', shouldBeSelected);
         card.querySelector('.selection-checkmark')?.classList.toggle('checked', shouldBeSelected);
+        if (isPendingPresent) {
+            card.classList.add('status-marked');
+            setTimeout(() => card.classList.remove('status-marked'), 500);
+        }
     });
     
     emit('ui.selection.updateCount');
@@ -375,9 +380,101 @@ function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateSt
         return;
     }
 
+    const formatTimeLabel = (value) => {
+        if (!value) return '--:--';
+        const dateVal = getJSDate(value);
+        if (!(dateVal instanceof Date) || Number.isNaN(dateVal)) return '--:--';
+        return dateVal.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const buildTimelineHTML = (attendance) => {
+        const isTimestampRecord = attendance?.type === 'timestamp';
+        const checkInText = isTimestampRecord && attendance?.checkIn ? formatTimeLabel(attendance.checkIn) : '--:--';
+        const checkOutText = isTimestampRecord && attendance?.checkOut ? formatTimeLabel(attendance.checkOut) : '--:--';
+        let hoursLabel = '-';
+        if (isTimestampRecord) {
+            if (attendance?.workHours && attendance.workHours > 0) {
+                hoursLabel = `${attendance.workHours.toFixed(1)} jam`;
+            } else if (attendance?.status === 'checked_in') {
+                hoursLabel = 'Sedang berjalan';
+            } else {
+                hoursLabel = '0 jam';
+            }
+        } else if (attendance?.attendanceStatus === 'full_day') {
+            hoursLabel = '1 Hari Kerja';
+        } else if (attendance?.attendanceStatus === 'half_day') {
+            hoursLabel = '½ Hari';
+        }
+
+        return `
+            <div class="attendance-timeline">
+                <div class="attendance-time-slot">
+                    <span class="label">Masuk</span>
+                    <strong class="value">${checkInText}</strong>
+                </div>
+                <div class="attendance-time-slot">
+                    <span class="label">Pulang</span>
+                    <strong class="value">${checkOutText}</strong>
+                </div>
+                <div class="attendance-hours-chip" title="Durasi kerja hari ini">${hoursLabel}</div>
+            </div>
+        `;
+    };
+
+    const getStatusInfo = (attendance, locked) => {
+        if (locked) return { text: 'Hadir di proyek lain', state: 'warn' };
+        if (!attendance) return { text: 'Belum Check-in', state: 'idle' };
+        if (attendance.type === 'timestamp') {
+            if (attendance.status === 'checked_in') return { text: 'Sedang bekerja', state: 'active' };
+            if (attendance.status === 'completed') return { text: 'Selesai (Jam)', state: 'done' };
+            return { text: 'Tercatat (Jam)', state: 'done' };
+        }
+        if (attendance.attendanceStatus === 'full_day') return { text: 'Manual: Hadir', state: 'done' };
+        if (attendance.attendanceStatus === 'half_day') return { text: 'Manual: ½ Hari', state: 'active' };
+        return { text: 'Manual: Absen', state: 'idle' };
+    };
+
+    const resolveProject = (attendance, worker) => {
+        const projectId = attendance?.projectId || worker.defaultProjectId;
+        if (!projectId) return null;
+        return (appState.projects || []).find(p => p.id === projectId) || null;
+    };
+
+    const buildPriorityNoteHTML = (attendance, worker, project) => {
+        const notes = attendance?.priorityNote || attendance?.notes;
+        const defaultPieces = [];
+        if (project?.projectName) defaultPieces.push(`Proyek: ${project.projectName}`);
+        const roleText = attendance?.jobRole || worker.defaultRole;
+        if (roleText) defaultPieces.push(`Peran: ${roleText}`);
+        const textContent = notes || defaultPieces.join(' • ') || 'Belum ada catatan penting';
+        const isEmpty = !notes;
+        return `
+            <div class="attendance-priority-note ${isEmpty ? 'is-empty' : ''}">
+                <span class="priority-note-label">Catatan Prioritas</span>
+                <p>${textContent}</p>
+            </div>
+        `;
+    };
+
+    const buildActionButtonsHTML = (attendance, worker, locked) => {
+        const isTimestampRecord = attendance?.type === 'timestamp';
+        const canCheckIn = !attendance && !locked;
+        const canCheckOut = !locked && isTimestampRecord && attendance?.status === 'checked_in';
+        const hasRecord = Boolean(attendance);
+        const checkOutButtonClass = canCheckOut ? 'btn btn-ghost is-active' : 'btn btn-ghost';
+
+        return `
+            <div class="attendance-timestamp-actions">
+                <button type="button" class="btn btn-primary" data-action="check-in" data-id="${worker.id}" ${canCheckIn ? '' : 'disabled'}>Check-in</button>
+                <button type="button" class="${checkOutButtonClass}" data-action="check-out" data-id="${attendance?.id || ''}" ${canCheckOut ? '' : 'disabled'}>Check-out</button>
+                <button type="button" class="btn btn-light" data-action="edit-attendance" data-id="${attendance?.id || ''}" ${hasRecord ? '' : 'disabled'}>Detail</button>
+            </div>
+        `;
+    };
+
     const cardsHTML = workersToDisplay.map(worker => {
         const attendance = attendanceMap.get(worker.id);
-        const project = attendance ? appState.projects?.find(p => p.id === attendance.projectId) : null;
+        const project = resolveProject(attendance, worker);
         const profession = appState.professions?.find(p => p.id === worker.professionId);
         const metaBadges = [];
         let headerMetaText = 'Belum Absen';
@@ -385,14 +482,24 @@ function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateSt
         const isSelected = false;
         const itemId = attendance?.id || worker.id;
         const recordId = attendance?.id;
-        let customClasses = '';
+        let customClasses = 'attendance-daily-card';
+        const isTimestampRecord = attendance?.type === 'timestamp';
 
         if (profession) metaBadges.push({icon: 'badge', text: profession.professionName});
 
         if (attendance) {
-            headerMetaText = attendance.isPaid ? 'Sudah Dibayar' : `Upah: ${fmtIDR(attendance.totalPay || 0)}`;
+            if (isTimestampRecord) {
+                if (attendance.status === 'checked_in') {
+                    headerMetaText = 'Sedang berjalan (Jam)';
+                } else {
+                    const hoursLabel = attendance.workHours ? `${attendance.workHours.toFixed(1)} jam` : '0 jam';
+                    headerMetaText = `${hoursLabel} • ${fmtIDR(attendance.totalPay || 0)}`;
+                }
+            } else {
+                headerMetaText = attendance.isPaid ? 'Sudah Dibayar' : `Upah: ${fmtIDR(attendance.totalPay || 0)}`;
+            }
             action = 'open-manual-attendance-modal';
-            customClasses = 'is-already-attended';
+            customClasses += ' is-already-attended';
             if (attendance.projectId) metaBadges.push({icon: 'work', text: project?.projectName || 'Proyek?'});
             if (attendance.jobRole) metaBadges.push({icon: 'hammer', text: attendance.jobRole});
             
@@ -402,8 +509,13 @@ function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateSt
                 metaBadges.push({icon: 'calendar-x-2', text: 'Absen'});
                 customClasses += ' is-absent';
                 headerMetaText = 'Absen';
-             }
+            }
         }
+
+        const statusInfo = getStatusInfo(attendance, false);
+        const timelineHTML = buildTimelineHTML(attendance);
+        const priorityNoteHTML = buildPriorityNoteHTML(attendance, worker, project);
+        const actionButtonsHTML = buildActionButtonsHTML(attendance, worker, false);
 
         return createUnifiedCard({
             id: `att-${itemId}`,
@@ -422,7 +534,15 @@ function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateSt
             moreAction: !isViewer(),
             selectionEnabled: false,
             isSelected: isSelected,
-            customClasses: customClasses
+            customClasses: customClasses,
+            mainContentHTML: `
+                <div class="attendance-timeline-card">
+                    <span class="attendance-status-chip status-${statusInfo.state}">${statusInfo.text}</span>
+                    ${timelineHTML}
+                </div>
+                ${priorityNoteHTML}
+                ${actionButtonsHTML}
+            `
         });
     }).join('');
 
@@ -768,8 +888,10 @@ function initAbsensiPage() {
             <div id="sub-page-content-wrapper" class="panel-body scrollable-content">
                 ${initialContentHTML}
             </div>
-        </div>
+       </div>
     `;
+
+    openAttendanceGuidanceModal();
 
     setupDebouncedRender();
 

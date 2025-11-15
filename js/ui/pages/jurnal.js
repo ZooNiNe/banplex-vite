@@ -8,6 +8,7 @@ import { formatDate, fmtIDR } from '../../utils/formatters.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
 import { createListSkeletonHTML } from '../components/skeleton.js';
+import { createModalSelectField, initModalSelects } from '../components/forms/index.js';
 import { toast } from '../components/toast.js';
 // --- PERUBAHAN: Menambahkan parseLocalDate ---
 import { getJSDate, parseLocalDate } from '../../utils/helpers.js';
@@ -16,6 +17,7 @@ import { openDailyProjectPickerForEdit } from '../../services/data/jurnalService
 import { openDailyAttendanceEditorPanel } from '../../services/data/attendanceService.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
 import { getPendingQuotaMaps } from '../../services/pendingQuotaService.js';
+import { createModal, closeModal, resetFormDirty } from '../components/modal.js';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -103,20 +105,43 @@ function setJurnalSortValue(tab, value) {
     try { localStorage.setItem('jurnal.sort', JSON.stringify(appState.jurnalSort)); } catch (_) {}
 }
 
-function updateJurnalSortControl() {
+function updateJurnalSortControl(listenerSignal) {
     if (typeof document === 'undefined') return;
     const sortBar = document.getElementById('jurnal-sort-bar');
-    const select = document.getElementById('jurnal-sort-select');
-    if (!sortBar || !select) return;
+    const control = document.getElementById('jurnal-sort-control');
+    if (!sortBar || !control) return;
     const activeTab = appState.activeSubPage.get('jurnal') || 'harian';
     const options = JURNAL_SORT_OPTIONS[activeTab];
     if (!options) {
         sortBar.style.display = 'none';
+        control.innerHTML = '';
         return;
     }
     sortBar.style.display = '';
-    select.innerHTML = options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
-    select.value = getJurnalSortValue(activeTab);
+    const selectHTML = createModalSelectField({
+        id: 'jurnal-sort-select',
+        label: '',
+        options: options.map(opt => ({ value: opt.value, label: opt.label })),
+        value: getJurnalSortValue(activeTab)
+    });
+    control.innerHTML = `
+        <div class="jurnal-sort-inline">
+            <span class="sort-inline-label">Urutkan</span>
+            ${selectHTML}
+        </div>
+    `;
+    initModalSelects(control);
+    const hiddenInput = control.querySelector('#jurnal-sort-select');
+    if (hiddenInput) {
+        hiddenInput.onchange = (e) => {
+            const tab = appState.activeSubPage.get('jurnal') || 'harian';
+            setJurnalSortValue(tab, e.target.value);
+            renderJurnalContent(false);
+        };
+        listenerSignal?.addEventListener('abort', () => {
+            if (hiddenInput) hiddenInput.onchange = null;
+        }, { once: true });
+    }
 }
 
 function sortJurnalItems(activeTab, items) {
@@ -162,68 +187,89 @@ function sortJurnalItems(activeTab, items) {
 
 
 function groupItemsByMonth(items, dateField = 'date') {
-    const grouped = {};
+    const groups = new Map();
     items.forEach(item => {
         const date = getJSDate(item[dateField]);
-        const monthYearKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-        const monthYearLabel = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-
-        if (!grouped[monthYearKey]) {
-            grouped[monthYearKey] = { label: monthYearLabel, items: [] };
+        if (isNaN(date.getTime())) return;
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const label = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        if (!groups.has(key)) {
+            groups.set(key, { key, label, sortDate: new Date(date.getFullYear(), date.getMonth(), 1), items: [] });
         }
-        grouped[monthYearKey].items.push(item);
+        groups.get(key).items.push(item);
     });
-    return grouped;
+    return Array.from(groups.values()).sort((a, b) => b.sortDate - a.sortDate);
 }
 
 function groupItemsByProfession(items) {
-    const grouped = {};
     const professionMap = new Map((appState.professions || []).map(p => [p.id, p.professionName]));
-
+    const groups = new Map();
     items.forEach(item => {
         const professionId = item.professionId || 'unknown';
         const groupLabel = professionMap.get(professionId) || 'Tanpa Profesi';
-        
-        if (!grouped[groupLabel]) {
-            grouped[groupLabel] = { label: groupLabel, items: [] };
+        const groupKey = `profession-${professionId}`;
+        if (!groups.has(groupKey)) {
+            groups.set(groupKey, { key: groupKey, label: groupLabel, items: [] });
         }
-        grouped[groupLabel].items.push(item);
+        groups.get(groupKey).items.push(item);
     });
-    return grouped;
+    return Array.from(groups.values()).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function renderJurnalGroupBody(items, type, options = {}) {
+    const sortedItems = [...items];
+    if (type === 'per_pekerja') {
+        sortedItems.sort((a, b) => (a.workerName || '').localeCompare(b.workerName || ''));
+    } else {
+        sortedItems.sort((a, b) => getJSDate(b.date || b.createdAt) - getJSDate(a.date || a.createdAt));
+    }
+    if (type === 'harian') {
+        return _getJurnalHarianListHTML(sortedItems);
+    }
+    if (type === 'riwayat_rekap') {
+        return _getRekapGajiListHTML(sortedItems, options.rekapPendingOptions || {});
+    }
+    return _getJurnalPerPekerjaListHTML(sortedItems);
 }
 
 function _renderGroupedListItems(groupedData, type, options = {}) {
-    let html = '';
-    
-    let sortedGroupKeys;
-    if (type === 'per_pekerja') {
-        sortedGroupKeys = Object.keys(groupedData).sort((a, b) => a.localeCompare(b));
-    } else {
-        sortedGroupKeys = Object.keys(groupedData).sort().reverse();
-    }
+    return groupedData.map(group => {
+        const bodyHTML = renderJurnalGroupBody(group.items, type, options);
+        const headerClass = type === 'per_pekerja' ? 'date-group-header' : 'month-group-header date-group-header';
+        return `
+            <section class="date-group" data-group-key="${group.key}">
+                <div class="${headerClass}">${group.label}</div>
+                <div class="date-group-body">${bodyHTML}</div>
+            </section>
+        `;
+    }).join('');
+}
 
-    sortedGroupKeys.forEach(key => {
-        const group = groupedData[key];
-        html += `<div class="month-group-header date-group-header">${group.label}</div>`; // Nama kelas 'month-group-header' kita biarkan
-        
-        let sortedItemsInGroup;
-        if (type === 'per_pekerja') {
-            sortedItemsInGroup = group.items.sort((a, b) => (a.workerName || '').localeCompare(b.workerName || ''));
+function appendJurnalGroups(wrapper, groups, type, options = {}) {
+    const insertedElements = [];
+    const headerClass = type === 'per_pekerja' ? 'date-group-header' : 'month-group-header date-group-header';
+    groups.forEach(group => {
+        const bodyHTML = renderJurnalGroupBody(group.items, type, options);
+        const section = wrapper.querySelector(`.date-group[data-group-key="${group.key}"]`);
+        if (section) {
+            const body = section.querySelector('.date-group-body');
+            if (!body) return;
+            const temp = document.createElement('div');
+            temp.innerHTML = bodyHTML;
+            Array.from(temp.children).forEach(node => {
+                body.appendChild(node);
+                if (node.classList?.contains('wa-card-v2-wrapper')) insertedElements.push(node);
+            });
         } else {
-            sortedItemsInGroup = group.items.sort((a, b) => getJSDate(b.date || b.createdAt) - getJSDate(a.date || a.createdAt));
+            const sectionEl = document.createElement('section');
+            sectionEl.className = 'date-group';
+            sectionEl.dataset.groupKey = group.key;
+            sectionEl.innerHTML = `<div class="${headerClass}">${group.label}</div><div class="date-group-body">${bodyHTML}</div>`;
+            wrapper.appendChild(sectionEl);
+            sectionEl.querySelectorAll('.wa-card-v2-wrapper')?.forEach(node => insertedElements.push(node));
         }
-
-        let groupHTML = '';
-        if (type === 'harian') {
-            groupHTML = _getJurnalHarianListHTML(sortedItemsInGroup);
-        } else if (type === 'riwayat_rekap') { // Nama tab baru
-            groupHTML = _getRekapGajiListHTML(sortedItemsInGroup, options.rekapPendingOptions || {});
-        } else if (type === 'per_pekerja') {
-            groupHTML = _getJurnalPerPekerjaListHTML(sortedItemsInGroup);
-        }
-        html += `<div class="date-group-body">${groupHTML}</div>`;
     });
-    return html;
+    return insertedElements;
 }
 
 async function renderJurnalContent(append = false) {
@@ -372,36 +418,24 @@ async function renderJurnalContent(append = false) {
         return;
     }
 
-    let groupedData;
-    if (activeTab === 'per_pekerja') {
-        groupedData = groupItemsByProfession(itemsToDisplay);
-    } else {
-        const dateField = (activeTab === 'harian') ? 'date' : 'createdAt';
-        groupedData = groupItemsByMonth(itemsToDisplay, dateField);
-    }
-    const listHTML = _renderGroupedListItems(groupedData, activeTab, { rekapPendingOptions });
-    
+    const groupedData = (activeTab === 'per_pekerja')
+        ? groupItemsByProfession(itemsToDisplay)
+        : groupItemsByMonth(itemsToDisplay, activeTab === 'harian' ? 'date' : 'createdAt');
     let listWrapper = container.querySelector('#journal-grouped-wrapper');
     let newlyAddedElements = [];
 
-    if (append) {
-        if (!listWrapper) {
-            container.innerHTML = `<div class="wa-card-list-wrapper grouped" id="journal-grouped-wrapper">${listHTML}</div>`;
-            listWrapper = container.querySelector('#journal-grouped-wrapper');
-        } else {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = listHTML;
-            newlyAddedElements = Array.from(tempDiv.children);
-            newlyAddedElements.forEach(el => listWrapper.appendChild(el));
-        }
-    } else {
+    if (!append || !listWrapper) {
+        const listHTML = _renderGroupedListItems(groupedData, activeTab, { rekapPendingOptions });
         container.innerHTML = `<div class="wa-card-list-wrapper grouped" id="journal-grouped-wrapper">${listHTML}</div>`;
         listWrapper = container.querySelector('#journal-grouped-wrapper');
-        container.scrollTop = 0;
-    }
-
-    if (listWrapper && !append) {
-        newlyAddedElements = Array.from(listWrapper.querySelectorAll('.wa-card-v2-wrapper'));
+        if (!append) {
+            container.scrollTop = 0;
+        }
+        if (listWrapper) {
+            newlyAddedElements = Array.from(listWrapper.querySelectorAll('.wa-card-v2-wrapper'));
+        }
+    } else {
+        newlyAddedElements = appendJurnalGroups(listWrapper, groupedData, activeTab, { rekapPendingOptions });
     }
 
     newlyAddedElements.forEach((el, idx) => {
@@ -517,6 +551,12 @@ function initJurnalHeroCarousel() {
             startDate = new Date('2000-01-01');
             endDate = new Date('2100-01-01');
         }
+        const { startDate: filterStart, endDate: filterEnd } = getAppliedJurnalFilterStrings();
+        const rangeLabelStart = formatDateLabel(filterStart);
+        const rangeLabelEnd = formatDateLabel(filterEnd);
+        const filterNote = activeTab === 'harian'
+            ? 'Filter ini berlaku pada tab Pekerja & Riwayat.'
+            : 'Gunakan ikon pengaturan di toolbar untuk mengubah.';
 
         // --- PERUBAHAN: Filter data berdasarkan rentang tanggal ---
         const attendance = (appState.attendanceRecords || []).filter(r => {
@@ -550,28 +590,43 @@ function initJurnalHeroCarousel() {
         }, 0);
 
         // --- PERUBAHAN: Judul slide diubah untuk menandakan data difilter/all-time ---
-        const titleSuffix = (activeTab === 'harian') ? '(Semua Waktu)' : '(Filter)';
+        const titleSuffix = (activeTab === 'harian') ? 'Semua Waktu' : 'Filter Aktif';
         const slides = [
             {
-                title: `Total Hari Kerja ${titleSuffix}`,
-                tone: 'success',
-                lines: [
-                    `${totalDays.toLocaleString('id-ID')} Hari Kerja`,
-                    `${workers.size} Pekerja Aktif`,
-                ]
-            },
-            {
-                title: `Ringkasan Upah ${titleSuffix}`,
+                kicker: 'Filter Aktif',
+                title: 'Rentang Data',
+                subtitle: `${rangeLabelStart} — ${rangeLabelEnd}`,
                 tone: 'warning',
-                lines: [
-                    `Dibayar: ${fmtIDR(totalWagesPaid)}`,
-                    `Belum Lunas: ${fmtIDR(totalWagesUnpaid)}`,
+                metrics: [
+                    filterNote
                 ]
             },
             {
-                title: `Upah Belum Direkap ${titleSuffix}`,
+                kicker: 'Produktivitas',
+                title: 'Total Hari Kerja',
+                subtitle: titleSuffix,
+                tone: 'success',
+                metrics: [
+                    `${totalDays.toLocaleString('id-ID')} hari kerja`,
+                    `${workers.size} pekerja aktif`,
+                ]
+            },
+            {
+                kicker: 'Upah',
+                title: 'Ringkasan Pembayaran',
+                subtitle: titleSuffix,
+                tone: 'warning',
+                metrics: [
+                    `Dibayar · ${fmtIDR(totalWagesPaid)}`,
+                    `Belum Lunas · ${fmtIDR(totalWagesUnpaid)}`,
+                ]
+            },
+            {
+                kicker: 'Tindakan',
+                title: 'Upah Belum Direkap',
+                subtitle: titleSuffix,
                 tone: 'danger',
-                lines: [
+                metrics: [
                     `${fmtIDR(totalUnrecapped)} belum dibayar`,
                     `${attendance.filter(rec => !(rec.isPaid === true || rec.isPaid === 1)).length} catatan`
                 ]
@@ -583,8 +638,29 @@ function initJurnalHeroCarousel() {
             ...slides.map((s, idx) => `
                 <div class="dashboard-hero hero-slide${idx === 0 ? ' active' : ''}" data-index="${idx}" data-tone="${s.tone}">
                     <div class="hero-content">
+                        ${s.kicker ? `<p class="hero-kicker">${s.kicker}</p>` : ''}
                         <h1>${s.title}</h1>
-                        <p>${s.lines.join(' · ')}</p>
+                        ${s.subtitle ? `<p class="hero-subtitle">${s.subtitle}</p>` : ''}
+                        <div class="hero-metrics">
+                            ${s.metrics.map(line => `<span>${line}</span>`).join('')}
+                        </div>
+                    </div>
+                    <div class="hero-illustration" aria-hidden="true">
+                        <svg viewBox="0 0 200 100" preserveAspectRatio="xMidYMid meet">
+                            <defs>
+                                <linearGradient id="jurnalHeroGrad-${idx}" x1="${Math.random()*100}%" y1="${Math.random()*100}%" x2="${Math.random()*100}%" y2="${Math.random()*100}%">
+                                    <stop offset="0%" style="stop-color:var(--hero-${s.tone === 'danger' ? 'rose' : (s.tone === 'success' ? 'emerald' : 'indigo')});stop-opacity:0.25" />
+                                    <stop offset="100%" style="stop-color:var(--hero-${s.tone === 'danger' ? 'sun' : (s.tone === 'success' ? 'indigo' : 'emerald')});stop-opacity:0.4" />
+                                </linearGradient>
+                                <linearGradient id="jurnalHeroGrad2-${idx}" x1="${Math.random()*100}%" y1="${Math.random()*100}%" x2="${Math.random()*100}%" y2="${Math.random()*100}%">
+                                     <stop offset="0%" style="stop-color:var(--hero-${s.tone === 'danger' ? 'indigo' : (s.tone === 'success' ? 'sun' : 'rose')});stop-opacity:0.12" />
+                                    <stop offset="100%" style="stop-color:var(--hero-${s.tone === 'danger' ? 'emerald' : (s.tone === 'success' ? 'rose' : 'sun')});stop-opacity:0.25" />
+                                </linearGradient>
+                            </defs>
+                            <circle cx="${40 + Math.random()*20}" cy="${40 + Math.random()*20}" r="${35 + Math.random()*10}" fill="url(#jurnalHeroGrad-${idx})" class="hero-circle1" />
+                            <circle cx="${140 + Math.random()*20}" cy="${50 + Math.random()*20}" r="${25 + Math.random()*10}" fill="url(#jurnalHeroGrad2-${idx})" class="hero-circle2" />
+                            <path d="M ${10+Math.random()*20} ${70+Math.random()*10} Q ${40+Math.random()*20} ${40+Math.random()*20} ${90+Math.random()*20} ${50+Math.random()*20} T ${170+Math.random()*20} ${60+Math.random()*10}" stroke="var(--hero-${s.tone === 'danger' ? 'rose' : (s.tone === 'success' ? 'emerald' : 'indigo')})" stroke-width="3" fill="none" stroke-linecap="round" class="hero-line" opacity="0.25"/>
+                        </svg>
                     </div>
                 </div>
             `),
@@ -658,7 +734,11 @@ function initJurnalPage() {
     const container = $('.page-container');
     
     const pageToolbarHTML = createPageToolbarHTML({ 
-        title: 'Jurnal'
+        title: 'Jurnal',
+        actions: [
+            { icon: 'settings', label: 'Rentang & Filter Jurnal', action: 'open-jurnal-filter-modal' },
+            { icon: 'download', label: 'Unduh Laporan Pekerja', action: 'open-worker-report-modal' }
+        ]
     });
 
     const tabsData = [
@@ -675,31 +755,12 @@ function initJurnalPage() {
     });
 
     const heroHTML = `
-        <div id="jurnal-hero-carousel" class="dashboard-hero-carousel hero-journal" style="position:relative;">
+        <div id="jurnal-hero-carousel" class="dashboard-hero-carousel hero-journal" style="position:relative; margin-top:0.5rem;">
         </div>`;
-
-    // --- PERUBAHAN: Filter Tanggal (Labels Dihapus) ---
-    const { startDate: initialStartDate, endDate: initialEndDate } = getAppliedJurnalFilterStrings();
-
-    const dateFilterHTML = `
-        <div class="jurnal-date-filter-bar rekap-filters" id="jurnal-date-filters">
-            <div class="form-group">
-                <input type="date" id="jurnal-start-date" value="${initialStartDate}">
-            </div>
-            <div class="form-group">
-                <input type="date" id="jurnal-end-date" value="${initialEndDate}">
-            </div>
-            <div class="jurnal-filter-actions">
-                <button type="button" class="btn btn-secondary" id="jurnal-filter-reset">Reset</button>
-                <button type="button" class="btn btn-primary" id="jurnal-filter-apply">Terapkan</button>
-            </div>
-        </div>
-    `;
 
     const sortBarHTML = `
         <div class="jurnal-sort-bar" id="jurnal-sort-bar">
-            <label for="jurnal-sort-select">Urutkan</label>
-            <select id="jurnal-sort-select"></select>
+            <div id="jurnal-sort-control"></div>
         </div>
     `;
     // --- AKHIR PERUBAHAN ---
@@ -709,18 +770,12 @@ function initJurnalPage() {
             <div class="panel-header">
                 ${pageToolbarHTML}
                 ${heroHTML}
-                <div id="jurnal-filter-container">
-                    ${dateFilterHTML}
-                </div>
                 ${sortBarHTML}
                 ${tabsHTML}
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content"></div>
         </div>
     `;
-
-    // --- PERUBAHAN: Kontrol visibilitas filter ---
-    const filterContainer = container.querySelector('#jurnal-filter-container');
 
     const tabsContainer = container.querySelector('#jurnal-tabs');
     if (tabsContainer) {
@@ -733,31 +788,15 @@ function initJurnalPage() {
                 const newView = tabButton.dataset.tab;
                 appState.activeSubPage.set('jurnal', newView);
                 
-                // --- Logika Show/Hide ---
-                if (newView === 'harian') {
-                    filterContainer.style.display = 'none';
-                } else {
-                    filterContainer.style.display = 'block';
-                }
-                // --- Akhir Logika ---
-                
                 renderJurnalContent(false); // Muat ulang konten (yang kini punya logika filter)
                 initJurnalHeroCarousel(); // Muat ulang hero (yang kini punya logika filter)
-                updateJurnalSortControl();
+                updateJurnalSortControl(listenerSignal);
             }
         }, { signal: listenerSignal });
     }
-    
-    // --- Set Visibilitas Awal ---
-    if (initialActiveTab === 'harian') {
-        filterContainer.style.display = 'none';
-    }
-    // --- AKHIR PERUBAHAN ---
 
 
-    setupJurnalFilterControls(listenerSignal);
-    setupJurnalSortControl(listenerSignal);
-    updateJurnalSortControl();
+    updateJurnalSortControl(listenerSignal);
 
     journalObserverInstance = initInfiniteScroll('#sub-page-content');
     
@@ -780,6 +819,7 @@ function initJurnalPage() {
 
     on('ui.jurnal.openDailyProjectPicker', ({ date }) => openDailyProjectPickerForEdit(date), { signal: listenerSignal });
     on('ui.jurnal.openDailyEditorPanel', ({ dateStr, projectId }) => openDailyAttendanceEditorPanel(dateStr, projectId), { signal: listenerSignal });
+    on('ui.jurnal.openFilterModal', openJurnalFilterModal, { signal: listenerSignal });
     on('ui.jurnal.renderContent', renderJurnalContent, { signal: listenerSignal });
     on('request-more-data', loadMoreJurnal, { signal: listenerSignal });
     
@@ -811,16 +851,56 @@ function initJurnalPage() {
 
 export { initJurnalPage };
 
-function setupJurnalFilterControls(listenerSignal) {
-    const startInput = document.getElementById('jurnal-start-date');
-    const endInput = document.getElementById('jurnal-end-date');
-    const applyBtn = document.getElementById('jurnal-filter-apply');
-    const resetBtn = document.getElementById('jurnal-filter-reset');
-    if (!startInput || !endInput) return;
+function formatDateLabel(value) {
+    if (!value) return '-';
+    try {
+        return parseLocalDate(value).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch {
+        return value;
+    }
+}
 
-    applyBtn?.addEventListener('click', () => {
-        const startVal = startInput.value;
-        const endVal = endInput.value;
+function openJurnalFilterModal() {
+    const { startDate, endDate } = getAppliedJurnalFilterStrings();
+    const isMobile = window.matchMedia('(max-width: 599px)').matches;
+    const subtitleHTML = `
+        <p class="modal-subtitle">
+            Rentang ini membatasi kartu pada tab "Pekerja" dan "Riwayat Rekap".
+            Tab Harian selalu menampilkan data berdasarkan tanggal yang sedang aktif.
+        </p>
+    `;
+    const content = `
+        ${subtitleHTML}
+        <form id="jurnal-filter-form" class="stacked-form">
+            <div class="form-group">
+                <label for="modal-jurnal-start">Tanggal Mulai</label>
+                <input type="date" id="modal-jurnal-start" name="startDate" value="${startDate}" required>
+            </div>
+            <div class="form-group">
+                <label for="modal-jurnal-end">Tanggal Akhir</label>
+                <input type="date" id="modal-jurnal-end" name="endDate" value="${endDate}" required>
+            </div>
+        </form>
+    `;
+    const footer = `
+        <button type="button" class="btn btn-ghost" id="jurnal-filter-reset-modal">Reset</button>
+        <button type="button" class="btn btn-primary" id="jurnal-filter-apply-modal">Terapkan</button>
+    `;
+    const modal = createModal(isMobile ? 'actionsPopup' : 'dataDetail', {
+        title: 'Atur Rentang Jurnal',
+        content,
+        footer,
+        layoutClass: isMobile ? 'is-bottom-sheet journal-filter-sheet' : ''
+    });
+    if (!modal) return;
+
+    const form = modal.querySelector('#jurnal-filter-form');
+    const startInput = form?.querySelector('#modal-jurnal-start');
+    const endInput = form?.querySelector('#modal-jurnal-end');
+
+    const handleApplyClick = () => {
+        const startVal = startInput?.value;
+        const endVal = endInput?.value;
         if (!startVal || !endVal) {
             toast('error', 'Rentang tanggal harus diisi.');
             return;
@@ -832,24 +912,15 @@ function setupJurnalFilterControls(listenerSignal) {
         persistJurnalFilters(startVal, endVal);
         renderJurnalContent(false);
         initJurnalHeroCarousel();
-    }, { signal: listenerSignal });
+        resetFormDirty();
+        toast('success', 'Filter jurnal diperbarui.');
+        closeModal(modal);
+    };
 
-    resetBtn?.addEventListener('click', () => {
+    modal.querySelector('#jurnal-filter-apply-modal')?.addEventListener('click', handleApplyClick);
+    modal.querySelector('#jurnal-filter-reset-modal')?.addEventListener('click', () => {
         const defaults = getDefaultJurnalFilterStrings();
-        startInput.value = defaults.startDate;
-        endInput.value = defaults.endDate;
-        persistJurnalFilters(defaults.startDate, defaults.endDate);
-        renderJurnalContent(false);
-        initJurnalHeroCarousel();
-    }, { signal: listenerSignal });
-}
-
-function setupJurnalSortControl(listenerSignal) {
-    const select = document.getElementById('jurnal-sort-select');
-    if (!select) return;
-    select.addEventListener('change', (e) => {
-        const activeTab = appState.activeSubPage.get('jurnal') || 'harian';
-        setJurnalSortValue(activeTab, e.target.value);
-        renderJurnalContent(false);
-    }, { signal: listenerSignal });
+        if (startInput) startInput.value = defaults.startDate;
+        if (endInput) endInput.value = defaults.endDate;
+    });
 }
