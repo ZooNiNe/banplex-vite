@@ -117,7 +117,7 @@ async function _renderWorkerListForManualAttendance() {
         const elsewhereB = assignedElsewhereWorkerIds.has(b.id);
 
         const getStatusVal = (pending, recordList, elsewhere) => {
-            if (elsewhere) return 0; 
+            if (elsewhere) return 0;
             if (pending) return 4;
             if (recordList && recordList.some(r => r.attendanceStatus === 'full_day' || r.attendanceStatus === 'half_day')) return 3;
             if (recordList && recordList.some(r => r.attendanceStatus === 'absent')) return 2;
@@ -126,16 +126,17 @@ async function _renderWorkerListForManualAttendance() {
 
         const statusValA = getStatusVal(pendingA, attendanceA, elsewhereA);
         const statusValB = getStatusVal(pendingB, attendanceB, elsewhereB);
-        
+
         let comparison = 0;
         if (sortBy === 'status') {
             comparison = statusValA - statusValB;
-            if (comparison === 0) comparison = (a.workerName || '').localeCompare(b.workerName || '');
-        } else {
-            comparison = (a.workerName || '').localeCompare(b.workerName || '');
-            if (comparison === 0) comparison = statusValA - statusValB;
+            if (comparison === 0) comparison = (a.workerName || '').localeCompare(b.workerName || '', 'id', { sensitivity: 'base' });
+            const statusDirection = sortDirection === 'desc' ? 1 : -1;
+            return comparison * statusDirection;
         }
-        return sortDirection === 'desc' ? comparison : -comparison;
+        const nameComparison = (a.workerName || '').localeCompare(b.workerName || '', 'id', { sensitivity: 'base' });
+        const nameDirection = sortDirection === 'desc' ? -1 : 1;
+        return nameComparison * nameDirection;
     });
 
     const cardsHTML = workersToShow.map(worker => {
@@ -345,16 +346,17 @@ async function renderAttendanceList(signal) {
             const statusValA = getStatusVal(attendanceA);
             const statusValB = getStatusVal(attendanceB);
             
-            let comparison = 0;
-
             if (sortBy === 'status') {
-                 comparison = statusValA - statusValB;
-                 if (comparison === 0) comparison = (a.workerName || '').localeCompare(b.workerName || '');
-            } else {
-                 comparison = (a.workerName || '').localeCompare(b.workerName || '');
-                  if (comparison === 0) comparison = statusValA - statusValB;
+                const statusDirection = sortDirection === 'desc' ? 1 : -1;
+                let comparison = (statusValA - statusValB) * statusDirection;
+                if (comparison === 0) comparison = (a.workerName || '').localeCompare(b.workerName || '', 'id', { sensitivity: 'base' }) * (sortDirection === 'desc' ? -1 : 1);
+                return comparison;
             }
-            return sortDirection === 'desc' ? comparison : -comparison;
+            
+            const nameDirection = sortDirection === 'desc' ? -1 : 1;
+            let comparison = (a.workerName || '').localeCompare(b.workerName || '', 'id', { sensitivity: 'base' }) * nameDirection;
+            if (comparison === 0) comparison = (statusValA - statusValB) * (sortDirection === 'desc' ? 1 : -1);
+            return comparison;
         });
 
         _renderAttendanceListUI(activeWorkers, attendanceMap, selectedDateStr, signal);

@@ -165,26 +165,31 @@ async function renderPemasukanContent(append = false) {
         }
 
         const { sortBy = 'date', sortDirection = 'desc' } = appState.pemasukanFilter || {};
+        const direction = sortDirection === 'asc' ? 1 : -1;
         itemsSource.sort((a, b) => {
+            const safeDate = (value) => {
+                const date = getJSDate(value);
+                return date && !Number.isNaN(date.getTime()) ? date : new Date(0);
+            };
+            const amountA = Number(a.totalAmount ?? a.amount ?? 0);
+            const amountB = Number(b.totalAmount ?? b.amount ?? 0);
+            const dateA = safeDate(a.date);
+            const dateB = safeDate(b.date);
+            const createdAtA = safeDate(a.createdAt || a.date);
+            const createdAtB = safeDate(b.createdAt || b.date);
+
             let comparison = 0;
             if (sortBy === 'amount') {
-                const amountA = a.totalAmount ?? a.amount ?? 0;
-                const amountB = b.totalAmount ?? b.amount ?? 0;
                 comparison = amountA - amountB;
             } else {
-                const dateA = getJSDate(a.date);
-                const dateB = getJSDate(b.date);
                 comparison = dateA - dateB;
             }
 
             if (comparison === 0) {
-                const createdAtA = getJSDate(a.createdAt || a.date);
-                const createdAtB = getJSDate(b.createdAt || b.date);
-                 comparison = createdAtB - createdAtA;
-                 if (sortDirection === 'asc') comparison = -comparison;
+                comparison = createdAtA - createdAtB;
             }
 
-            return sortDirection === 'desc' ? -comparison : comparison;
+            return comparison * direction;
         });
 
         appState.pemasukan.currentList = itemsSource;
@@ -373,11 +378,13 @@ function _showPemasukanSortModal(onApply) {
 
     const footer = `<button type="submit" class="btn btn-primary" form="pemasukan-sort-form">Terapkan</button>`;
 
-    const modalEl = createModal('formView', {
+    const isMobile = window.matchMedia('(max-width: 599px)').matches;
+    const modalEl = createModal(isMobile ? 'actionsPopup' : 'formView', {
       title: 'Urutkan Pemasukan',
       content,
       footer,
-      isUtility: true
+      isUtility: true,
+      layoutClass: isMobile ? 'is-bottom-sheet' : ''
     });
     if (!modalEl) return;
 

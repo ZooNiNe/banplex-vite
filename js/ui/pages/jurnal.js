@@ -863,6 +863,19 @@ function formatDateLabel(value) {
 function openJurnalFilterModal() {
     const { startDate, endDate } = getAppliedJurnalFilterStrings();
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
+    const abortController = new AbortController();
+    const { signal } = abortController;
+    const modalRoot = document.getElementById('modal-container');
+    let removalObserver = null;
+    const cleanup = () => {
+        if (!abortController.signal.aborted) {
+            abortController.abort();
+        }
+        if (removalObserver) {
+            removalObserver.disconnect();
+            removalObserver = null;
+        }
+    };
     const subtitleHTML = `
         <p class="modal-subtitle">
             Rentang ini membatasi kartu pada tab "Pekerja" dan "Riwayat Rekap".
@@ -893,6 +906,14 @@ function openJurnalFilterModal() {
         layoutClass: isMobile ? 'is-bottom-sheet journal-filter-sheet' : ''
     });
     if (!modal) return;
+    if (modalRoot) {
+        removalObserver = new MutationObserver(() => {
+            if (!modalRoot.contains(modal)) {
+                cleanup();
+            }
+        });
+        removalObserver.observe(modalRoot, { childList: true });
+    }
 
     const form = modal.querySelector('#jurnal-filter-form');
     const startInput = form?.querySelector('#modal-jurnal-start');
@@ -915,12 +936,13 @@ function openJurnalFilterModal() {
         resetFormDirty();
         toast('success', 'Filter jurnal diperbarui.');
         closeModal(modal);
+        cleanup();
     };
 
-    modal.querySelector('#jurnal-filter-apply-modal')?.addEventListener('click', handleApplyClick);
+    modal.querySelector('#jurnal-filter-apply-modal')?.addEventListener('click', handleApplyClick, { signal });
     modal.querySelector('#jurnal-filter-reset-modal')?.addEventListener('click', () => {
         const defaults = getDefaultJurnalFilterStrings();
         if (startInput) startInput.value = defaults.startDate;
         if (endInput) endInput.value = defaults.endDate;
-    });
+    }, { signal });
 }

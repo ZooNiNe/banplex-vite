@@ -1,6 +1,6 @@
 import { appState } from "../../../state/appState.js";
 import { createModal, closeModalImmediate } from "../../components/modal.js";
-import { createMasterDataSelect, initCustomSelects } from "../../components/forms/index.js";
+import { createModalSelectField, initModalSelects } from "../../components/forms/index.js";
 
 function createIcon(iconName, size = 18, classes = '') {
   const icons = {
@@ -68,11 +68,33 @@ function buildFilterOptions() {
 
 async function _showBillsFilterModal(onApply) {
   const { supplierOptions, projectOptions, categoryOptions } = buildFilterOptions();
+  const selectProject = createModalSelectField({
+    id: 'filter-project-id',
+    label: 'Filter Proyek',
+    options: projectOptions.map(opt => ({ value: opt.value, label: opt.text })),
+    value: appState.billsFilter.projectId || 'all',
+    placeholder: 'Semua proyek'
+  });
+  const selectSupplier = createModalSelectField({
+    id: 'filter-supplier-id',
+    label: 'Filter Supplier',
+    options: supplierOptions.map(opt => ({ value: opt.value, label: opt.text })),
+    value: appState.billsFilter.supplierId || 'all',
+    placeholder: 'Semua supplier'
+  });
+  const selectCategory = createModalSelectField({
+    id: 'filter-category',
+    label: 'Kategori',
+    options: categoryOptions.map(opt => ({ value: opt.value, label: opt.text })),
+    value: appState.billsFilter.category || 'all',
+    placeholder: 'Semua kategori'
+  });
+
   const content = `
         <form id="bills-filter-form">
-            ${createMasterDataSelect('filter-project-id', 'Filter Proyek', projectOptions, appState.billsFilter.projectId || 'all', 'projects')}
-            ${createMasterDataSelect('filter-supplier-id', 'Filter Supplier', supplierOptions, appState.billsFilter.supplierId || 'all', 'suppliers')}
-            ${createMasterDataSelect('filter-category', 'Kategori', categoryOptions, appState.billsFilter.category || 'all', null, false, false)}
+            ${selectProject}
+            ${selectSupplier}
+            ${selectCategory}
         </form>
     `;
 
@@ -81,10 +103,18 @@ async function _showBillsFilterModal(onApply) {
         <button type="submit" class="btn btn-primary" form="bills-filter-form">Terapkan</button>
     `;
 
-  const modalEl = createModal('formView', { title: 'Filter Tagihan', content, footer, isUtility: true, allowContentOverflow: true });
+  const isMobile = window.matchMedia('(max-width: 599px)').matches;
+  const modalEl = createModal(isMobile ? 'actionsPopup' : 'formView', {
+    title: 'Filter Tagihan',
+    content,
+    footer,
+    isUtility: true,
+    allowContentOverflow: true,
+    layoutClass: isMobile ? 'is-bottom-sheet' : ''
+  });
   if (!modalEl) return;
 
-  initCustomSelects(modalEl);
+  initModalSelects(modalEl);
 
   const form = modalEl.querySelector('#bills-filter-form');
   form.addEventListener('submit', (e) => {
@@ -152,11 +182,13 @@ function _showBillsSortModal(onApply) {
   const footer = `<button type="submit" class="btn btn-primary" form="bills-sort-form">Terapkan</button>`;
 
   // PERBAIKAN: Tambahkan isUtility: true
-  const modalEl = createModal('formView', {
+  const isMobile = window.matchMedia('(max-width: 599px)').matches;
+  const modalEl = createModal(isMobile ? 'actionsPopup' : 'formView', {
     title: 'Urutkan Tagihan',
     content,
     footer,
-    isUtility: true
+    isUtility: true,
+    layoutClass: isMobile ? 'is-bottom-sheet' : ''
   });
   if (!modalEl) return;
 

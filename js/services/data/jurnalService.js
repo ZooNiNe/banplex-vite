@@ -19,6 +19,7 @@ import { validateForm } from "../../utils/validation.js";
 import { queueOutbox } from "../outboxService.js";
 // --- PERUBAHAN: Menambahkan impor $ (utility DOM) ---
 import { $ } from "../../utils/dom.js";
+import { notify } from "../../state/liveQuery.js";
 
 function getDefaultJurnalFilterRangeStrings() {
     const today = new Date();
@@ -281,6 +282,8 @@ export async function handleGenerateBillForWorker(dataset) {
                 
                 requestSync({ silent: true });
                 await loadAllLocalDataToState();
+                notify('bills');
+                notify('attendance_records');
                 emit('ui.page.render'); 
 
             } catch (error) {
@@ -335,6 +338,8 @@ export async function handleDeleteSalaryBill(billId) {
                 toast('success', 'Rekap gaji berhasil dibatalkan.');
                 
                 await loadAllLocalDataToState();
+                notify('bills');
+                notify('attendance_records');
                 emit('ui.animate.removeItem', `bill-${billId}`);
 
             } catch (error) {

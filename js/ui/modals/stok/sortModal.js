@@ -45,7 +45,14 @@ export function showStockSortModal(onApply) {
   const footer = `<button type="submit" class="btn btn-primary" form="stock-sort-form">Terapkan</button>`;
 
   // PERBAIKAN: Tambahkan isUtility: true
-  const modalEl = createModal('formView', { title: 'Urutkan Stok', content, footer, isUtility: true });
+  const isMobile = window.matchMedia('(max-width: 599px)').matches;
+  const modalEl = createModal(isMobile ? 'actionsPopup' : 'formView', {
+    title: 'Urutkan Stok',
+    content,
+    footer,
+    isUtility: true,
+    layoutClass: isMobile ? 'is-bottom-sheet' : ''
+  });
   if (!modalEl) return;
 
   const form = modalEl.querySelector('#stock-sort-form');

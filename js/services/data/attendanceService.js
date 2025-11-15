@@ -13,6 +13,7 @@ import { showDetailPane, createModal, closeModal, closeDetailPane, closeDetailPa
 import { createMasterDataSelect, initCustomSelects, formatNumberInput } from "../../ui/components/forms/index.js";
 import { fetchAndCacheData } from "./fetch.js";
 import { createUnifiedCard } from "../../ui/components/cards.js";
+import { notify } from "../../state/liveQuery.js";
 
 function createIcon(iconName, size = 18, classes = '') {
     const icons = {
@@ -301,6 +302,7 @@ export async function handleUpdateAttendance(form) {
 
         const deltaPay = newTotalPay - (record.totalPay || 0);
         const pendingPaymentIds = pendingPaymentsForWorker.map(p => p.id);
+        const mutatedBill = !!bill && deltaPay !== 0;
         const recordUpdatePayload = { ...dataToUpdate, syncState: 'pending_update', updatedAt: new Date() };
         let billStatusAfterUpdate = bill?.status;
 
@@ -356,6 +358,8 @@ export async function handleUpdateAttendance(form) {
         emit('ui.modal.closeAll');
 
         await loadAllLocalDataToState();
+        notify('attendance_records');
+        if (mutatedBill) notify('bills');
 
         const detailJurnalTerbuka = appState.detailPaneHistory.some(h => h.title?.includes('Jurnal Harian'));
         if (detailJurnalTerbuka) {
@@ -812,6 +816,8 @@ export async function handleDeleteSingleAttendance(recordId) {
 
                 emit('ui.animate.removeItem', `att-${record.workerId}`);
                 await loadAllLocalDataToState();
+                notify('attendance_records');
+                if (bill) notify('bills');
                 emit('ui.page.recalcDashboardTotals');
 
                 if (billWasPaid && billStatusAfterUpdate !== 'paid') {

@@ -17,6 +17,7 @@ function createIcon(iconName, size = 20, classes = '') {
 }
 
 function getModalLayout(type, data = {}) {
+    const normalizedType = typeof type === 'string' ? type.trim() : type;
     const contentGenerators = {
         'confirmDelete': () => _getSimpleDialogHTML('Konfirmasi Hapus', `<p class="confirm-modal-text">${data.message || 'Anda yakin ingin menghapus data ini?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-danger">Hapus</button>`),
         'confirmPayment': () => _getSimpleDialogHTML('Konfirmasi Pembayaran', `<p class="confirm-modal-text">${data.message || 'Anda yakin ingin melanjutkan pembayaran?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Bayar</button>`),
@@ -113,9 +114,12 @@ function getModalLayout(type, data = {}) {
             const dialog = _getSimpleDialogHTML(
                 data.title || 'Informasi',
                 data.content || '<p>Konten tidak ditemukan.</p>',
-                data.footer
+                data.footer || ''
             );
-            dialog.layoutClass = [dialog.layoutClass, data.layoutClass].filter(Boolean).join(' ').trim();
+            dialog.layoutClass = [dialog.layoutClass, 'is-welcome-modal', data.layoutClass]
+                .filter(Boolean)
+                .join(' ')
+                .trim();
             return dialog;
         },
         'welcomeOnboarding': () => _getWelcomeOnboardingHTML(data),
@@ -123,7 +127,7 @@ function getModalLayout(type, data = {}) {
         'infoSheet': () => _getInfoSheetContent(data)
     };
 
-    const generator = contentGenerators[type] || (() => ({ layoutClass: 'is-simple-dialog', contentHTML: 'Konten tidak ditemukan' }));
+    const generator = contentGenerators[normalizedType] || (() => ({ layoutClass: 'is-simple-dialog', contentHTML: 'Konten tidak ditemukan' }));
     return generator();
 }
 

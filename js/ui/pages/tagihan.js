@@ -235,26 +235,30 @@ async function renderTagihanContent(append = false) {
         }
 
         items.sort((a, b) => {
-            let comparison = 0;
-             let dateA, dateB, createdAtA, createdAtB;
-             try { dateA = getJSDate(a[dateField] || a.date); if(isNaN(dateA.getTime())) throw Error();} catch(e){ dateA = new Date(0); }
-             try { dateB = getJSDate(b[dateField] || b.date); if(isNaN(dateB.getTime())) throw Error();} catch(e){ dateB = new Date(0); }
-             try { createdAtA = getJSDate(a.createdAt); if(isNaN(createdAtA.getTime())) throw Error();} catch(e){ createdAtA = new Date(0); }
-             try { createdAtB = getJSDate(b.createdAt); if(isNaN(createdAtB.getTime())) throw Error();} catch(e){ createdAtB = new Date(0); }
+            const safeDate = (value) => {
+                const date = getJSDate(value);
+                return date && !Number.isNaN(date.getTime()) ? date : new Date(0);
+            };
+            const dateA = safeDate(a[dateField] || a.date);
+            const dateB = safeDate(b[dateField] || b.date);
+            const createdAtA = safeDate(a.createdAt || a.date);
+            const createdAtB = safeDate(b.createdAt || b.date);
+            const amountA = Number(a.amount) || 0;
+            const amountB = Number(b.amount) || 0;
+            const direction = sortDirection === 'asc' ? 1 : -1;
 
+            let comparison = 0;
             if (sortBy === 'amount') {
-                const amountA = a.amount || 0;
-                const amountB = b.amount || 0;
                 comparison = amountA - amountB;
             } else {
                 comparison = dateA - dateB;
             }
 
             if (comparison === 0) {
-                comparison = createdAtB - createdAtA;
+                comparison = createdAtA - createdAtB;
             }
 
-            return sortDirection === 'desc' ? -comparison : comparison;
+            return comparison * direction;
         });
 
         appState.tagihan.currentList = items;
