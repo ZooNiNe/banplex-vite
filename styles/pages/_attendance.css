@@ -694,8 +694,11 @@
 }
 
 .wa-card-v2-wrapper.is-assigned-elsewhere .selection-checkmark {
-    background-color: var(--line);
+    background-color: transparent;
     border-color: var(--line);
+    pointer-events: none;
+    cursor: default;
+    opacity: 0.55;
 }
 
 .wa-card-v2-wrapper.is-assigned-elsewhere .selection-checkmark .lucide-check {

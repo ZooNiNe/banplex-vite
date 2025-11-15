@@ -151,16 +151,25 @@ export function createUnifiedCard({
             ${createIcon('check', 18)}
         </div>` : '';
 
+    const isJournalCard = pageContext === 'jurnal';
+    const headerClasses = ['wa-card-v2__header'];
+    if (isJournalCard) headerClasses.push('wa-card-v2__header--stacked');
+    const headerMetaHTML = headerMeta
+        ? `<span class="wa-card-v2__header-meta${isJournalCard ? ' meta-below-title' : ''}">${headerMeta}</span>`
+        : '';
+    const headerMetaAfterTitle = isJournalCard ? headerMetaHTML : '';
+    const headerMetaInline = isJournalCard ? '' : headerMetaHTML;
 
     return `
         <div class="wa-card-v2-wrapper ${customClasses} ${isSelected ? 'selected' : ''}" data-id="${id}" data-item-id="${itemId}" ${allDataAttributes}>
             ${selectionCheckmarkHTML} ${''}
             <div class="wa-card-v2">
                 <div class="wa-card-v2__main">
-                    <div class="wa-card-v2__header">
+                    <div class="${headerClasses.join(' ')}">
                         <span class="wa-card-v2__title">${title}</span>
-                        <span class="wa-card-v2__header-meta">${headerMeta}</span>
+                        ${headerMetaInline}
                     </div>
+                    ${headerMetaAfterTitle}
                     ${mainBodyContent}
                 </div>
                 <div class="wa-card-v2__meta">
@@ -654,16 +663,21 @@ export function _getJurnalHarianListHTML(items) {
     return items.map(item => {
         const itemId = item.date;
         const title = formatDate(item.date, { weekday: 'long', day: 'numeric', month: 'long' });
-        const dataset = { itemId: item.date, date: item.date, title: title, description: title };
+        const dataset = { itemId: item.date, date: item.date, title: title, description: title, pageContext: 'jurnal' };
         const showMoreIcon = true;
-        const workerCount = typeof item.workerCount === 'number'
+        const statusCounts = item.statusCounts || {};
+        const baseWorkerCount = typeof item.workerCount === 'number'
             ? item.workerCount
             : (item.workerCount instanceof Set ? item.workerCount.size : 0);
+        const workerCount = baseWorkerCount || (statusCounts.full_day || 0) + (statusCounts.half_day || 0);
+        const headerMeta = workerCount > 0
+            ? `${workerCount} Pekerja Terabsen`
+            : 'Belum Ada Absensi';
 
         return createUnifiedCard({
             id: `jurnal-${itemId}`,
             title: title,
-            headerMeta: `${workerCount} Pekerja Hadir`,
+            headerMeta,
             amount: fmtIDR(item.totalPay),
             amountLabel: 'Total Upah',
             amountColorClass: 'negative',
@@ -711,7 +725,7 @@ export function _getRekapGajiListHTML(items, options = {}) {
     return items.map(item => {
         const itemId = item.id;
         const title = item.description;
-        const dataset = { itemId: itemId, type: 'bill', title: title, description: title };
+        const dataset = { itemId: itemId, type: 'bill', title: title, description: title, pageContext: 'jurnal' };
         const showMoreIcon = true;
 
         const pendingLog = pendingBills.get(itemId);

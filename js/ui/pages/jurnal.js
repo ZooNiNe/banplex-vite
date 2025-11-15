@@ -300,7 +300,6 @@ async function renderJurnalContent(append = false) {
     let rekapPendingOptions = null;
 
     if (activeTab === 'harian') {
-        const allowedStatuses = new Set(['full_day', 'half_day', 'absent']);
         const groupedByDate = (appState.attendanceRecords || []).reduce((acc, record) => {
             if (record.isDeleted) return acc;
             const recDate = getJSDate(record.date);
@@ -312,19 +311,33 @@ async function renderJurnalContent(append = false) {
             const date = `${y}-${m}-${d}`;
 
             if (!acc[date]) {
-                acc[date] = { date, totalPay: 0, workerIds: new Set() };
+                acc[date] = {
+                    date,
+                    totalPay: 0,
+                    workerIds: new Set(),
+                    statusCounts: { full_day: 0, half_day: 0, absent: 0 }
+                };
             }
             acc[date].totalPay += record.totalPay || 0;
-            if (allowedStatuses.has(record.attendanceStatus)) {
+            const status = record.attendanceStatus || 'absent';
+            if (status === 'full_day' || status === 'half_day') {
                 acc[date].workerIds.add(record.workerId);
             }
+            if (status === 'full_day') acc[date].statusCounts.full_day += 1;
+            else if (status === 'half_day') acc[date].statusCounts.half_day += 1;
+            else acc[date].statusCounts.absent += 1;
             return acc;
         }, {});
-        sourceItems = Object.values(groupedByDate).map(item => ({
-            date: item.date,
-            totalPay: item.totalPay,
-            workerCount: item.workerIds.size
-        }));
+        sourceItems = Object.values(groupedByDate).map(item => {
+            const statusCounts = item.statusCounts || { full_day: 0, half_day: 0, absent: 0 };
+            const workerCount = item.workerIds ? item.workerIds.size : (statusCounts.full_day + statusCounts.half_day);
+            return {
+                date: item.date,
+                totalPay: item.totalPay,
+                workerCount,
+                statusCounts
+            };
+        });
 
     } else if (activeTab === 'per_pekerja') {
         // Filter absensi berdasarkan rentang tanggal
@@ -861,6 +874,11 @@ function formatDateLabel(value) {
 }
 
 function openJurnalFilterModal() {
+    const existingInstance = document.querySelector('[data-jurnal-filter-modal="true"]');
+    if (existingInstance) {
+        return;
+    }
+
     const { startDate, endDate } = getAppliedJurnalFilterStrings();
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
     const abortController = new AbortController();
@@ -906,6 +924,7 @@ function openJurnalFilterModal() {
         layoutClass: isMobile ? 'is-bottom-sheet journal-filter-sheet' : ''
     });
     if (!modal) return;
+    modal.dataset.jurnalFilterModal = 'true';
     if (modalRoot) {
         removalObserver = new MutationObserver(() => {
             if (!modalRoot.contains(modal)) {

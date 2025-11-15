@@ -170,6 +170,13 @@
   flex-wrap: nowrap; /* Prevent wrapping */
 }
 
+.wa-card-v2__header--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.15rem;
+}
+
 .wa-card-v2__title {
   font-size: 0.85rem;
   font-weight: 600;
@@ -192,6 +199,14 @@
   flex-shrink: 0;
   margin-left: auto;
   text-align: center; /* Center the date */
+}
+
+.wa-card-v2__header-meta.meta-below-title {
+  margin-left: 0;
+  text-align: left;
+  white-space: normal;
+  width: 100%;
+  font-size: 0.75rem;
 }
 /* v2: Style state absensi */
 .wa-card-v2-wrapper.is-pending-save .wa-card-v2__header-meta {
@@ -342,8 +357,11 @@ body.selection-active .selection-checkmark {
 /* v2: Checkmark untuk item yang sudah diabsen/dialokasikan */
 .wa-card-v2-wrapper.is-assigned-elsewhere .selection-checkmark,
 .wa-card-v2-wrapper.is-already-attended .selection-checkmark {
-    background-color: var(--line);
+    background-color: transparent;
     border-color: var(--line);
+    cursor: default;
+    pointer-events: none;
+    opacity: 0.55;
 }
 .wa-card-v2-wrapper.is-assigned-elsewhere .selection-checkmark .lucide-check,
 .wa-card-v2-wrapper.is-already-attended .selection-checkmark .lucide-check {

@@ -511,6 +511,16 @@ export async function handleSaveAllPendingAttendance() {
                 if (success) {
                     appState.pendingAttendance.clear();
                     _showPostSaveAttendanceDialog(summary);
+
+                    if (appState.selectionMode?.selectedIds) {
+                        appState.selectionMode.selectedIds.clear();
+                        emit('ui.selection.updateCount');
+                        const manualList = document.getElementById('manual-attendance-list-container');
+                        manualList?.querySelectorAll('.wa-card-v2-wrapper.selected').forEach(card => {
+                            card.classList.remove('selected');
+                            card.querySelector('.selection-checkmark')?.classList.remove('checked');
+                        });
+                    }
                     
                     appState.absensi.manualListNeedsUpdate = true;
                     emit('ui.absensi.renderManualForm');
