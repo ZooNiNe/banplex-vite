@@ -7,7 +7,7 @@ import { toast } from "../../ui/components/toast.js";
 import { _isQuotaExceeded, _setQuotaExceededFlag, syncFromServer, requestSync } from "../syncService.js";
 import { localDB, loadAllLocalDataToState } from "../localDbService.js";
 import { fetchAndCacheData } from "./fetch.js";
-import { showDetailPane } from "../../ui/components/modal.js";
+import { showDetailPane, startGlobalLoading } from "../../ui/components/modal.js";
 
 function createIcon(iconName, size = 18, classes = '') {
     const icons = {
@@ -28,24 +28,24 @@ export async function _safeFirestoreWrite(writeFunction, successMessage, failure
         return false;
     }
 
-    let loadingToast = null;
+    let loader = null;
     if (loadingMessage) {
-        loadingToast = toast('syncing', loadingMessage, 0);
+        loader = startGlobalLoading(loadingMessage);
     }
 
     try {
         await writeFunction();
         _setQuotaExceededFlag(false);
-        if (loadingToast && typeof loadingToast.close === 'function') {
-            loadingToast.close();
+        if (loader) {
+            loader.close();
         }
         if (successMessage) {
             toast('success', successMessage);
         }
         return true;
     } catch (error) {
-        if (loadingToast && typeof loadingToast.close === 'function') {
-            loadingToast.close();
+        if (loader) {
+            loader.close();
         }
         if (error.code === 'resource-exhausted') {
             _setQuotaExceededFlag(true);
@@ -116,7 +116,7 @@ export function openToolsGrid() {
 
 
 export async function handleRestoreOrphanLoans() {
-    toast('syncing', 'Memindai dan memulihkan pinjaman...');
+    const loader = startGlobalLoading('Memindai dan memulihkan pinjaman...');
     try {
         const creditors = await localDB.funding_creditors.toArray();
         const validCreditorIds = new Set(creditors.map(c => c.id));
@@ -166,11 +166,13 @@ export async function handleRestoreOrphanLoans() {
     } catch (error) {
         console.error('Gagal memulihkan pinjaman yatim:', error);
         toast('error', 'Gagal memulihkan pinjaman.');
+    } finally {
+        loader.close();
     }
 }
 
 async function _runServerDataIntegrityCheck() {
-    toast('syncing', 'Memindai data server...');
+    const loader = startGlobalLoading('Memindai data server...');
     console.log("Memulai pemindaian integritas data server...");
 
     let billsDeletedCount = 0;
@@ -221,7 +223,7 @@ async function _runServerDataIntegrityCheck() {
             return;
         }
 
-        toast('syncing', `Memperbaiki ${totalOperations} item data...`);
+        loader.update(`Memperbaiki ${totalOperations} item data...`);
 
         const allWritePromises = [];
         const BATCH_SIZE = 400;
@@ -254,6 +256,8 @@ async function _runServerDataIntegrityCheck() {
     } catch (error) {
         console.error("Gagal menjalankan pembersihan data server:", error);
         toast('error', 'Gagal membersihkan data server. Cek console untuk detail.');
+    } finally {
+        loader.close();
     }
 }
 
@@ -324,7 +328,7 @@ export async function handleRecalculateUsageCount() {
 }
 
 async function _recalculateAndApplyUsageCounts() {
-      toast('syncing', 'Membaca semua faktur material...');
+      const loader = startGlobalLoading('Membaca semua faktur material...');
       console.log('Memulai perhitungan ulang frekuensi penggunaan material...');
       try {
           await fetchAndCacheData('materials', materialsCol);
@@ -348,7 +352,7 @@ async function _recalculateAndApplyUsageCounts() {
               toast('info', 'Tidak ada data master material untuk diperbarui.');
               return;
           }
-          toast('syncing', `Menghitung dan memperbarui ${appState.materials.length} material...`);
+          loader.update(`Menghitung dan memperbarui ${appState.materials.length} material...`);
           const batch = writeBatch(db);
           appState.materials.forEach(material => {
               const materialRef = doc(materialsCol, material.id);
@@ -368,6 +372,8 @@ async function _recalculateAndApplyUsageCounts() {
       } catch (error) {
           console.error("Gagal menghitung ulang:", error);
           toast('error', 'Terjadi kesalahan saat perhitungan ulang.');
+      } finally {
+          loader.close();
       }
 }
 

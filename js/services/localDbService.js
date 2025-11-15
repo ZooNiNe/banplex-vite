@@ -4,6 +4,7 @@ import { fundingCreditorsCol } from "../config/firebase.js";
 import { getDoc, doc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { emit } from "../state/eventBus.js";
 import { toast } from "../ui/components/toast.js";
+import { startGlobalLoading } from "../ui/components/modal.js";
 
 export const localDB = new Dexie('BanPlexDevLocalDB');
 
@@ -426,7 +427,7 @@ export async function _verifyDataIntegrity() {
 
 export async function _runDeepCleanV4() {
     console.log("Memulai Pembersihan V4 (Metode Brute Force)...");
-    toast('syncing', 'Membaca seluruh data tanpa indeks...');
+    const loader = startGlobalLoading('Membaca seluruh data tanpa indeks...');
 
     try {
         let fixedBills = 0;
@@ -500,5 +501,7 @@ export async function _runDeepCleanV4() {
         console.error('Proses pembersihan V4 gagal:', error);
         toast('error', 'Gagal membersihkan data.');
         alert('Proses pembersihan gagal. Error: ' + error.message);
+    } finally {
+        loader.close();
     }
 }

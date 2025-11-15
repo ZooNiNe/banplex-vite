@@ -11,7 +11,7 @@ import { isViewer, getJSDate } from "../../utils/helpers.js";
 import { _safeFirestoreWrite } from "./adminService.js";
 import { fetchAndCacheData } from "./fetch.js";
 import { parseFormattedNumber } from "../../utils/formatters.js";
-import { showDetailPane, closeDetailPaneImmediate, closeModalImmediate } from "../../ui/components/modal.js";
+import { showDetailPane, closeDetailPaneImmediate, closeModalImmediate, startGlobalLoading } from "../../ui/components/modal.js";
 import { createTabsHTML } from "../../ui/components/tabs.js";
 import { getEmptyStateHTML } from "../../ui/components/emptyState.js";
 import { _getMasterDataListHTML } from "../../ui/components/cards.js";
@@ -130,7 +130,6 @@ export async function handleManageMasterData(type, options = {}) {
 
 
 export async function handleAddMasterItem(form) {
-
     if (!validateForm(form)) {
         toast('error', 'Harap periksa kembali isian Anda, semua field wajib diisi.');
         return false;
@@ -142,137 +141,140 @@ export async function handleAddMasterItem(form) {
         return false;
     }
 
-
     emit('ui.modal.create', 'confirmUserAction', {
         title: `Simpan ${config.title} Baru?`,
         message: `Anda akan menyimpan data baru: <strong>${itemName}</strong>. Lanjutkan?`,
         onConfirm: async () => {
+            const loader = startGlobalLoading(`Menyimpan ${config.title}...`);
+            try {
+                const dataToAdd = {
+                    [config.nameField]: itemName,
+                    notes: form.elements.notes.value.trim(),
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                    isDeleted: 0
+                };
 
-            const loadingToast = toast('syncing', `Menyimpan ${config.title}...`, 0, { forceSnackbar: true });
-
-            const dataToAdd = {
-                [config.nameField]: itemName,
-                notes: form.elements.notes.value.trim(),
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                isDeleted: 0
-            };
-
-            if (type === 'staff') {
-                dataToAdd.paymentType = form.elements.paymentType.value;
-                dataToAdd.salary = parseFormattedNumber(form.elements.salary.value) || 0;
-                dataToAdd.feePercentage = Number(form.elements.feePercentage.value) || 0;
-                dataToAdd.feeAmount = parseFormattedNumber(form.elements.feeAmount.value) || 0;
-            }
-            if (type === 'suppliers') { dataToAdd.category = form.elements.itemCategory.value; }
-            if (type === 'projects') {
-                dataToAdd.projectType = form.elements.projectType.value;
-                dataToAdd.budget = parseFormattedNumber(form.elements.budget.value);
-                dataToAdd.isWageAssignable = form.elements.isWageAssignable.checked;
-            }
-            if (type === 'materials') {
-                dataToAdd.unit = form.elements.itemUnit.value.trim();
-                const reorderPoint = Number(form.elements.reorderPoint.value);
-                if(reorderPoint < 0) {
-                    toast('error', 'Jumlah pembelian minimal tidak boleh negatif.');
-                    if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
-                    return;
+                // Type-specific logic
+                if (type === 'staff') {
+                    dataToAdd.paymentType = form.elements.paymentType.value;
+                    dataToAdd.salary = parseFormattedNumber(form.elements.salary.value) || 0;
+                    dataToAdd.feePercentage = Number(form.elements.feePercentage.value) || 0;
+                    dataToAdd.feeAmount = parseFormattedNumber(form.elements.feeAmount.value) || 0;
                 }
-                dataToAdd.reorderPoint = reorderPoint;
-            }
-            if (type === 'workers') {
-                dataToAdd.professionId = form.elements.professionId.value;
-                dataToAdd.status = form.elements.workerStatus.value;
-                const projectWages = {};
-                
-                form.querySelectorAll('.worker-wage-summary-item').forEach(itemEl => {
-                    const projectId = itemEl.dataset.projectId;
-                    try {
-                        const wages = JSON.parse(itemEl.dataset.wages);
-                        if (projectId && wages) {
-                            
-                            if (projectWages[projectId]) {
-                                projectWages[projectId] = { ...projectWages[projectId], ...wages };
-                            } else {
-                                projectWages[projectId] = wages;
+                if (type === 'suppliers') {
+                    dataToAdd.category = form.elements.itemCategory.value;
+                }
+                if (type === 'projects') {
+                    dataToAdd.projectType = form.elements.projectType.value;
+                    dataToAdd.budget = parseFormattedNumber(form.elements.budget.value);
+                    dataToAdd.isWageAssignable = form.elements.isWageAssignable.checked;
+                }
+                if (type === 'materials') {
+                    dataToAdd.unit = form.elements.itemUnit.value.trim();
+                    const reorderPoint = Number(form.elements.reorderPoint.value);
+                    if (reorderPoint < 0) {
+                        toast('error', 'Jumlah pembelian minimal tidak boleh negatif.');
+                        return; // Stops onConfirm execution
+                    }
+                    dataToAdd.reorderPoint = reorderPoint;
+                }
+                if (type === 'workers') {
+                    dataToAdd.professionId = form.elements.professionId.value;
+                    dataToAdd.status = form.elements.workerStatus.value;
+                    const projectWages = {};
+
+                    form.querySelectorAll('.worker-wage-summary-item').forEach(itemEl => {
+                        const projectId = itemEl.dataset.projectId;
+                        try {
+                            const wages = JSON.parse(itemEl.dataset.wages);
+                            if (projectId && wages) {
+                                if (projectWages[projectId]) {
+                                    projectWages[projectId] = { ...projectWages[projectId], ...wages };
+                                } else {
+                                    projectWages[projectId] = wages;
+                                }
                             }
+                        } catch (e) { console.error('Gagal parsing data upah', e); }
+                    });
+
+                    if (Object.keys(projectWages).length === 0) {
+                        toast('error', 'minimal simpan satu pengaturan upah');
+                        return; // Stops onConfirm execution
+                    }
+
+                    dataToAdd.projectWages = projectWages;
+                    
+                    // Set default project/role
+                    const firstProjectIdWithWage = Object.keys(projectWages)[0];
+                    if (firstProjectIdWithWage) {
+                        dataToAdd.defaultProjectId = firstProjectIdWithWage;
+                        const firstRole = Object.keys(projectWages[firstProjectIdWithWage])[0];
+                        if (firstRole) {
+                            dataToAdd.defaultRole = firstRole;
                         }
-                    } catch(e) { console.error('Gagal parsing data upah', e);}
-                });
-                
-                if (Object.keys(projectWages).length === 0) {
-                    toast('error','minimal simpan satu pengaturan upah');
-                    if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
-                    return;
-                }
-                
-                dataToAdd.projectWages = projectWages;
-                
-                const firstProjectIdWithWage = Object.keys(projectWages)[0];
-                if (firstProjectIdWithWage) {
-                    dataToAdd.defaultProjectId = firstProjectIdWithWage;
-                    const firstRole = Object.keys(projectWages[firstProjectIdWithWage])[0];
-                    if (firstRole) {
-                        dataToAdd.defaultRole = firstRole;
                     }
                 }
-            }
 
-            const collectionRef = COLLECTIONS[type];
-            const newDocRef = doc(collection(db, collectionRef.path));
-            dataToAdd.id = newDocRef.id;
+                const collectionRef = COLLECTIONS[type];
+                // Firestore v9: doc(collection(db, path)) creates a ref with a new ID
+                const newDocRef = doc(collection(db, collectionRef.path));
+                dataToAdd.id = newDocRef.id; // Add the new ID to the data object
 
+                const writeOperation = async () => {
+                    await setDoc(newDocRef, dataToAdd);
+                };
 
-            const writeOperation = async () => {
-                 await setDoc(newDocRef, dataToAdd);
-            };
+                const success = await _safeFirestoreWrite(
+                    writeOperation,
+                    '',
+                    `Gagal menambah ${config.title}.`
+                );
 
-            const success = await _safeFirestoreWrite(
-                writeOperation,
-                '',
-                `Gagal menambah ${config.title}.`
-            );
+                if (success) {
+                    await localDB[config.dbTable].put({ ...dataToAdd, createdAt: new Date(), updatedAt: new Date(), syncState: 'synced' });
+                    _logActivity(`Menambah Master Data: ${config.title}`, { name: itemName });
 
-            if (loadingToast && typeof loadingToast.close === 'function') {
-                loadingToast.close();
-            }
+                    emit('masterData.updated', { type });
+                    emit('ui.form.markDirty', false);
 
-            if (success) {
-                await localDB[config.dbTable].put({ ...dataToAdd, createdAt: new Date(), updatedAt: new Date(), syncState: 'synced' });
-                _logActivity(`Menambah Master Data: ${config.title}`, { name: itemName });
-                
-                emit('masterData.updated', { type });
-                emit('ui.form.markDirty', false); 
-                
-                if (appState.activePage === 'master_data') {
-                    const tabsContainer = document.querySelector('#master-data-tabs');
-                    const listTab = tabsContainer?.querySelector('[data-tab="list"]');
-                    if (listTab) listTab.click();
+                    // Navigate
+                    if (appState.activePage === 'master_data') {
+                        const tabsContainer = document.querySelector('#master-data-tabs');
+                        const listTab = tabsContainer?.querySelector('[data-tab="list"]');
+                        if (listTab) listTab.click();
+                    } else {
+                        emit('ui.navigate', 'pengaturan');
+                    }
+
+                    toast('success', `${config.title} baru berhasil ditambahkan.`);
                 } else {
-                    emit('ui.navigate', 'pengaturan');
+                    // Offline handling
+                    const localDoc = { ...dataToAdd, createdAt: new Date(), updatedAt: new Date(), syncState: 'pending_create' };
+                    await localDB[config.dbTable].put(localDoc);
+                    try { await queueOutbox({ table: config.dbTable, docId: dataToAdd.id, op: 'upsert', payload: localDoc, priority: 6 }); } catch (_) {}
+
+                    emit('masterData.updated', { type });
+                    emit('ui.form.markDirty', false);
+
+                    // Navigate
+                    if (appState.activePage === 'master_data') {
+                        const tabsContainer = document.querySelector('#master-data-tabs');
+                        const listTab = tabsContainer?.querySelector('[data-tab="list"]');
+                        if (listTab) listTab.click();
+                    } else {
+                        emit('ui.navigate', 'pengaturan');
+                    }
+
+                    toast('info', `${config.title} disimpan offline dan akan disinkronkan.`);
                 }
-
-                toast('success', `${config.title} baru berhasil ditambahkan.`);
-            } else {
-                const localDoc = { ...dataToAdd, createdAt: new Date(), updatedAt: new Date(), syncState: 'pending_create' };
-                await localDB[config.dbTable].put(localDoc);
-                try { await queueOutbox({ table: config.dbTable, docId: dataToAdd.id, op: 'upsert', payload: localDoc, priority: 6 }); } catch(_) {}
-                
-                emit('masterData.updated', { type });
-                emit('ui.form.markDirty', false); 
-
-                if (appState.activePage === 'master_data') {
-                    const tabsContainer = document.querySelector('#master-data-tabs');
-                    const listTab = tabsContainer?.querySelector('[data-tab="list"]');
-                    if (listTab) listTab.click();
-                } else {
-                    emit('ui.navigate', 'pengaturan');
-                }
-
-                toast('info', `${config.title} disimpan offline dan akan disinkronkan.`);
+            } finally {
+                loader.close();
             }
         }
     });
+    
+    return true;
 }
 
 export async function handleDeleteMasterItem(id, type) {
@@ -291,64 +293,69 @@ export async function handleDeleteMasterItem(id, type) {
         message: `Anda yakin ingin memindahkan ${config.title} "<strong>${item[config.nameField]}</strong>" ke Sampah? Data ini dapat dipulihkan nanti.`,
         onConfirm: async () => {
             const itemElement = document.querySelector(`.wa-card-v2-wrapper[data-item-id='${id}']`);
-            const loadingToast = toast('syncing', 'Memindahkan ke Sampah...', 0);
+            const loader = startGlobalLoading('Memindahkan ke Sampah...');
 
-            const writeOperation = () => updateDoc(doc(COLLECTIONS[type], id), {
-                isDeleted: 1,
-                updatedAt: serverTimestamp()
-            });
-
-            const success = await _safeFirestoreWrite(writeOperation, '', `Gagal menghapus ${config.title}.`);
-
-            if (loadingToast && typeof loadingToast.close === 'function') await loadingToast.close();
-
-            if (success) {
-                const originalItem = await localDB[config.dbTable].get(id);
-                await localDB[config.dbTable].update(id, { isDeleted: 1, syncState: 'synced' });
-                _logActivity(`Memindahkan Master Data ke Sampah: ${config.title}`, { docId: id, name: item[config.nameField] });
-
-                if (itemElement) removeItemFromListWithAnimation(itemElement.dataset.id);
-                emit('masterData.updated', { type });
-
-                toast('info', `${config.title} dipindahkan ke Sampah.`, 6000, {
-                    actionText: 'Urungkan',
-                    onAction: async () => {
-                        const undoToast = toast('syncing', 'Mengembalikan...');
-                        try {
-                            if (originalItem) await localDB[config.dbTable].put(originalItem);
-                            await _safeFirestoreWrite(() => updateDoc(doc(COLLECTIONS[type], id), { isDeleted: 0, updatedAt: serverTimestamp() }), '', 'Gagal mengurungkan.');
-                            if(undoToast.close) undoToast.close();
-                            emit('masterData.updated', { type });
-                            toast('success', 'Aksi dibatalkan.');
-                        } catch (e) {
-                            if(undoToast.close) undoToast.close();
-                            toast('error', 'Gagal mengurungkan aksi.');
-                        }
-                    }
+            try {
+                const writeOperation = () => updateDoc(doc(COLLECTIONS[type], id), {
+                    isDeleted: 1,
+                    updatedAt: serverTimestamp()
                 });
-                setTimeout(() => {
-                    const itemIndex = (appState[config.stateKey] || []).findIndex(i => i.id === id);
-                    if (itemIndex > -1) appState[config.stateKey].splice(itemIndex, 1);
-                    const listContainer = document.querySelector('.wa-card-list-wrapper.master-data-list');
-                    if (listContainer && listContainer.children.length === 0) {
-                        listContainer.innerHTML = getEmptyStateHTML({
-                            icon: 'database',
-                            title: `Data ${config.title} Kosong`,
-                            desc: `Anda bisa menambahkan data baru melalui tab 'Input Baru'.`
-                        });
-                    }
-                }, 500);
-            } else {
-                const originalItem = await localDB[config.dbTable].get(id);
-                await localDB[config.dbTable].update(id, { isDeleted: 1, syncState: 'pending_update', updatedAt: new Date() });
-                try { await queueOutbox({ table: config.dbTable, docId: id, op: 'upsert', payload: { id, isDeleted: 1, updatedAt: new Date() }, priority: 5 }); } catch(_) {}
-                emit('masterData.updated', { type });
-                toast('info', `${config.title} ditandai terhapus (offline). Akan disinkronkan.`);
+
+                const success = await _safeFirestoreWrite(writeOperation, '', `Gagal menghapus ${config.title}.`);
+
+                if (success) {
+                    const originalItem = await localDB[config.dbTable].get(id);
+                    await localDB[config.dbTable].update(id, { isDeleted: 1, syncState: 'synced' });
+                    _logActivity(`Memindahkan Master Data ke Sampah: ${config.title}`, { docId: id, name: item[config.nameField] });
+
+                    if (itemElement) removeItemFromListWithAnimation(itemElement.dataset.id);
+                    emit('masterData.updated', { type });
+
+                    toast('info', `${config.title} dipindahkan ke Sampah.`, 6000, {
+                        actionText: 'Urungkan',
+                        onAction: async () => {
+                            const undoLoader = startGlobalLoading('Mengembalikan...');
+                            try {
+                                if (originalItem) await localDB[config.dbTable].put(originalItem);
+                                await _safeFirestoreWrite(() => updateDoc(doc(COLLECTIONS[type], id), { isDeleted: 0, updatedAt: serverTimestamp() }), '', 'Gagal mengurungkan.');
+                                emit('masterData.updated', { type });
+                                toast('success', 'Aksi dibatalkan.');
+                            } catch (e) {
+                                toast('error', 'Gagal mengurungkan aksi.');
+                            } finally {
+                                undoLoader.close();
+                            }
+                        }
+                    });
+
+                    setTimeout(() => {
+                        const itemIndex = (appState[config.stateKey] || []).findIndex(i => i.id === id);
+                        if (itemIndex > -1) appState[config.stateKey].splice(itemIndex, 1);
+                        
+                        const listContainer = document.querySelector('.wa-card-list-wrapper.master-data-list');
+                        if (listContainer && listContainer.children.length === 0) {
+                            listContainer.innerHTML = getEmptyStateHTML({
+                                icon: 'database',
+                                title: `Data ${config.title} Kosong`,
+                                desc: `Anda bisa menambahkan data baru melalui tab 'Input Baru'.`
+                            });
+                        }
+                    }, 500);
+
+                } else {
+                    // Offline handling
+                    const originalItem = await localDB[config.dbTable].get(id);
+                    await localDB[config.dbTable].update(id, { isDeleted: 1, syncState: 'pending_update', updatedAt: new Date() });
+                    try { await queueOutbox({ table: config.dbTable, docId: id, op: 'upsert', payload: { id, isDeleted: 1, updatedAt: new Date() }, priority: 5 }); } catch(_) {}
+                    emit('masterData.updated', { type });
+                    toast('info', `${config.title} ditandai terhapus (offline). Akan disinkronkan.`);
+                }
+            } finally {
+                loader.close();
             }
         }
     });
 }
-
 
 export async function handleEditMasterItem(id, type) {
     appState.masterDataOpenRequest = { type, itemId: id, activeTab: 'form' };
@@ -356,11 +363,11 @@ export async function handleEditMasterItem(id, type) {
 }
 
 export async function handleUpdateMasterItem(form) {
-
     if (!validateForm(form)) {
         toast('error', 'Harap periksa kembali isian Anda, semua field wajib diisi.');
         return false;
     }
+    
     const { id, type } = form.dataset;
     const config = masterDataConfig[type];
     if (!config) {
@@ -369,127 +376,132 @@ export async function handleUpdateMasterItem(form) {
 
     const newName = form.elements.itemName.value.trim();
     if (!newName) {
-        return false;
+        return false; // Or show specific toast
     }
-
 
     emit('ui.modal.create', 'confirmEdit', {
         message: `Anda yakin ingin menyimpan perubahan pada <strong>${newName}</strong>?`,
         onConfirm: async () => {
+            const loader = startGlobalLoading('Memperbarui...');
+            try {
+                let dataToUpdate = {
+                    [config.nameField]: newName,
+                    notes: form.elements.notes.value.trim()
+                };
 
-            const loadingToast = toast('syncing', 'Memperbarui...', 0, { forceSnackbar: true });
-
-            let dataToUpdate = {
-                [config.nameField]: newName,
-                notes: form.elements.notes.value.trim()
-            };
-
-            if (type === 'staff') {
-                dataToUpdate.paymentType = form.elements.paymentType.value;
-                dataToUpdate.salary = parseFormattedNumber(form.elements.salary.value) || 0;
-                dataToUpdate.feePercentage = Number(form.elements.feePercentage.value) || 0;
-                dataToUpdate.feeAmount = parseFormattedNumber(form.elements.feeAmount.value) || 0;
-            }
-            if (type === 'suppliers') { dataToUpdate.category = form.elements.itemCategory.value; }
-            if (type === 'projects') {
-                dataToUpdate.projectType = form.elements.projectType.value;
-                dataToUpdate.budget = parseFormattedNumber(form.elements.budget.value);
-                dataToUpdate.isWageAssignable = form.elements.isWageAssignable.checked;
-            }
-            if (type === 'materials') {
-                dataToUpdate.unit = form.elements.itemUnit.value.trim();
-                const reorderPoint = Number(form.elements.reorderPoint.value);
-                if(reorderPoint < 0) {
-                    toast('error', 'Jumlah pembelian minimal tidak boleh negatif.');
-                    if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
-                    return;
+                // Type-specific logic
+                if (type === 'staff') {
+                    dataToUpdate.paymentType = form.elements.paymentType.value;
+                    dataToUpdate.salary = parseFormattedNumber(form.elements.salary.value) || 0;
+                    dataToUpdate.feePercentage = Number(form.elements.feePercentage.value) || 0;
+                    dataToUpdate.feeAmount = parseFormattedNumber(form.elements.feeAmount.value) || 0;
                 }
-                dataToUpdate.reorderPoint = reorderPoint;
-            }
-            if (type === 'workers') {
-                dataToUpdate.professionId = form.elements.professionId.value;
-                dataToUpdate.status = form.elements.workerStatus.value;
-                const projectWages = {};
-                form.querySelectorAll('.worker-wage-summary-item').forEach(itemEl => {
-                    const projectId = itemEl.dataset.projectId;
-                    try {
-                        const wages = JSON.parse(itemEl.dataset.wages);
-                        if (projectId && wages) {
-                            
-                            if (projectWages[projectId]) {
-                                projectWages[projectId] = { ...projectWages[projectId], ...wages };
-                            } else {
-                                projectWages[projectId] = wages;
+                if (type === 'suppliers') { 
+                    dataToUpdate.category = form.elements.itemCategory.value; 
+                }
+                if (type === 'projects') {
+                    dataToUpdate.projectType = form.elements.projectType.value;
+                    dataToUpdate.budget = parseFormattedNumber(form.elements.budget.value);
+                    dataToUpdate.isWageAssignable = form.elements.isWageAssignable.checked;
+                }
+                if (type === 'materials') {
+                    dataToUpdate.unit = form.elements.itemUnit.value.trim();
+                    const reorderPoint = Number(form.elements.reorderPoint.value);
+                    if(reorderPoint < 0) {
+                        toast('error', 'Jumlah pembelian minimal tidak boleh negatif.');
+                        return; // Stop execution
+                    }
+                    dataToUpdate.reorderPoint = reorderPoint;
+                }
+                if (type === 'workers') {
+                    dataToUpdate.professionId = form.elements.professionId.value;
+                    dataToUpdate.status = form.elements.workerStatus.value;
+                    
+                    const projectWages = {};
+                    form.querySelectorAll('.worker-wage-summary-item').forEach(itemEl => {
+                        const projectId = itemEl.dataset.projectId;
+                        try {
+                            const wages = JSON.parse(itemEl.dataset.wages);
+                            if (projectId && wages) {
+                                if (projectWages[projectId]) {
+                                    projectWages[projectId] = { ...projectWages[projectId], ...wages };
+                                } else {
+                                    projectWages[projectId] = wages;
+                                }
                             }
-                        }
-                    } catch(e) { console.error('Gagal parsing data upah', e);}
-                });
-                
-                if (Object.keys(projectWages).length === 0) {
-                    toast('error','minimal simpan satu pengaturan upah');
-                    if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
-                    return;
+                        } catch(e) { console.error('Gagal parsing data upah', e);}
+                    });
+                    
+                    if (Object.keys(projectWages).length === 0) {
+                        toast('error','minimal simpan satu pengaturan upah');
+                        return; // Stop execution
+                    }
+                    dataToUpdate.projectWages = projectWages;
                 }
-                dataToUpdate.projectWages = projectWages;
-            }
 
+                // Firestore Transaction
+                const collectionRef = COLLECTIONS[type];
+                const writeOperation = async () => {
+                    await runTransaction(db, async (transaction) => {
+                        const docRef = doc(collectionRef, id);
+                        const serverSnap = await transaction.get(docRef);
+                        if (!serverSnap.exists()) throw new Error("Data tidak ditemukan di server.");
+                        
+                        const serverData = serverSnap.data();
+                        transaction.update(docRef, { ...dataToUpdate, rev: (serverData.rev || 0) + 1, updatedAt: serverTimestamp() });
+                    });
+                };
 
-            const collectionRef = COLLECTIONS[type];
-            const writeOperation = async () => {
-                await runTransaction(db, async (transaction) => {
-                    const docRef = doc(collectionRef, id);
-                    const serverSnap = await transaction.get(docRef);
-                    if (!serverSnap.exists()) throw new Error("Data tidak ditemukan di server.");
-                    const serverData = serverSnap.data();
-                    transaction.update(docRef, { ...dataToUpdate, rev: (serverData.rev || 0) + 1, updatedAt: serverTimestamp() });
-                });
-            };
+                const success = await _safeFirestoreWrite(
+                    writeOperation,
+                    '',
+                    `Gagal memperbarui ${config.title}.`
+                );
 
-            const success = await _safeFirestoreWrite(
-                writeOperation,
-                '',
-                `Gagal memperbarui ${config.title}.`
-            );
+                if (success) {
+                    await fetchAndCacheData(config.stateKey, collectionRef, config.nameField);
+                    _logActivity(`Memperbarui Master: ${config.title}`, { docId: id });
+                    emit('masterData.updated', { type });
+                    emit('ui.form.markDirty', false); 
 
-            if (loadingToast && typeof loadingToast.close === 'function') {
-                loadingToast.close();
-            }
+                    // Navigate
+                    if (appState.activePage === 'master_data') {
+                        const tabsContainer = document.querySelector('#master-data-tabs');
+                        const listTab = tabsContainer?.querySelector('[data-tab="list"]');
+                        if (listTab) listTab.click();
+                    } else {
+                        emit('ui.navigate', 'pengaturan');
+                    }
+                    
+                    toast('success', `Data ${config.title} berhasil diperbarui.`);
 
-            if (success) {
-                await fetchAndCacheData(config.stateKey, collectionRef, config.nameField);
-                _logActivity(`Memperbarui Master: ${config.title}`, { docId: id });
-                emit('masterData.updated', { type });
-                emit('ui.form.markDirty', false); 
-
-                
-                if (appState.activePage === 'master_data') {
-                    const tabsContainer = document.querySelector('#master-data-tabs');
-                    const listTab = tabsContainer?.querySelector('[data-tab="list"]');
-                    if (listTab) listTab.click();
                 } else {
-                    emit('ui.navigate', 'pengaturan');
+                    // Offline handling
+                    const localUpdate = { ...dataToUpdate, updatedAt: new Date(), syncState: 'pending_update' };
+                    await localDB[config.dbTable].update(id, localUpdate);
+                    try { await queueOutbox({ table: config.dbTable, docId: id, op: 'upsert', payload: { id, ...localUpdate }, priority: 6 }); } catch(_) {}
+                    
+                    emit('masterData.updated', { type });
+                    emit('ui.form.markDirty', false); 
+                    
+                    // Navigate
+                    if (appState.activePage === 'master_data') {
+                        const tabsContainer = document.querySelector('#master-data-tabs');
+                        const listTab = tabsContainer?.querySelector('[data-tab="list"]');
+                        if (listTab) listTab.click();
+                    } else {
+                        emit('ui.navigate', 'pengaturan');
+                    }
+                    
+                    toast('info', `${config.title} diperbarui offline. Akan disinkronkan.`);
                 }
-
-                toast('success', `Data ${config.title} berhasil diperbarui.`);
-            } else {
-                const localUpdate = { ...dataToUpdate, updatedAt: new Date(), syncState: 'pending_update' };
-                await localDB[config.dbTable].update(id, localUpdate);
-                try { await queueOutbox({ table: config.dbTable, docId: id, op: 'upsert', payload: { id, ...localUpdate }, priority: 6 }); } catch(_) {}
-                emit('masterData.updated', { type });
-                emit('ui.form.markDirty', false); 
-
-                if (appState.activePage === 'master_data') {
-                    const tabsContainer = document.querySelector('#master-data-tabs');
-                    const listTab = tabsContainer?.querySelector('[data-tab="list"]');
-                    if (listTab) listTab.click();
-                } else {
-                    emit('ui.navigate', 'pengaturan');
-                }
-
-                toast('info', `${config.title} diperbarui offline. Akan disinkronkan.`);
+            } finally {
+                loader.close();
             }
         }
     });
+    
+    return true; 
 }
 
 export async function _saveNewMasterMaterial(data) {

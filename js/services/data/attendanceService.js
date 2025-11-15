@@ -9,7 +9,7 @@ import { queueOutbox } from "../outboxService.js";
 import { toast } from "../../ui/components/toast.js";
 import { _logActivity } from "../logService.js";
 import { parseFormattedNumber, fmtIDR } from "../../utils/formatters.js";
-import { showDetailPane, createModal, closeModal, closeDetailPane, closeDetailPaneImmediate, hideMobileDetailPage, resetFormDirty } from "../../ui/components/modal.js";
+import { showDetailPane, createModal, closeModal, closeDetailPane, closeDetailPaneImmediate, hideMobileDetailPage, resetFormDirty, startGlobalLoading } from "../../ui/components/modal.js";
 import { createMasterDataSelect, initCustomSelects, formatNumberInput } from "../../ui/components/forms/index.js";
 import { fetchAndCacheData } from "./fetch.js";
 import { createUnifiedCard } from "../../ui/components/cards.js";
@@ -48,7 +48,7 @@ export async function handleCheckIn(workerId) {
         return;
     }
 
-    toast('syncing', 'Mencatat jam masuk lokal...');
+    const loader = startGlobalLoading('Mencatat jam masuk lokal...');
     try {
         const worker = appState.workers.find(w => w.id === workerId);
         if (!worker) throw new Error('Pekerja tidak ditemukan');
@@ -102,11 +102,13 @@ export async function handleCheckIn(workerId) {
     } catch (error) {
         toast('error', 'Gagal melakukan check in.');
         console.error(error);
+    } finally {
+        loader.close();
     }
 }
 
 export async function handleCheckOut(recordId) {
-    toast('syncing', 'Mencatat jam keluar lokal...');
+    const loader = startGlobalLoading('Mencatat jam keluar lokal...');
     try {
         const record = appState.attendanceRecords.find(r => r.id === recordId);
         if (!record) throw new Error('Data absensi tidak ditemukan di state');
@@ -150,6 +152,8 @@ export async function handleCheckOut(recordId) {
     } catch (error) {
         toast('error', 'Gagal melakukan check out.');
         console.error(error);
+    } finally {
+        loader.close();
     }
 }
 
@@ -198,7 +202,7 @@ export async function handleUpdateAttendance(form) {
         }
     }
 
-    toast('syncing', 'Memperbarui absensi...');
+    const loader = startGlobalLoading('Memperbarui absensi...');
     try {
         const dataToUpdate = {};
         let newTotalPay = record.totalPay;
@@ -302,6 +306,8 @@ export async function handleUpdateAttendance(form) {
     } catch (error) {
         toast('error', 'Gagal memperbarui absensi.');
         console.error(error);
+    } finally {
+        loader.close();
     }
 }
 
@@ -366,11 +372,9 @@ async function _confirmAndSaveAttendance(attendanceData) {
     const previewModal = document.getElementById('attendancePreview-modal');
     if (previewModal) closeModal(previewModal);
 
-    const loadingToast = toast('syncing', 'Menyimpan absensi...');
+    const loader = startGlobalLoading('Menyimpan absensi...');
     try {
         const { success, skipped, summary } = await handleSaveManualAttendance(attendanceData);
-        
-        if(loadingToast?.close) loadingToast.close();
 
         if (success) {
             appState.pendingAttendance.clear();
@@ -384,8 +388,9 @@ async function _confirmAndSaveAttendance(attendanceData) {
              else toast('error', 'Gagal menyimpan absensi.');
         }
     } catch (error) {
-         if(loadingToast?.close) loadingToast.close();
          toast('error', `Terjadi kesalahan: ${error.message}`);
+    } finally {
+        loader.close();
     }
 }
 
@@ -424,11 +429,9 @@ export async function handleSaveAllPendingAttendance() {
         title: 'Konfirmasi Simpan Absensi',
         message: `Anda akan menyimpan absensi untuk <strong>${totalHadir} pekerja hadir/khusus</strong> (Total Upah <strong>${fmtIDR(totalPay)}</strong>) dan menandai <strong>semua pekerja lain</strong> sebagai <strong>Absen</strong> pada tanggal <strong>${formattedDate}</strong>. Lanjutkan?`,
         onConfirm: async () => {
-            const loadingToast = toast('syncing', 'Menyimpan absensi...');
+            const loader = startGlobalLoading('Menyimpan absensi...');
             try {
                 const { success, skipped, saved, summary } = await _executeSaveAttendance(dateStr);
-                
-                if(loadingToast?.close) loadingToast.close();
 
                 if (success) {
                     appState.pendingAttendance.clear();
@@ -442,8 +445,9 @@ export async function handleSaveAllPendingAttendance() {
                     else toast('error', 'Gagal menyimpan absensi.');
                 }
             } catch (error) {
-                if(loadingToast?.close) loadingToast.close();
                 toast('error', `Terjadi kesalahan: ${error.message}`);
+            } finally {
+                loader.close();
             }
         }
     });
@@ -988,7 +992,7 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
                     title: 'Konfirmasi Simpan Absensi',
                     message: `Anda akan menyimpan perubahan absensi untuk ${entries.length} pekerja pada ${date.toLocaleDateString('id-ID')}. Lanjutkan?`,
                     onConfirm: async () => {
-                        const loadingToast = toast('syncing', 'Menyimpan perubahan...');
+                        const loader = startGlobalLoading('Menyimpan perubahan...');
                         try {
                             await handleSaveManualAttendance({ date: dateStr, projectId, entries });
                             await loadAllLocalDataToState();
@@ -1001,11 +1005,11 @@ export async function openDailyAttendanceEditorPanel(dateStr, projectId) {
                                 closeDetailPaneImmediate();
                             }
                             emit('ui.page.render');
-                            loadingToast.close();
                             toast('success', 'Perubahan absensi disimpan.');
                         } catch (e) {
-                            loadingToast.close();
                             toast('error', `Gagal menyimpan: ${e.message}`);
+                        } finally {
+                            loader.close();
                         }
                         
                         if (typeof closeModal === 'function') {

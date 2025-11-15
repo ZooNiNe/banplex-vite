@@ -7,6 +7,7 @@ import { localDB, loadAllLocalDataToState, _verifyDataIntegrity } from "./localD
 import { syncFromServer, subscribeToAllRealtimeData, updateSyncIndicator } from "./syncService.js";
 import { emit } from "../state/eventBus.js";
 import { toast } from "../ui/components/toast.js";
+import { startGlobalLoading } from "../ui/components/modal.js";
 import { renderUI } from "../ui/mainUI.js";
 import { calculateAndCacheDashboardTotals } from "./data/calculationService.js";
 import { listenForNotifications, requestNotificationPermission } from './notificationService.js';
@@ -28,7 +29,7 @@ async function signInWithGoogle() {
 
 async function handleLogout() {
     emit('ui.modal.close', document.getElementById('confirmLogout-modal'));
-    toast('syncing', 'Keluar...');
+    const loader = startGlobalLoading('Keluar...');
     try {
         const user = auth.currentUser;
         if (user) {
@@ -48,7 +49,9 @@ async function handleLogout() {
         } else {
             renderUI();
         }
+        loader.close();
     } catch (error) {
+        loader.close();
         toast('error', `Gagal keluar.`);
     }
 }

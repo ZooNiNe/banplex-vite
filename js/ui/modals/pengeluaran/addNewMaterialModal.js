@@ -1,6 +1,6 @@
 import { appState } from "../../../state/appState.js";
 import { $ } from "../../../utils/dom.js";
-import { createModal } from "../../components/modal.js";
+import { createModal, startGlobalLoading } from "../../components/modal.js";
 import { emit } from "../../../state/eventBus.js";
 import { toast } from "../../components/toast.js";
 import { _saveNewMasterMaterial } from "../../../services/data/masterDataService.js";
@@ -36,28 +36,35 @@ function handleAddNewMaterialModal(targetWrapper = null) {
       toast('error', 'Nama dan Satuan harus diisi.');
       return;
     }
-    toast('syncing', 'Menyimpan material baru...');
-    const newMaterial = await _saveNewMasterMaterial({ name: newName, unit: newUnit });
+    const loader = startGlobalLoading('Menyimpan material baru...');
+    try {
+      const newMaterial = await _saveNewMasterMaterial({ name: newName, unit: newUnit });
 
-    if (newMaterial) {
-      appState.materials.push(newMaterial);
-      toast('success', 'Material baru berhasil disimpan!');
-      emit('ui.modal.close', modalEl);
+      if (newMaterial) {
+        appState.materials.push(newMaterial);
+        toast('success', 'Material baru berhasil disimpan!');
+        emit('ui.modal.close', modalEl);
 
-      if (targetWrapper) {
-        const nameInput = $('.autocomplete-input', targetWrapper);
-        const idInput = $('.autocomplete-id', targetWrapper);
-        const clearBtn = $('.autocomplete-clear-btn', targetWrapper);
+        if (targetWrapper) {
+          const nameInput = $('.autocomplete-input', targetWrapper);
+          const idInput = $('.autocomplete-id', targetWrapper);
+          const clearBtn = $('.autocomplete-clear-btn', targetWrapper);
 
-        nameInput.value = newMaterial.materialName;
-        idInput.value = newMaterial.id;
-        nameInput.readOnly = true;
-        if (clearBtn) clearBtn.style.display = 'flex';
+          nameInput.value = newMaterial.materialName;
+          idInput.value = newMaterial.id;
+          nameInput.readOnly = true;
+          if (clearBtn) clearBtn.style.display = 'flex';
 
-        const row = targetWrapper.closest('.invoice-item-row');
-        const unitSpan = row?.querySelector('.item-unit');
-        if (unitSpan) unitSpan.textContent = newMaterial.unit || '';
+          const row = targetWrapper.closest('.invoice-item-row');
+          const unitSpan = row?.querySelector('.item-unit');
+          if (unitSpan) unitSpan.textContent = newMaterial.unit || '';
+        }
       }
+    } catch (error) {
+      console.error('[AddNewMaterialModal] Failed saving material', error);
+      toast('error', error?.message || 'Gagal menyimpan material.');
+    } finally {
+      loader.close();
     }
   });
 }

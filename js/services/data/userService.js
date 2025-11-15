@@ -4,7 +4,7 @@ import { db, membersCol } from "../../config/firebase.js";
 import { doc, getDocs, deleteDoc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { toast } from "../../ui/components/toast.js";
 import { _logActivity } from "../logService.js";
-import { createModal, showDetailPane, closeModalImmediate } from "../../ui/components/modal.js";
+import { createModal, showDetailPane, closeModalImmediate, startGlobalLoading } from "../../ui/components/modal.js";
 import { _getUserManagementListHTML } from "../../ui/components/cards.js";
 import { getEmptyStateHTML } from "../../ui/components/emptyState.js";
 
@@ -17,7 +17,7 @@ function createIcon(iconName, size = 18, classes = '') {
 }
 
 export async function handleManageUsers() {
-      const loadingToast = toast('syncing', 'Memuat data pengguna...');
+      const loader = startGlobalLoading('Memuat data pengguna...');
       try {
           const pendingQuery = query(membersCol, where("status", "==", "pending"));
           const pendingSnap = await getDocs(pendingQuery);
@@ -57,10 +57,9 @@ export async function handleManageUsers() {
               paneType: 'user-management'
           });
 
-          if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
-
+          loader.close();
       } catch (e) {
-          if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+          loader.close();
           console.error("Gagal mengambil data pengguna:", e);
           toast('error', 'Gagal memuat data pengguna.');
           showDetailPane({
@@ -96,7 +95,7 @@ export async function handleUserAction(dataset) {
     }
 
     const confirmAction = async () => {
-        const loadingToast = toast('syncing', 'Memproses...');
+        const loader = startGlobalLoading('Memproses...');
         try {
             const userRef = doc(membersCol, userId);
             if (action.isDelete) {
@@ -110,7 +109,7 @@ export async function handleUserAction(dataset) {
                 targetUserName: user.name
             });
 
-            if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+            loader.close();
             toast('success', 'Aksi berhasil dilakukan.');
 
             const detailPane = document.getElementById('detail-pane');
@@ -119,7 +118,7 @@ export async function handleUserAction(dataset) {
             }
 
         } catch (error) {
-            if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+            loader.close();
             console.error('User action error:', error);
             toast('error', 'Gagal memproses aksi.');
         }

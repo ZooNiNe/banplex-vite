@@ -1,6 +1,6 @@
 import { appState } from '../../../state/appState.js';
 // PERBAIKAN: Impor closeModalImmediate
-import { createModal, closeModal, closeModalImmediate, markFormDirty, resetFormDirty } from '../../components/modal.js';
+import { createModal, closeModal, closeModalImmediate, markFormDirty, resetFormDirty, startGlobalLoading } from '../../components/modal.js';
 import { toast } from '../../components/toast.js';
 import { emit } from '../../../state/eventBus.js';
 
@@ -89,19 +89,19 @@ export function openAdjustStockModal(materialId, mode = 'in') {
         message,
         // PERBAIKAN: Ubah onConfirm agar me-return status
         onConfirm: async () => {
-          const savingToast = toast('syncing', 'Menyimpan perubahan stok...');
+          const loader = startGlobalLoading('Menyimpan perubahan stok...');
           try {
             const { processStokIn, processStokOut } = await import('../../../services/data/stockService.js');
             if (mode === 'in') await processStokIn(form); else await processStokOut(form);
             
-            if (savingToast?.close) savingToast.close();
+            loader.close();
             resetFormDirty();
             // PERBAIKAN: Gunakan closeModalImmediate
             closeModalImmediate(modal);
             toast('success', 'Stok diperbarui.');
             return true; // Signal sukses
           } catch (e) {
-            if (savingToast?.close) savingToast.close();
+            loader.close();
             console.error(e);
             toast('error', e.message || 'Gagal memperbarui stok.');
             return false; // Signal gagal

@@ -4,6 +4,7 @@ import { localDB, loadAllLocalDataToState } from "../localDbService.js";
 import { db, billsCol } from "../../config/firebase.js";
 import { doc, writeBatch, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { toast } from "../../ui/components/toast.js";
+import { startGlobalLoading } from "../../ui/components/modal.js";
 import { syncToServer, requestSync } from "../syncService.js"; // Import requestSync
 import { TEAM_ID, masterDataConfig } from "../../config/constants.js";
 import { _logActivity } from "../logService.js";
@@ -49,7 +50,7 @@ export async function _handleEmptyRecycleBin() {
 export async function _handleRestoreItems(items) {
     if (!items || items.length === 0) return;
     const count = items.length;
-    const loadingToast = toast('syncing', `Memulihkan ${count} item...`);
+    const loader = startGlobalLoading(`Memulihkan ${count} item...`);
     let successCount = 0;
     const failedItems = [];
     const originalItemsData = []; // Store original data for undo
@@ -75,14 +76,12 @@ export async function _handleRestoreItems(items) {
         // Request sync after all local operations are done
         if (successCount > 0) requestSync({ silent: true });
 
-        if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
-
         if (successCount > 0) {
             const message = count === 1 ? 'Item dipulihkan.' : `${successCount} item dipulihkan.`;
             toast('info', message, 6000, {
                 actionText: 'Urungkan',
                 onAction: async () => {
-                    const undoToast = toast('syncing', 'Mengembalikan ke Sampah...');
+                    const undoLoader = startGlobalLoading('Mengembalikan ke Sampah...');
                     let undoSuccessCount = 0;
                     try {
                         for(const { table, item: original } of originalItemsData) {
@@ -92,14 +91,14 @@ export async function _handleRestoreItems(items) {
                         }
                         if (undoSuccessCount > 0) requestSync({ silent: true }); // Sync after undo
 
-                        if(undoToast.close) undoToast.close();
                         await loadAllLocalDataToState(); // Reload state
                         appState.recycledItemsCache = null; // Clear cache
                         emit('ui.recycleBin.renderContent'); // Re-render recycle bin
                         toast('success', `${undoSuccessCount} item dikembalikan ke Sampah.`);
                     } catch (e) {
-                         if(undoToast.close) undoToast.close();
                          toast('error', 'Gagal mengurungkan aksi.');
+                    } finally {
+                        undoLoader.close();
                     }
                 }
             });
@@ -120,9 +119,10 @@ export async function _handleRestoreItems(items) {
         }
 
     } catch (e) {
-        if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
         toast('error', 'Gagal memulihkan item.');
         console.error(e);
+    } finally {
+        loader.close();
     }
 }
 
@@ -143,7 +143,7 @@ export async function _handleDeletePermanentItems(items, fromEmptyBin = false) {
 
 async function executePermanentDeletion(items) {
     const count = items.length;
-    const loadingToast = toast('syncing', `Menghapus ${count} item secara permanen...`);
+    const loader = startGlobalLoading(`Menghapus ${count} item secara permanen...`);
     let successCount = 0;
     const failedItems = [];
     const processedItemIds = []; 
@@ -233,8 +233,6 @@ async function executePermanentDeletion(items) {
             }
         }
 
-        if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
-
         if (successCount > 0) {
             appState.recycledItemsCache = appState.recycledItemsCache?.filter(cachedItem => !processedItemIds.includes(cachedItem.id)) || null;
             await loadAllLocalDataToState(); 
@@ -254,9 +252,10 @@ async function executePermanentDeletion(items) {
         }
 
     } catch (e) {
-        if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
         toast('error', 'Gagal menghapus item secara permanen.');
         console.error('Permanent delete error:', e);
+    } finally {
+        loader.close();
     }
 }
 
@@ -334,17 +333,20 @@ export async function handleDeleteItem(id, type) {
             const deleteMsg = 'Item dipindahkan ke Sampah.';
             toast('info', deleteMsg, 6000, {
                 actionText: 'Urungkan',
-                onAction: async () => {                    const loadingToast = toast('syncing', 'Mengembalikan...');
-                    const { success: undoSuccess } = await _performSoftDelete(id, config.table, false); // false = restore
-                    if (undoSuccess) {
-                        requestSync({ silent: true }); 
-                        await loadAllLocalDataToState(); 
-                        if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
-                        emit('ui.page.render');
-                        toast('success', 'Aksi dibatalkan.');
-                    } else {
-                         if(loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
-                         toast('error', 'Gagal mengurungkan aksi.');
+                onAction: async () => {
+                    const undoLoader = startGlobalLoading('Mengembalikan...');
+                    try {
+                        const { success: undoSuccess } = await _performSoftDelete(id, config.table, false); // false = restore
+                        if (undoSuccess) {
+                            requestSync({ silent: true }); 
+                            await loadAllLocalDataToState(); 
+                            emit('ui.page.render');
+                            toast('success', 'Aksi dibatalkan.');
+                        } else {
+                             toast('error', 'Gagal mengurungkan aksi.');
+                        }
+                    } finally {
+                        undoLoader.close();
                     }
                 }
             });
@@ -361,89 +363,90 @@ export async function handleDeleteMultipleItems(items) {
     emit('ui.modal.create', 'confirmDelete', {
         message: message,
         onConfirm: async () => {
-            const loadingToast = toast('syncing', `Memindahkan ${items.length} item...`);
+            const loader = startGlobalLoading(`Memindahkan ${items.length} item...`);
 
-            let successCount = 0;
-            const failedItems = [];
-            const itemsToUndo = []; // Store info needed for undo
-            const processedDomIds = [];
+            try {
+                let successCount = 0;
+                const failedItems = [];
+                const itemsToUndo = []; // Store info needed for undo
+                const processedDomIds = [];
 
-            for (const item of items) {
-                const { id, type } = item;
-                 // Normalize type here as well
-                 let normalizedType = type;
-                 if (type === 'bill') normalizedType = 'bills';
-                 else if (type === 'expense') normalizedType = 'expenses';
-                 else if (type === 'termin') normalizedType = 'incomes';
-                 else if (type === 'pinjaman' || type === 'loan') normalizedType = 'funding_sources';
+                for (const item of items) {
+                    const { id, type } = item;
+                     // Normalize type here as well
+                     let normalizedType = type;
+                     if (type === 'bill') normalizedType = 'bills';
+                     else if (type === 'expense') normalizedType = 'expenses';
+                     else if (type === 'termin') normalizedType = 'incomes';
+                     else if (type === 'pinjaman' || type === 'loan') normalizedType = 'funding_sources';
 
-                 const masterConfig = Object.values(masterDataConfig).find(c => c.stateKey === normalizedType || c.dbTable === normalizedType);
-                 const tableName = masterConfig?.dbTable || normalizedType;
+                     const masterConfig = Object.values(masterDataConfig).find(c => c.stateKey === normalizedType || c.dbTable === normalizedType);
+                     const tableName = masterConfig?.dbTable || normalizedType;
 
-                if (!tableName || !localDB[tableName]) { // Check if table exists in Dexie
-                    console.error("Tipe tabel tidak valid atau tidak ditemukan di DB lokal:", item, `(Normalized: ${normalizedType}, TableName: ${tableName})`);
-                    failedItems.push(id);
-                    continue;
+                    if (!tableName || !localDB[tableName]) { // Check if table exists in Dexie
+                        console.error("Tipe tabel tidak valid atau tidak ditemukan di DB lokal:", item, `(Normalized: ${normalizedType}, TableName: ${tableName})`);
+                        failedItems.push(id);
+                        continue;
+                    }
+
+                    const { success } = await _performSoftDelete(id, tableName, true); // true = soft delete
+                    if (success) {
+                        successCount++;
+                        itemsToUndo.push({ id, table: tableName }); // Store for undo
+                        const domId = document.querySelector(`[data-item-id="${id}"]`)?.dataset.id || id;
+                        // Emit animation immediately after successful local update
+                        emit('ui.animate.removeItem', domId);
+                        processedDomIds.push(domId);
+                    } else {
+                        failedItems.push(id);
+                    }
                 }
+                 // Request sync after all local operations are done
+                if (successCount > 0) requestSync({ silent: true });
 
-                const { success } = await _performSoftDelete(id, tableName, true); // true = soft delete
-                if (success) {
-                    successCount++;
-                    itemsToUndo.push({ id, table: tableName }); // Store for undo
-                    const domId = document.querySelector(`[data-item-id="${id}"]`)?.dataset.id || id;
-                    // Emit animation immediately after successful local update
-                    emit('ui.animate.removeItem', domId);
-                    processedDomIds.push(domId);
-                } else {
-                    failedItems.push(id);
-                }
-            }
-             // Request sync after all local operations are done
-            if (successCount > 0) requestSync({ silent: true });
+                if (successCount > 0) {
+                     // Deactivate selection and update UI after a delay
+                     setTimeout(async () => {
+                        deactivateSelectionMode();
+                        appState.recycledItemsCache = null; // Invalidate cache
+                        emit('ui.page.recalcDashboardTotals');
 
+                        _logActivity(`Memindahkan ${successCount} item ke Sampah (Massal)`);
 
-            if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
+                        toast('info', `${successCount} item dipindahkan ke Sampah.`, 6000, {
+                            actionText: 'Urungkan',
+                            onAction: async () => {
+                                const undoLoader = startGlobalLoading('Mengembalikan semua item...');
+                                 let undoSuccessCount = 0;
+                                try {
+                                    for (const itemToRestore of itemsToUndo) {
+                                        const { success: undoSuccess } = await _performSoftDelete(itemToRestore.id, itemToRestore.table, false); // false = restore
+                                        if(undoSuccess) undoSuccessCount++;
+                                    }
+                                    if (undoSuccessCount > 0) requestSync({ silent: true }); // Sync after undo
 
-            if (successCount > 0) {
-                 // Deactivate selection and update UI after a delay
-                 setTimeout(async () => {
-                    deactivateSelectionMode();
-                    appState.recycledItemsCache = null; // Invalidate cache
-                    emit('ui.page.recalcDashboardTotals');
-
-                    _logActivity(`Memindahkan ${successCount} item ke Sampah (Massal)`);
-
-                    toast('info', `${successCount} item dipindahkan ke Sampah.`, 6000, {
-                        actionText: 'Urungkan',
-                        onAction: async () => {
-                            const undoToast = toast('syncing', 'Mengembalikan semua item...');
-                             let undoSuccessCount = 0;
-                            try {
-                                for (const itemToRestore of itemsToUndo) {
-                                    const { success: undoSuccess } = await _performSoftDelete(itemToRestore.id, itemToRestore.table, false); // false = restore
-                                    if(undoSuccess) undoSuccessCount++;
+                                    await loadAllLocalDataToState(); // Reload state
+                                    emit('ui.page.render'); // Re-render current page
+                                    toast('success', `${undoSuccessCount} item berhasil dikembalikan.`);
+                                } catch (e) {
+                                    toast('error', 'Gagal mengurungkan aksi.');
+                                } finally {
+                                    undoLoader.close();
                                 }
-                                if (undoSuccessCount > 0) requestSync({ silent: true }); // Sync after undo
-
-                                if(undoToast.close) undoToast.close();
-                                await loadAllLocalDataToState(); // Reload state
-                                emit('ui.page.render'); // Re-render current page
-                                toast('success', `${undoSuccessCount} item berhasil dikembalikan.`);
-                            } catch (e) {
-                                if(undoToast.close) undoToast.close();
-                                toast('error', 'Gagal mengurungkan aksi.');
                             }
-                        }
-                    });
-                     // Re-render current page after potential state changes
-                     emit('ui.page.render');
-                 }, 400); // Small delay before UI update
+                        });
+                         // Re-render current page after potential state changes
+                         emit('ui.page.render');
+                     }, 400); // Small delay before UI update
 
-            } else {
-                 toast('error', 'Gagal memindahkan item.');
-            }
-             if (failedItems.length > 0) {
-                 toast('error', `Gagal memindahkan ${failedItems.length} item.`);
+                } else {
+                     toast('error', 'Gagal memindahkan item.');
+                }
+                 if (failedItems.length > 0) {
+                     toast('error', `Gagal memindahkan ${failedItems.length} item.`);
+                }
+            } finally {
+                loader.close();
             }
         }
     });

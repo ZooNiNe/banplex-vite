@@ -10,7 +10,7 @@ import { toast } from '../components/toast.js';
 import { validateForm, attachClientValidation } from '../../utils/validation.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { handleNavigation } from '../mainUI.js';
-import { resetFormDirty } from '../components/modal.js';
+import { resetFormDirty, startGlobalLoading } from '../components/modal.js';
 import { createMasterDataSelect } from '../components/forms/index.js';
 import { appState } from '../../state/appState.js';
 import { isValidNikKk, sanitizeDigits, sanitizePhone } from '../../utils/helpers.js';
@@ -951,8 +951,8 @@ async function handleBulkImportFile(file, fileInput) {
     if (isBulkUploading) return;
     isBulkUploading = true;
     setBulkImportState(true);
+    const loader = startGlobalLoading(`Memproses ${file.name}...`);
     try {
-        toast('syncing', `Memproses ${file.name}...`);
         const records = await parseApplicantSpreadsheet(file);
         if (records.length === 0) {
             toast('info', 'Tidak ada data valid pada file yang diunggah.');
@@ -966,6 +966,7 @@ async function handleBulkImportFile(file, fileInput) {
         console.error('[HrdApplicantsForm] Bulk import gagal:', error);
         toast('error', error?.message || 'Gagal mengunggah file. Pastikan format sudah sesuai.');
     } finally {
+        loader.close();
         isBulkUploading = false;
         setBulkImportState(false);
         if (fileInput) fileInput.value = '';

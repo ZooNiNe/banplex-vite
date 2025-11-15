@@ -2,6 +2,7 @@ import { storage } from "../config/firebase.js";
 import { ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-storage.js";
 import { localDB } from "./localDbService.js";
 import { toast } from "../ui/components/toast.js";
+import { startGlobalLoading } from "../ui/components/modal.js";
 import { isViewer } from "../utils/helpers.js";
 import { emit } from "../state/eventBus.js";
 
@@ -11,7 +12,7 @@ async function _uploadFileToFirebaseStorage(file, folder = 'attachments') {
           toast('error', 'Viewer tidak dapat mengunggah file.');
           return null;
       }
-      toast('syncing', `Mengunggah ${file.name}...`);
+      const loader = startGlobalLoading(`Mengunggah ${file.name}...`);
       try {
           const timestamp = Date.now();
           const uniqueFileName = `${timestamp}-${file.name}`;
@@ -24,6 +25,8 @@ async function _uploadFileToFirebaseStorage(file, folder = 'attachments') {
           console.error("Upload error:", error);
           toast('error', 'Gagal mengunggah file.');
           return null;
+      } finally {
+          loader.close();
       }
   }
 
@@ -152,7 +155,7 @@ async function _compressImage(file, quality = 0.85, maxWidth = 1024) {
 
 async function downloadAttachment(url, filename) {
     if (!url) return;
-    toast('syncing', `Mengunduh ${filename}...`);
+    const loader = startGlobalLoading(`Mengunduh ${filename}...`);
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Gagal mengunduh: Server merespon dengan status ${response.status}`);
@@ -166,9 +169,11 @@ async function downloadAttachment(url, filename) {
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
         toast('success', `${filename} berhasil diunduh.`);
+        loader.close();
     } catch (error) {
         console.error("Gagal mengunduh lampiran:", error);
         toast('error', `Gagal mengunduh file: ${error.message}`);
+        loader.close();
     }
 }
 

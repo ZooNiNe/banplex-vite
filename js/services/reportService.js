@@ -3,6 +3,7 @@ import { appState } from "../state/appState.js";
 import { settingsDocRef, projectsCol, billsCol, suppliersCol } from "../config/firebase.js";
 import { getDoc } from "../config/firebase.js";
 import { toast } from "../ui/components/toast.js";
+import { startGlobalLoading } from "../ui/components/modal.js";
 import { getJSDate, parseLocalDate } from "../utils/helpers.js";
 import { fetchAndCacheData } from "./data/fetch.js";
 import { $ } from "../utils/dom.js";
@@ -86,7 +87,7 @@ async function generatePdfReport(config) {
         return;
     }
   
-    toast('syncing', 'Membuat laporan PDF...');
+    const loader = startGlobalLoading('Membuat laporan PDF...');
     try {
         await __ensurePdfLibs();
         if (!appState.pdfSettings) {
@@ -204,7 +205,9 @@ async function generatePdfReport(config) {
   
         pdf.save(filename);
         toast('success', 'PDF berhasil dibuat!');
+        loader.close();
     } catch (error) {
+        loader.close();
         console.error("Gagal membuat PDF:", error);
         toast('error', 'Terjadi kesalahan saat membuat PDF.');
     }
@@ -670,7 +673,7 @@ export async function createSimulasiPDF() {
         return;
     }
 
-    toast('syncing', 'Mempersiapkan Laporan PDF...');
+    const loader = startGlobalLoading('Mempersiapkan Laporan PDF...');
 
     try {
         const { groupedByCategory, totalAlokasi } = _prepareSimulasiData();
@@ -713,14 +716,16 @@ export async function createSimulasiPDF() {
             });
         }
 
-        generatePdfReport({
+        await generatePdfReport({
             title: 'Laporan Simulasi Alokasi Dana',
             subtitle: `Dibuat pada: ${new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}`,
             filename: `Simulasi-Alokasi-Dana-${new Date().toISOString().slice(0, 10)}.pdf`,
             sections: sections
         });
 
+        loader.close();
     } catch (error) {
+        loader.close();
         toast('error', 'Gagal membuat PDF. Coba lagi.');
         console.error("Gagal membuat PDF Simulasi:", error);
     }

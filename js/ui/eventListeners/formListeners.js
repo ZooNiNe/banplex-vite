@@ -2,7 +2,7 @@ import { emit, on } from "../../state/eventBus.js";
 import { toProperCase } from "../../utils/helpers.js";
 import { submitFormAsync, fallbackLocalFormHandler, serializeForm } from "../../utils/formPersistence.js"; // Impor serializeForm
 import { handleAddMasterItem, handleUpdateMasterItem } from "../../services/data/masterDataService.js";
-import { createModal, closeModal, resetFormDirty, markFormDirty, closeDetailPane, closeDetailPaneImmediate, hideMobileDetailPage, hideMobileDetailPageImmediate } from "../components/modal.js";
+import { createModal, closeModal, resetFormDirty, markFormDirty, closeDetailPane, closeDetailPaneImmediate, hideMobileDetailPage, hideMobileDetailPageImmediate, startGlobalLoading } from "../components/modal.js";
 import { handleUpdatePemasukan, handleAddPemasukan } from "../../services/data/transactions/pemasukanService.js";
 import { handleUpdatePengeluaran, handleAddPengeluaran } from "../../services/data/transactions/pengeluaranService.js";
 import { toast } from "../components/toast.js";
@@ -72,9 +72,13 @@ function initializeFormSpecificListeners() {
                     }
                     resetFormDirty(); 
 
-                    const savingToast = toast('syncing', 'Menyimpan...');
-                    const result = await updateFunction(form);
-                    if (savingToast && typeof savingToast.close === 'function') savingToast.close();
+                    const loader = startGlobalLoading('Menyimpan...');
+                    let result;
+                    try {
+                        result = await updateFunction(form);
+                    } finally {
+                        loader.close();
+                    }
 
                     if (result.success) {
                         toast('success', isConversion ? 'Surat Jalan berhasil diubah menjadi Tagihan!' : 'Perubahan berhasil disimpan!');

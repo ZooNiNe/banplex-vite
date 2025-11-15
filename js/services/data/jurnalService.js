@@ -14,7 +14,7 @@ import { createTabsHTML } from "../../ui/components/tabs.js";
 import { getEmptyStateHTML } from "../../ui/components/emptyState.js";
 import { _getRekapGajiListHTML } from "../../ui/components/cards.js";
 import { createListSkeletonHTML } from "../../ui/components/skeleton.js";
-import { showDetailPane, createModal, closeModal } from "../../ui/components/modal.js";
+import { showDetailPane, createModal, closeModal, startGlobalLoading } from "../../ui/components/modal.js";
 import { validateForm } from "../../utils/validation.js";
 import { queueOutbox } from "../outboxService.js";
 // --- PERUBAHAN: Menambahkan impor $ (utility DOM) ---
@@ -72,7 +72,7 @@ async function _executeGenerateBillForWorker(worker, recordsToPay, grandTotal) {
     // --- PERUBAHAN: Deskripsi tagihan menyertakan rentang tanggal ---
     const description = `Gaji: ${worker.workerName} (${minDate.toLocaleDateString('id-ID')} - ${maxDate.toLocaleDateString('id-ID')})`;
     
-    toast('syncing', 'Membuat tagihan gaji...');
+    const loader = startGlobalLoading('Membuat tagihan gaji...');
     try {
         const billId = generateUUID();
         const newBillData = {
@@ -126,6 +126,8 @@ async function _executeGenerateBillForWorker(worker, recordsToPay, grandTotal) {
     } catch (error) {
         toast('error', 'Gagal membuat tagihan gaji.');
         console.error('Error generating worker salary bill:', error);
+    } finally {
+        loader.close();
     }
 }
 
@@ -229,7 +231,7 @@ export async function handleGenerateBillForWorker(dataset) {
         // --- PERUBAHAN: Pesan konfirmasi menyertakan rentang tanggal ---
         message: `Anda akan membuat 1 tagihan gaji untuk <strong>${worker.workerName}</strong> sebesar <strong>${fmtIDR(grandTotal)}</strong> (dari ${recordsToPay.length} absensi antara ${formattedDateRange}). Lanjutkan?`,
         onConfirm: async () => { 
-            toast('syncing', 'Membuat tagihan gaji...');
+            const loader = startGlobalLoading('Membuat tagihan gaji...');
             try {
                 const billId = generateUUID();
                 const newBillData = {
@@ -284,6 +286,8 @@ export async function handleGenerateBillForWorker(dataset) {
             } catch (error) {
                 toast('error', 'Gagal membuat tagihan gaji.');
                 console.error('Error generating worker salary bill:', error);
+            } finally {
+                loader.close();
             }
         }
     });
@@ -300,7 +304,7 @@ export async function handleDeleteSalaryBill(billId) {
     emit('ui.modal.create', 'confirmDelete', {
         message: 'Membatalkan rekap akan menghapus tagihan ini dan mengembalikan status absensi terkait menjadi "belum dibayar". Lanjutkan?',
         onConfirm: async () => {
-            toast('syncing', 'Membatalkan rekap...');
+            const loader = startGlobalLoading('Membatalkan rekap...');
             try {
                 const bill = await localDB.bills.get(billId);
                 if (!bill) throw new Error('Tagihan tidak ditemukan');
@@ -336,6 +340,8 @@ export async function handleDeleteSalaryBill(billId) {
             } catch (error) {
                 console.error('Error deleting salary bill:', error);
                 toast('error', error.message || 'Gagal membatalkan rekap.');
+            } finally {
+                loader.close();
             }
         }
     });

@@ -9,6 +9,7 @@ import { createPageToolbarHTML } from '../components/toolbar.js';
 import { getApplicants, deleteApplicant } from '../../services/data/hrdApplicantService.js';
 import { getEmptyStateHTML } from '../components/emptyState.js';
 import { toast } from '../components/toast.js';
+import { startGlobalLoading } from '../components/modal.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { createMasterDataSelect, initCustomSelects } from '../components/forms/index.js';
 import { formatDate } from '../../utils/formatters.js';
@@ -965,10 +966,7 @@ async function performDeleteRecords(ids = []) {
     if (!Array.isArray(ids) || ids.length === 0) return;
     if (isDeletingRecords) return;
     isDeletingRecords = true;
-    let loadingToast = null;
-    try {
-        loadingToast = toast('syncing', ids.length > 1 ? 'Menghapus data terpilih...' : 'Menghapus data...', 0);
-    } catch (_) {}
+    const loader = startGlobalLoading(ids.length > 1 ? 'Menghapus data terpilih...' : 'Menghapus data...');
     try {
         const results = await Promise.allSettled(ids.map(id => deleteApplicant(id))); // --- Gunakan deleteApplicant ---
         const failed = [];
@@ -993,9 +991,7 @@ async function performDeleteRecords(ids = []) {
         console.error('[HrdApplicants] Gagal menghapus data:', error);
         toast('error', 'Terjadi kesalahan saat menghapus data.');
     } finally {
-        if (loadingToast?.close) {
-            loadingToast.close().catch(() => {});
-        }
+        loader.close();
         isDeletingRecords = false;
         renderHrdApplicantsTable();
     }

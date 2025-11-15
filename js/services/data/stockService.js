@@ -3,6 +3,7 @@ import { appState } from "../../state/appState.js";
 import { db, materialsCol, stockTransactionsCol } from "../../config/firebase.js";
 import { doc, runTransaction, increment, serverTimestamp, Timestamp, collection, getDocs, where, query } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { toast } from "../../ui/components/toast.js";
+import { startGlobalLoading } from "../../ui/components/modal.js";
 import { _logActivity } from "../logService.js";
 import { parseFormattedNumber } from "../../utils/formatters.js";
 import { apiRequest, mapDeleteEndpoint } from "../../utils/formPersistence.js";
@@ -225,7 +226,7 @@ async function _processStockTransactionUpdate(form) {
 
 async function _processStockTransactionDelete(dataset) {
       const { id, type, qty, materialId } = dataset;
-      toast('syncing', 'Menghapus transaksi...');
+      const loader = startGlobalLoading('Menghapus transaksi...');
       try {
           let apiOk = false;
           try {
@@ -261,6 +262,8 @@ async function _processStockTransactionDelete(dataset) {
       } catch (error) {
           toast('error', 'Gagal menghapus riwayat.');
           console.error(error);
+      } finally {
+          loader.close();
       }
 }
 

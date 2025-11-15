@@ -7,7 +7,7 @@ import { _uploadFileToCloudinary, _compressImage, _enforceLocalFileStorageLimit 
 import { requestSync } from "../../syncService.js";
 import { queueOutbox } from "../../outboxService.js";
 // *** PERBAIKAN: Impor closeModalImmediate ***
-import { closeModalImmediate } from "../../../ui/components/modal.js";
+import { closeModalImmediate, startGlobalLoading } from "../../../ui/components/modal.js";
 // *** AKHIR PERBAIKAN ***
 
 // Flag untuk mencegah klik ganda pada pemicu file
@@ -30,7 +30,7 @@ export async function handleReplaceAttachment(expenseId, oldAttachmentUrl) {
     // Fungsi internal untuk memproses file SETELAH dipilih
     const processFile = async (file) => {
         if (!file) return;
-        const loadingToast = toast('syncing', `Mengunggah lampiran baru...`);
+        const loader = startGlobalLoading(`Mengunggah lampiran baru...`);
         try {
             // Kompres gambar sebelum upload
             const compressedFile = await _compressImage(file);
@@ -71,7 +71,6 @@ export async function handleReplaceAttachment(expenseId, oldAttachmentUrl) {
                 });
             });
 
-            if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
             toast('success', 'Lampiran berhasil diganti.');
             _logActivity('Mengganti Lampiran', { expenseId, newUrl });
 
@@ -80,9 +79,10 @@ export async function handleReplaceAttachment(expenseId, oldAttachmentUrl) {
             requestSync({ silent: true }); // Minta sinkronisasi
 
         } catch (error) {
-            if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
             toast('error', `Gagal mengganti lampiran: ${error.message}`);
             console.error("[handleReplaceAttachment] processFile error:", error);
+        } finally {
+            loader.close();
         }
     };
 
@@ -157,7 +157,7 @@ export async function handleDeleteAttachment(expenseId, attachmentUrl) {
 
     emit('ui.modal.create', 'confirmDeleteAttachment', {
         onConfirm: async () => {
-            const loadingToast = toast('syncing', 'Menghapus lampiran...');
+            const loader = startGlobalLoading('Menghapus lampiran...');
             try {
                 await localDB.transaction('rw', localDB.expenses, localDB.outbox, async () => { // Tambah outbox
                     const expense = await localDB.expenses.get(expenseId);
@@ -186,7 +186,6 @@ export async function handleDeleteAttachment(expenseId, attachmentUrl) {
                     });
                 });
 
-                if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
                 toast('success', 'Lampiran berhasil dihapus.');
                 _logActivity('Menghapus Lampiran', { expenseId, attachmentUrl });
 
@@ -197,10 +196,11 @@ export async function handleDeleteAttachment(expenseId, attachmentUrl) {
                 return true; // PERBAIKAN: Signal sukses
 
             } catch (error) {
-                if (loadingToast && typeof loadingToast.close === 'function') loadingToast.close();
                 toast('error', `Gagal menghapus lampiran: ${error.message}`);
                 console.error("[handleDeleteAttachment] Error:", error);
                 return false; // PERBAIKAN: Signal gagal
+            } finally {
+                loader.close();
             }
         }
     });

@@ -5,6 +5,7 @@ import { TEAM_ID } from "../config/constants.js";
 import { db, billsCol } from "../config/firebase.js";
 import { getDocs, collection, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { toast } from "../ui/components/toast.js";
+import { startGlobalLoading } from "../ui/components/modal.js";
 import { getJSDate } from "../utils/helpers.js";
 import { _terbilang, fmtIDR as fmtIDRFormat } from "../utils/formatters.js";
 import { localDB } from "./localDbService.js";
@@ -150,7 +151,7 @@ function handleDownloadConfirmation(downloader, data, actionType, previewModal) 
 }
 
 export async function downloadUniversalKwitansiAsPDF(data = {}) {
-    toast('syncing', 'Membuat PDF Kwitansi...');
+    const loader = startGlobalLoading('Membuat PDF Kwitansi...');
     try {
         await __ensurePdfLibs();
         const { jsPDF } = window.jspdf || {};
@@ -187,12 +188,14 @@ export async function downloadUniversalKwitansiAsPDF(data = {}) {
     } catch (err) {
         console.error('Gagal membuat PDF universal:', err);
         toast('error', 'Gagal membuat PDF.');
+    } finally {
+        loader.close();
     }
 }
 
 
 export async function downloadUniversalKwitansiAsImage(data = {}) {
-    toast('syncing', 'Membuat gambar kwitansi...');
+    const loader = startGlobalLoading('Membuat gambar kwitansi...');
     try {
         await __ensurePdfLibs();
         const html2canvas = window.html2canvas;
@@ -229,6 +232,8 @@ export async function downloadUniversalKwitansiAsImage(data = {}) {
     } catch (err) {
         console.error('Gagal render gambar universal:', err);
         toast('error', 'Gagal membuat gambar.');
+    } finally {
+        loader.close();
     }
 }
 
@@ -297,7 +302,7 @@ on('ui.modal.showKwitansiPayment', async (kwitansiData = {}) => {
 });
 
 export async function openShareModal(elementSelector, shareData) {
-    toast('syncing', 'Mempersiapkan pratinjau untuk dibagikan...');
+    const loader = startGlobalLoading('Mempersiapkan pratinjau untuk dibagikan...');
     try {
         await __ensurePdfLibs();
         const html2canvas = window.html2canvas;
@@ -367,9 +372,11 @@ export async function openShareModal(elementSelector, shareData) {
             }
         });
 
+        loader.close();
     } catch (error) {
         console.error('Gagal membuat modal bagikan:', error);
         toast('error', 'Gagal mempersiapkan pratinjau. Kesalahan: ' + error.message);
+        loader.close();
     }
 }
 
@@ -407,7 +414,7 @@ export async function shareElementAsImage(elementSelector, shareData) {
 
 
 async function downloadKolektifKwitansiAsPDF({ allKwitansiData, bill }) {
-    toast('syncing', `Membuat PDF Kolektif (${allKwitansiData.length} kwitansi)...`);
+    const loader = startGlobalLoading(`Membuat PDF Kolektif (${allKwitansiData.length} kwitansi)...`);
     try {
         await __ensurePdfLibs();
         const { jsPDF } = window.jspdf || {};
@@ -455,16 +462,19 @@ async function downloadKolektifKwitansiAsPDF({ allKwitansiData, bill }) {
     } catch (err) {
         console.error('Gagal membuat PDF Kolektif:', err);
         toast('error', 'Gagal membuat PDF kolektif.');
+    } finally {
+        loader.close();
     }
 }
 
 export async function handleCetakKwitansi(billId) {
-    toast('syncing', 'Mempersiapkan kwitansi...');
-    const bill = appState.bills.find(b => b.id === billId);
-    if (!bill) {
-        toast('error', 'Data tagihan tidak ditemukan.');
-        return;
-    }
+    const loader = startGlobalLoading('Mempersiapkan kwitansi...');
+    try {
+        const bill = appState.bills.find(b => b.id === billId);
+        if (!bill) {
+            toast('error', 'Data tagihan tidak ditemukan.');
+            return;
+        }
     let recipientName = 'Penerima Tidak Dikenal'; // Default fallback
     if (bill.type === 'gaji') {
         if (bill.workerDetails && bill.workerDetails.length === 1) {
@@ -510,24 +520,27 @@ export async function handleCetakKwitansi(billId) {
         sisaTagihan: Math.max(0, (bill.amount || 0) - (bill.paidAmount || 0)),
     };
 
-    emit('ui.modal.showKwitansiPayment', kwitansiData);
+        emit('ui.modal.showKwitansiPayment', kwitansiData);
+    } finally {
+        loader.close();
+    }
 }
 
 export async function handleCetakKwitansiIndividu(dataset) {
     const { billId, workerId } = dataset;
-    toast('syncing', 'Mempersiapkan kwitansi...');
+    const loader = startGlobalLoading('Mempersiapkan kwitansi...');
+    try {
+        const bill = appState.bills.find(b => b.id === billId);
+        if (!bill || !bill.workerDetails) {
+            toast('error', 'Data tagihan gabungan tidak ditemukan.');
+            return;
+        }
 
-    const bill = appState.bills.find(b => b.id === billId);
-    if (!bill || !bill.workerDetails) {
-        toast('error', 'Data tagihan gabungan tidak ditemukan.');
-        return;
-    }
-
-    const workerDetail = bill.workerDetails.find(w => w.id === workerId || w.workerId === workerId);
-    if (!workerDetail) {
-        toast('error', 'Data pekerja di tagihan ini tidak ditemukan.');
-        return;
-    }
+        const workerDetail = bill.workerDetails.find(w => w.id === workerId || w.workerId === workerId);
+        if (!workerDetail) {
+            toast('error', 'Data pekerja di tagihan ini tidak ditemukan.');
+            return;
+        }
 
     const __paidAtDate = bill.paidAt ? getJSDate(bill.paidAt) : new Date();
     const kwitansiData = {
@@ -544,18 +557,21 @@ export async function handleCetakKwitansiIndividu(dataset) {
         sisaTagihan: 0,
     };
 
-    emit('ui.modal.showKwitansiPayment', kwitansiData);
+        emit('ui.modal.showKwitansiPayment', kwitansiData);
+    } finally {
+        loader.close();
+    }
 }
 
 export async function handleCetakKwitansiKolektif(dataset) {
     const { billId } = dataset;
-    toast('syncing', 'Mengumpulkan data pembayaran...');
-
-    const bill = appState.bills.find(b => b.id === billId);
-    if (!bill || !bill.workerDetails) {
-        toast('error', 'Data tagihan gabungan tidak ditemukan.');
-        return;
-    }
+    const loader = startGlobalLoading('Mengumpulkan data pembayaran...');
+    try {
+        const bill = appState.bills.find(b => b.id === billId);
+        if (!bill || !bill.workerDetails) {
+            toast('error', 'Data tagihan gabungan tidak ditemukan.');
+            return;
+        }
 
     let allPaymentsForBill = [];
     try {
@@ -608,7 +624,10 @@ export async function handleCetakKwitansiKolektif(dataset) {
         return;
     }
 
-    emit('ui.pdf.downloadKolektif', { allKwitansiData, bill });
+        emit('ui.pdf.downloadKolektif', { allKwitansiData, bill });
+    } finally {
+        loader.close();
+    }
 }
 
 on('ui.pdf.downloadKolektif', (data) => {

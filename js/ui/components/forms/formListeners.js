@@ -3,7 +3,7 @@ import { attachClientValidation, validateForm } from '../../../utils/validation.
 import { toProperCase } from "../../../utils/helpers.js";
 import { submitFormAsync, fallbackLocalFormHandler, serializeForm } from "../../../utils/formPersistence.js";
 import { handleAddMasterItem, handleUpdateMasterItem } from "../../../services/data/masterDataService.js";
-import { createModal, closeModal, resetFormDirty, markFormDirty, closeDetailPane, closeDetailPaneImmediate, hideMobileDetailPage, hideMobileDetailPageImmediate, closeModalImmediate } from "../modal.js";
+import { createModal, closeModal, resetFormDirty, markFormDirty, closeDetailPane, closeDetailPaneImmediate, hideMobileDetailPage, hideMobileDetailPageImmediate, closeModalImmediate, startGlobalLoading } from "../modal.js";
 import { handleUpdatePemasukan, handleAddPemasukan } from "../../../services/data/transactions/pemasukanService.js";
 import { handleUpdatePengeluaran, handleAddPengeluaran } from "../../../services/data/transactions/pengeluaranService.js";
 import { handleDeleteAttachment, handleReplaceAttachment } from "../../../services/data/transactions/attachmentService.js";
@@ -122,9 +122,13 @@ function initializeFormSpecificListeners() {
                     const panel = form.closest('#detail-pane');
                     const isMobile = window.matchMedia('(max-width: 599px)').matches;
 
-                    const savingToast = toast('syncing', 'Menyimpan...');
-                    const result = await updateFunction(form); // Coba update
-                    if (savingToast && typeof savingToast.close === 'function') savingToast.close();
+                    const loader = startGlobalLoading('Menyimpan...');
+                    let result;
+                    try {
+                        result = await updateFunction(form); // Coba update
+                    } finally {
+                        loader.close();
+                    }
 
                     if (result.success) {
                         toast('success', isConversion ? 'Surat Jalan berhasil diubah menjadi Tagihan!' : 'Perubahan berhasil disimpan!');

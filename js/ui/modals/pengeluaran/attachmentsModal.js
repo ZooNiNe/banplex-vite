@@ -1,4 +1,4 @@
-import { createModal, closeModalImmediate } from '../../components/modal.js';
+import { createModal, closeModalImmediate, startGlobalLoading } from '../../components/modal.js';
 import { appState } from '../../../state/appState.js';
 import { getEmptyStateHTML } from '../../components/emptyState.js';
 import { toast } from '../../components/toast.js';
@@ -75,7 +75,7 @@ export async function handleOpenAttachmentsListModal(dataset) {
     let attachments = [];
     let source = 'unknown';
 
-    const loadingToast = toast('syncing', 'Memuat lampiran...');
+    const loader = startGlobalLoading('Memuat lampiran...');
 
     try {
         // DEBUGGING: Check online status and Firestore attempt
@@ -134,7 +134,6 @@ export async function handleOpenAttachmentsListModal(dataset) {
                  console.warn('[handleOpenAttachmentsListModal] No attachments found in expenseData.');
             }
         } else {
-             if (loadingToast?.close) loadingToast.close();
             const errorMsg = `Data pengeluaran dengan ID ${expenseId} tidak ditemukan baik di server maupun lokal.`;
              console.error('[handleOpenAttachmentsListModal] Critical Error:', errorMsg);
             toast('error', errorMsg);
@@ -142,8 +141,6 @@ export async function handleOpenAttachmentsListModal(dataset) {
             createModal('dataDetail', { title: 'Daftar Lampiran', content: errorContent });
             return;
         }
-
-        if (loadingToast?.close) loadingToast.close();
 
          // DEBUGGING: Log final attachments before rendering HTML
          console.warn('[handleOpenAttachmentsListModal] Final attachments to render:', attachments);
@@ -158,10 +155,11 @@ export async function handleOpenAttachmentsListModal(dataset) {
         }
 
     } catch (error) {
-         if (loadingToast?.close) loadingToast.close();
         console.error("[handleOpenAttachmentsListModal] General Error:", error);
         toast('error', 'Gagal memuat lampiran.');
         const errorContent = getEmptyStateHTML({ icon: 'error', title: 'Gagal Memuat', desc: 'Terjadi kesalahan saat mencoba memuat data lampiran.' });
         createModal('dataDetail', { title: 'Daftar Lampiran', content: errorContent });
+    } finally {
+        loader.close();
     }
 }

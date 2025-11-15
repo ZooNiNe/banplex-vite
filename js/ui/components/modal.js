@@ -717,6 +717,33 @@ export function updateLoadingModal(message = null, percent = null) {
     messageEl.innerHTML = `${baseMessage}${percentText}`;
 }
 
+let loadingSessionCount = 0;
+
+export function startGlobalLoading(message = 'Memproses...', percent = null) {
+    let closed = false;
+    loadingSessionCount++;
+    if (loadingSessionCount === 1) {
+        showLoadingModal(message, percent);
+    } else {
+        updateLoadingModal(message, percent);
+    }
+
+    return {
+        update: (msg, pct) => {
+            if (closed) return;
+            updateLoadingModal(msg || message, pct);
+        },
+        close: () => {
+            if (closed) return;
+            closed = true;
+            if (loadingSessionCount > 0) loadingSessionCount--;
+            if (loadingSessionCount === 0) {
+                hideLoadingModal();
+            }
+        }
+    };
+}
+
 /**
  * Menyembunyikan modal loading global.
  */
