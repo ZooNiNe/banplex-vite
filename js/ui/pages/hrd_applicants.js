@@ -17,6 +17,7 @@ import { handleNavigation } from '../mainUI.js';
 import { APPLICANT_FIELD_KEYS as FIELD_KEYS } from './jobApplicantFieldMap.js';
 import * as XLSX from 'xlsx';
 import { createPdfDoc } from '../../services/reportService.js';
+import { createHrdInfoButton, showHrdInfoModal } from './hrdApplicantsInfoModal.js';
 
 const TABLE_COLUMNS = [
     { key: 'select', label: '', className: 'col-select' },
@@ -197,6 +198,7 @@ function renderPageShell() {
     const searchValue = filters.search || '';
     const genderValue = filters.gender || 'all';
     const statusValue = filters.statusAplikasi || 'all'; // --- BARU ---
+    const statusFilterLabel = `Status Aplikasi ${createHrdInfoButton('status')}`;
 
     container.innerHTML = `
         <div class="content-panel file-storage-panel hrd-applicants-panel">
@@ -238,7 +240,7 @@ function renderPageShell() {
                         >
                     </div>
                     ${createMasterDataSelect('hrd-applicants-gender-filter', 'Jenis Kelamin', GENDER_FILTER_OPTIONS, genderValue, null, false, false)}
-                    ${createMasterDataSelect('hrd-applicants-status-filter', 'Status Aplikasi', STATUS_FILTER_OPTIONS, statusValue, null, false, false)}
+                    ${createMasterDataSelect('hrd-applicants-status-filter', statusFilterLabel, STATUS_FILTER_OPTIONS, statusValue, null, false, false)}
                     <div class="filter-stats">
                         <span class="filter-count-label">Menampilkan</span>
                         <span class="filter-count-value" id="hrd-applicants-visible-count">0</span>
@@ -261,6 +263,21 @@ function attachEventListeners() {
     cleanupFns.forEach(fn => fn?.());
     cleanupFns = [];
     const container = $('.page-container');
+
+    if (container) {
+        const infoClickHandler = (event) => {
+            const trigger = event.target.closest('[data-action="show-hrd-info"]');
+            if (!trigger) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const key = trigger.dataset.infoKey;
+            if (key) {
+                showHrdInfoModal(key);
+            }
+        };
+        container.addEventListener('click', infoClickHandler);
+        cleanupFns.push(() => container.removeEventListener('click', infoClickHandler));
+    }
 
     const searchInput = $('#hrd-applicants-search');
     if (searchInput) {
