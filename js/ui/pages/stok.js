@@ -107,9 +107,11 @@ async function renderStokContent(append = false) {
 
     try {
         const activeTab = appState.activeSubPage.get('stok') || 'daftar';
-        const pendingMaps = await getPendingQuotaMaps(activeTab === 'daftar' ? ['materials'] : ['expenses']);
+        const pendingTargets = activeTab === 'daftar' ? ['materials'] : ['expenses','stock_transactions'];
+        const pendingMaps = await getPendingQuotaMaps(pendingTargets);
         const pendingMaterials = pendingMaps.get('materials') || new Map();
         const pendingExpenses = pendingMaps.get('expenses') || new Map();
+        const pendingStockTx = pendingMaps.get('stock_transactions') || new Map();
         
         let sourceItems = [];
         if (activeTab === 'daftar') {
@@ -126,8 +128,30 @@ async function renderStokContent(append = false) {
             };
             try { sourceItems.sort(sorters[sortMode] || sorters.name); } catch(_) {}
         } else {
-            sourceItems = (appState.expenses || []).filter(e => !e.isDeleted && e.type === 'material' && Array.isArray(e.items) && e.items.length > 0)
-                .sort((a,b) => getJSDate(b.date) - getJSDate(a.date));
+            const toSafeDate = (value) => {
+                const parsed = getJSDate(value);
+                return parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date(0);
+            };
+            const purchaseEntries = (appState.expenses || [])
+                .filter(e => !e.isDeleted && e.type === 'material' && Array.isArray(e.items) && e.items.length > 0)
+                .map(exp => ({
+                    kind: 'expense',
+                    sortDate: toSafeDate(exp.date),
+                    data: exp
+                }));
+            const usageEntries = (appState.stockTransactions || [])
+                .filter(tx => !tx.isDeleted && tx.type === 'out')
+                .map(tx => ({
+                    kind: 'stock_out',
+                    sortDate: toSafeDate(tx.date || tx.createdAt),
+                    data: tx
+                }));
+            sourceItems = [...purchaseEntries, ...usageEntries]
+                .sort((a, b) => b.sortDate - a.sortDate);
+        }
+
+        if (!append) {
+            _updateStockHeroCarousel();
         }
 
         if (signal?.aborted) throw new DOMException('Operation aborted', 'AbortError');
@@ -149,9 +173,10 @@ async function renderStokContent(append = false) {
         }
         
         if (!append && visibleItems.length === 0) {
-            container.innerHTML = (activeTab === 'daftar')
+            const emptyHTML = (activeTab === 'daftar')
                 ? `<div class="card card-pad">${getEmptyStateHTML({ icon:'inventory_2', title:'Belum Ada Data Material', desc:'Tambahkan master material terlebih dahulu.' })}</div>`
-                : `<div class="card card-pad">${getEmptyStateHTML({ icon:'receipt_long', title:'Belum Ada Riwayat Material', desc:'Input material via faktur/surat jalan akan tampil di sini.' })}</div>`;
+                : `<div class="card card-pad">${getEmptyStateHTML({ icon:'history', title:'Belum Ada Riwayat Stok', desc:'Catatan pembelian atau penyaluran material akan tampil di sini.' })}</div>`;
+            container.innerHTML = emptyHTML;
             return;
         }
 
@@ -169,20 +194,83 @@ async function renderStokContent(append = false) {
                 const currentStock = Number(mat.currentStock || 0);
                 const mainContentHTML = `<div class="wa-card-v2__description">Stok Saat Ini: <strong>${currentStock}</strong> ${mat.unit || ''}</div>`;
                 const dataset = { 'item-id': mat.id, pageContext: 'stok', type: 'materials' };
-                const cardHTML = createUnifiedCard({ id: `material-${mat.id}`, title, headerMeta, metaBadges: [], mainContentHTML, dataset, moreAction: true, amount: '', amountLabel: '' });
+                const cardHTML = createUnifiedCard({
+                    id: `material-${mat.id}`,
+                    title,
+                    headerMeta,
+                    metaBadges: [],
+                    mainContentHTML,
+                    dataset,
+                    moreAction: false,
+                    amount: '',
+                    amountLabel: '',
+                    cardAction: 'open-stock-usage-modal'
+                });
                 const pendingLog = pendingMaterials.get(mat.id);
                 return pendingLog ? `${buildPendingQuotaBanner(pendingLog)}${cardHTML}` : cardHTML;
             }).join('');
         } else {
-            itemsHTML = itemsToDisplay.map(exp => {
-                const supplier = (appState.suppliers || []).find(s => s.id === exp.supplierId);
-                const project = (appState.projects || []).find(p => p.id === exp.projectId);
-                const title = exp.description || (supplier?.supplierName ? `Pembelian - ${supplier.supplierName}` : 'Pembelian Material');
-                const headerMeta = formatDate(getJSDate(exp.date));
-                const mainContentHTML = `<div class="wa-card-v2__description sub">${supplier?.supplierName || "Supplier -" } ${project ? ("| " + project.projectName) : ""}</div>`;
-                const dataset = { 'item-id': exp.id, pageContext: 'stok', type: 'expense', expenseId: exp.id };
-                const cardHTML = createUnifiedCard({ id: `exp-${exp.id}`, title, headerMeta, metaBadges: [], mainContentHTML, dataset, moreAction: true, amount: '', amountLabel: '' });
-                const pendingLog = pendingExpenses.get(exp.id);
+            itemsHTML = itemsToDisplay.map(entry => {
+                if (entry.kind === 'expense') {
+                    const exp = entry.data;
+                    const supplier = (appState.suppliers || []).find(s => s.id === exp.supplierId);
+                    const project = (appState.projects || []).find(p => p.id === exp.projectId);
+                    const title = exp.description || (supplier?.supplierName ? `Pembelian - ${supplier.supplierName}` : 'Pembelian Material');
+                    const headerMeta = formatDate(entry.sortDate || getJSDate(exp.date));
+                    const mainContentHTML = `<div class="wa-card-v2__description sub">${supplier?.supplierName || "Supplier -" } ${project ? ("| " + project.projectName) : ""}</div>`;
+                    const dataset = { 'item-id': exp.id, pageContext: 'stok', type: 'expense', expenseId: exp.id };
+                    const cardHTML = createUnifiedCard({
+                        id: `exp-${exp.id}`,
+                        title,
+                        headerMeta,
+                        metaBadges: [],
+                        mainContentHTML,
+                        dataset,
+                        moreAction: false,
+                        amount: '',
+                        amountLabel: '',
+                        cardAction: 'view-invoice-items'
+                    });
+                    const pendingLog = pendingExpenses.get(exp.id);
+                    return pendingLog ? `${buildPendingQuotaBanner(pendingLog)}${cardHTML}` : cardHTML;
+                }
+
+                const tx = entry.data;
+                const material = (appState.materials || []).find(m => m.id === tx.materialId);
+                const project = tx.projectId ? (appState.projects || []).find(p => p.id === tx.projectId) : null;
+                const kindLabel = 'Stok Keluar';
+                const title = material ? `${kindLabel} - ${material.materialName}` : kindLabel;
+                const headerMeta = formatDate(entry.sortDate || getJSDate(tx.date || tx.createdAt));
+                const quantity = Number(tx.quantity || 0);
+                const quantityText = quantity ? quantity.toLocaleString('id-ID') : '0';
+                const unitText = material?.unit ? ` ${material.unit}` : '';
+                const usageInfo = project ? `<div class="wa-card-v2__description sub">Dialokasikan ke: ${project.projectName}</div>` : '';
+                const mainContentHTML = usageInfo;
+                const dataset = {
+                    'item-id': tx.id,
+                    pageContext: 'stok',
+                    type: 'stock-transaction',
+                    transactionId: tx.id,
+                    materialId: tx.materialId,
+                    stockType: tx.type,
+                    projectId: tx.projectId || '',
+                    quantity: quantity,
+                    unit: material?.unit || '',
+                    recordedAt: tx.createdAt || tx.date || ''
+                };
+                const cardHTML = createUnifiedCard({
+                    id: `stock-${tx.id}`,
+                    title,
+                    headerMeta,
+                    metaBadges: [{ icon: 'history', text: kindLabel }],
+                    mainContentHTML,
+                    dataset,
+                    moreAction: false,
+                    amount: quantityText,
+                    amountLabel: unitText.trim(),
+                    cardAction: 'open-stock-history-modal'
+                });
+                const pendingLog = pendingStockTx.get(tx.id);
                 return pendingLog ? `${buildPendingQuotaBanner(pendingLog)}${cardHTML}` : cardHTML;
             }).join('');
         }
@@ -292,15 +380,33 @@ function initStokPage() {
     const savedTab = appState.activeSubPage.get('stok') || 'daftar';
     const tabsHTML = createTabsHTML({ id: 'stok-tabs', tabs: tabsData, activeTab: savedTab, customClasses: 'tabs-underline two-tabs' });
 
+    const heroSection = `<div id="stock-hero-carousel" class="dashboard-hero-carousel hero-stock"></div>`;
     container.innerHTML = `
         <div class="content-panel">
             <div class="panel-header">
                 ${pageToolbarHTML}
+                ${heroSection}
                 ${tabsHTML}
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content"></div>
         </div>
     `;
+
+    const scrollableBody = container.querySelector('#sub-page-content');
+    if (scrollableBody) {
+        const handleScrollFallback = () => {
+            if (appState.activePage !== 'stok') return;
+            const activeTab = appState.activeSubPage.get('stok') || 'daftar';
+            const paginationKey = `stok_${activeTab}`;
+            const state = appState.pagination[paginationKey];
+            if (!state || state.isLoading || !state.hasMore) return;
+            const distanceFromBottom = scrollableBody.scrollHeight - (scrollableBody.scrollTop + scrollableBody.clientHeight);
+            if (distanceFromBottom < 200) {
+                loadMoreStok();
+            }
+        };
+        scrollableBody.addEventListener('scroll', handleScrollFallback, { passive: true, signal: listenerSignal });
+    }
 
     const tabsContainer = container.querySelector('#stok-tabs');
     if (tabsContainer) {
@@ -332,6 +438,16 @@ function initStokPage() {
     
     const cleanupStok = () => {
         off('app.unload.stok', cleanupStok);
+        if (pageAbortController) {
+            pageAbortController.abort();
+            pageAbortController = null;
+        }
+        if (pageEventListenerController) {
+            pageEventListenerController.abort();
+            pageEventListenerController = null;
+        }
+        cleanupInfiniteScroll();
+        stockObserverInstance = null;
     };
 
     off('app.unload.stok', cleanupStok);
@@ -367,4 +483,146 @@ function _computeMaterialStats() {
         });
     });
     return stats;
+}
+
+function _updateStockHeroCarousel() {
+    const wrap = document.getElementById('stock-hero-carousel');
+    if (!wrap) return;
+
+    const materials = (appState.materials || []).filter(m => !m.isDeleted);
+    const stats = _computeMaterialStats();
+    const totalStock = materials.reduce((sum, mat) => sum + (Number(mat.currentStock) || 0), 0);
+    const totals = Object.values(stats).reduce((acc, item) => {
+        acc.incoming += item.incoming || 0;
+        acc.outgoing += item.outgoing || 0;
+        return acc;
+    }, { incoming: 0, outgoing: 0 });
+
+    const transactions = (appState.stockTransactions || []).filter(tx => !tx.isDeleted);
+    const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    const recentTx = transactions.filter(tx => {
+        const d = getJSDate(tx.date || tx.createdAt);
+        return d && !Number.isNaN(d.getTime()) && d.getTime() >= cutoff;
+    });
+    const recentOut = recentTx.filter(tx => tx.type === 'out');
+    const recentIn = recentTx.filter(tx => tx.type === 'in');
+    const recentOutQty = recentOut.reduce((sum, tx) => sum + (Number(tx.quantity) || 0), 0);
+    const recentInQty = recentIn.reduce((sum, tx) => sum + (Number(tx.quantity) || 0), 0);
+
+    const formatNumber = (value, options = {}) => {
+        const number = Number(value) || 0;
+        const formatter = new Intl.NumberFormat('id-ID', options);
+        return formatter.format(number);
+    };
+
+    const slides = [
+        {
+            title: 'Ringkasan Inventaris',
+            tone: 'success',
+            lines: [
+                `Material aktif: ${formatNumber(materials.length)} jenis`,
+                `Stok tersedia: ${formatNumber(totalStock)} unit`
+            ]
+        },
+        {
+            title: 'Mutasi 30 Hari',
+            tone: 'warning',
+            lines: [
+                `Keluar: ${formatNumber(recentOut.length)} trx (${formatNumber(recentOutQty)} unit)`,
+                `Masuk: ${formatNumber(recentIn.length)} trx (${formatNumber(recentInQty)} unit)`
+            ]
+        },
+        {
+            title: 'Akumulasi Pencatatan',
+            tone: 'danger',
+            lines: [
+                `Total masuk: ${formatNumber(totals.incoming)} unit`,
+                `Total keluar: ${formatNumber(totals.outgoing)} unit`
+            ]
+        }
+    ];
+
+    wrap.innerHTML = [
+        ...slides.map((slide, idx) => `
+            <div class="dashboard-hero hero-slide${idx === 0 ? ' active' : ''}" data-index="${idx}" data-tone="${slide.tone}">
+                <div class="hero-content">
+                    <h1>${slide.title}</h1>
+                    <p>${slide.lines.join(' · ')}</p>
+                </div>
+                <div class="hero-illustration" aria-hidden="true">
+                    <svg viewBox="0 0 200 100" preserveAspectRatio="xMidYMid meet">
+                        <defs>
+                            <linearGradient id="stockHero1-${idx}" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:var(--hero-emerald);stop-opacity:0.18" />
+                                <stop offset="100%" style="stop-color:var(--hero-indigo);stop-opacity:0.25" />
+                            </linearGradient>
+                            <linearGradient id="stockHero2-${idx}" x1="100%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style="stop-color:var(--hero-sun);stop-opacity:0.18" />
+                                <stop offset="100%" style="stop-color:var(--hero-rose);stop-opacity:0.25" />
+                            </linearGradient>
+                        </defs>
+                        <circle cx="48" cy="52" r="40" fill="url(#stockHero1-${idx})" class="hero-circle1" />
+                        <circle cx="140" cy="60" r="32" fill="url(#stockHero2-${idx})" class="hero-circle2" />
+                        <path d="M 18 78 Q 50 48 96 56 T 180 70" stroke="var(--hero-indigo)" stroke-width="3" fill="none" stroke-linecap="round" class="hero-line" opacity="0.25" />
+                    </svg>
+                </div>
+            </div>
+        `),
+        `<div class="hero-indicators">${slides.map((_, i) => `<span class="dot${i === 0 ? ' active' : ''}" data-idx="${i}"></span>`).join('')}</div>`
+    ].join('');
+
+    _initStockHeroCarouselBehavior(wrap, slides.length);
+}
+
+function _initStockHeroCarouselBehavior(wrap, totalSlides) {
+    if (!wrap) return;
+    let index = 0;
+    const setIndex = (next) => {
+        index = (next + totalSlides) % totalSlides;
+        wrap.querySelectorAll('.hero-slide').forEach((el, idx) => {
+            el.classList.toggle('active', idx === index);
+        });
+        wrap.querySelectorAll('.hero-indicators .dot').forEach((dot, idx) => {
+            dot.classList.toggle('active', idx === index);
+        });
+    };
+
+    if (wrap._timer) clearInterval(wrap._timer);
+    wrap._timer = setInterval(() => setIndex(index + 1), 7000);
+
+    wrap.querySelectorAll('.hero-indicators .dot').forEach(dot => {
+        dot.addEventListener('click', () => {
+            const idx = parseInt(dot.getAttribute('data-idx')) || 0;
+            setIndex(idx);
+            if (wrap._timer) {
+                clearInterval(wrap._timer);
+                wrap._timer = setInterval(() => setIndex(index + 1), 7000);
+            }
+        });
+    });
+
+    let startX = 0;
+    let currentX = 0;
+    let isDragging = false;
+    wrap.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+        currentX = startX;
+        isDragging = true;
+    }, { passive: true });
+    wrap.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        currentX = e.touches[0].clientX;
+    }, { passive: true });
+    wrap.addEventListener('touchend', () => {
+        if (!isDragging) return;
+        const dx = currentX - startX;
+        isDragging = false;
+        if (Math.abs(dx) > 40) {
+            setIndex(index + (dx < 0 ? 1 : -1));
+            if (wrap._timer) {
+                clearInterval(wrap._timer);
+                wrap._timer = setInterval(() => setIndex(index + 1), 7000);
+            }
+        }
+    });
 }

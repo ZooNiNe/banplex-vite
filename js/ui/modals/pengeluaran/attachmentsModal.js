@@ -145,13 +145,14 @@ export async function handleOpenAttachmentsListModal(dataset) {
          // DEBUGGING: Log final attachments before rendering HTML
          console.warn('[handleOpenAttachmentsListModal] Final attachments to render:', attachments);
         const content = getAttachmentManagerHTML(attachments, expenseId);
-        // DEBUGGING: Tambahkan log sumber data ke judul modal
-        const modal = createModal('dataDetail', { title: `Daftar Lampiran (${source})`, content });
-        // DEBUGGING: Log jika modal berhasil dibuat
-        if (modal) {
-            console.warn('[handleOpenAttachmentsListModal] Modal created successfully.');
+        const modalTitle = `Daftar Lampiran (${source})`;
+        const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+        const modalOptions = { title: modalTitle, content };
+
+        if (isMobile) {
+            createModal('dataBottomSheet', { ...modalOptions, layoutClass: 'attachments-bottom-sheet', allowContentOverflow: true });
         } else {
-            console.error('[handleOpenAttachmentsListModal] Failed to create modal.');
+            createModal('dataDetail', modalOptions);
         }
 
     } catch (error) {

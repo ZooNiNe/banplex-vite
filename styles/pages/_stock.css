@@ -4,6 +4,15 @@
  * stok, daftar material, dan estimasi belanja.
  * ======================================================= */
 
+.hero-stock {
+  margin: 0.5rem 0 1rem;
+}
+
+.hero-stock .hero-slide {
+  min-height: 130px;
+  border-radius: var(--radius-lg);
+}
+
 .estimasi-item {
   display: flex;
   align-items: center;

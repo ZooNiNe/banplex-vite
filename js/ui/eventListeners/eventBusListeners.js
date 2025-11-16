@@ -182,6 +182,7 @@ export function initializeEventBusListeners() {
     });
     on('ui.action.stok-in', (dataset) => emit('ui.modal.stokIn', dataset.itemId));
     on('ui.action.stok-out', (dataset) => emit('ui.modal.stokOut', dataset.itemId));
+    on('ui.action.open-stock-history-modal', (dataset) => emit('ui.modal.openStockHistoryDetail', dataset));
     on('ui.action.edit-stock', (dataset) => emit('ui.modal.editStock', dataset));
     on('ui.action.delete-stock', async (dataset) => {
          const { handleDeleteStockTransaction } = await import('../../services/data/stockService.js');

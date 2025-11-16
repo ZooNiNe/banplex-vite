@@ -49,7 +49,8 @@ export function createUnifiedCard({
     moreAction = true,
     selectionEnabled = false,
     isSelected = false,
-    unreadCount = 0
+    unreadCount = 0,
+    cardAction = ''
 }) {
 
     const allDataAttributes = Object.entries(dataset)
@@ -160,10 +161,12 @@ export function createUnifiedCard({
     const headerMetaAfterTitle = isJournalCard ? headerMetaHTML : '';
     const headerMetaInline = isJournalCard ? '' : headerMetaHTML;
 
+    const cardActionAttr = cardAction ? `data-action="${cardAction}"` : '';
+
     return `
         <div class="wa-card-v2-wrapper ${customClasses} ${isSelected ? 'selected' : ''}" data-id="${id}" data-item-id="${itemId}" ${allDataAttributes}>
             ${selectionCheckmarkHTML} ${''}
-            <div class="wa-card-v2">
+            <div class="wa-card-v2" ${cardActionAttr}>
                 <div class="wa-card-v2__main">
                     <div class="${headerClasses.join(' ')}">
                         <span class="wa-card-v2__title">${title}</span>
@@ -599,6 +602,17 @@ export function _getSinglePemasukanHTML(item, type, options = {}) {
     let title = ''; 
     let project = null;
     let creditor = null;
+    const principalAmount = Number(item.totalAmount ?? item.amount ?? 0);
+    const totalPayable = isTermin
+        ? Number(item.amount ?? 0)
+        : Number(item.totalRepaymentAmount ?? principalAmount);
+    const displayAmount = Number.isFinite(totalPayable) ? totalPayable : 0;
+    const interestPortion = !isTermin
+        ? Math.max(0, totalPayable - principalAmount)
+        : 0;
+    const interestBreakdownHTML = (!isTermin && item.interestType === 'interest' && interestPortion > 0)
+        ? `<div class="wa-card-v2__description sub">Termasuk bunga ${fmtIDR(interestPortion)}</div>`
+        : '';
 
     if (isTermin) {
         project = appState.projects?.find(p => p.id === item.projectId);
@@ -630,7 +644,7 @@ export function _getSinglePemasukanHTML(item, type, options = {}) {
     const dataset = {
         'item-id': itemIdForDataset,
         type: isTermin ? 'termin' : 'pinjaman',
-        amount: item.amount || item.totalAmount,
+        amount: displayAmount,
         title: title, 
         description: item.description,
         'parent-id': parentId || '',     // PERUBAHAN: Tambahkan parent-id
@@ -645,11 +659,12 @@ export function _getSinglePemasukanHTML(item, type, options = {}) {
         title: title, 
         headerMeta: formatDate(item.date),
         metaBadges: localMetaBadges, 
-        amount: fmtIDR(item.amount || item.totalAmount),
+        amount: fmtIDR(displayAmount),
         amountLabel: !isTermin ? (item.status === 'paid' ? 'Lunas' : 'Belum Lunas') : '',
         amountColorClass: isTermin ? 'positive' : (item.status === 'paid' ? 'positive' : 'warn'),
         dataset: dataset,
         moreAction: showMoreIcon,
+        mainContentHTML: interestBreakdownHTML,
         actions: [],
         selectionEnabled: selectionActive,
         isSelected: isSelected,

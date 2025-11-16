@@ -491,6 +491,7 @@ function createStokPageSkeletonHTML() {
         <div class="content-panel">
             <div class="panel-header">
                 ${_createStandardToolbarSkeleton('Manajemen Stok')}
+                ${createHeroSkeleton('110px')}
                 ${createTabsSkeleton(2)}
             </div>
             <div id="sub-page-content" class="panel-body scrollable-content">

@@ -107,14 +107,26 @@ function buildSimulasiListHTML() {
             const credName = creditor?.creditorName || 'Kreditur';
             let subTotal = 0;
             const itemsHTML = items.map(l => {
-                const remain = getRemain(l.totalAmount, l.paidAmount);
+                const totalPayable = Number(l.totalRepaymentAmount ?? l.totalAmount ?? l.amount ?? 0);
+                const principal = Number(l.totalAmount ?? l.amount ?? 0);
+                const interestPortion = l.interestType === 'interest'
+                    ? Math.max(0, totalPayable - principal)
+                    : 0;
+                const remain = getRemain(totalPayable, l.paidAmount);
                 subTotal += remain; sectionTotal += remain;
                 const selected = appState.simulasiState.selectedPayments.has(`loan-${l.id}`);
+                const interestDetails = interestPortion > 0
+                    ? `<small class="cicilan-label">Bunga ${l.rate || 0}% selama ${l.tenor || 0} bln (${fmtIDR(interestPortion)})</small>`
+                    : '';
+                const description = interestPortion > 0
+                    ? `Cicilan Pinjaman (Termasuk bunga ${fmtIDR(interestPortion)})`
+                    : 'Cicilan Pinjaman';
                 return `
-                    <div class="simulasi-item ${selected ? 'selected' : ''}" data-action="open-simulasi-actions" data-id="loan-${l.id}" data-title="${credName}" data-description="Cicilan Pinjaman" data-full-amount="${fmtIDR(remain)}" data-partial-allowed="true">
+                    <div class="simulasi-item ${selected ? 'selected' : ''}" data-action="open-simulasi-actions" data-id="loan-${l.id}" data-title="${credName}" data-description="${description}" data-full-amount="${fmtIDR(remain)}" data-partial-allowed="true">
                         <div class="simulasi-info">
                             <div class="simulasi-title">Cicilan Pinjaman</div>
                             <small class="cicilan-label">${credName}</small>
+                            ${interestDetails}
                         </div>
                         <div class="simulasi-amount">${fmtIDR(remain)}</div>
                     </div>`;

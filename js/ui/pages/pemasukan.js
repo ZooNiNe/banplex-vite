@@ -166,13 +166,14 @@ async function renderPemasukanContent(append = false) {
 
         const { sortBy = 'date', sortDirection = 'desc' } = appState.pemasukanFilter || {};
         const direction = sortDirection === 'asc' ? 1 : -1;
+        const getSortableAmount = (entry) => Number(entry.totalRepaymentAmount ?? entry.totalAmount ?? entry.amount ?? 0);
         itemsSource.sort((a, b) => {
             const safeDate = (value) => {
                 const date = getJSDate(value);
                 return date && !Number.isNaN(date.getTime()) ? date : new Date(0);
             };
-            const amountA = Number(a.totalAmount ?? a.amount ?? 0);
-            const amountB = Number(b.totalAmount ?? b.amount ?? 0);
+            const amountA = getSortableAmount(a);
+            const amountB = getSortableAmount(b);
             const dateA = safeDate(a.date);
             const dateB = safeDate(b.date);
             const createdAtA = safeDate(a.createdAt || a.date);

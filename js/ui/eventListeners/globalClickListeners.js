@@ -131,6 +131,7 @@ export function initializeGlobalClickListeners() {
             'convert-surat-jalan', 'edit-surat-jalan', 'user-action',
             'stok-in', 'stok-out', 'edit-stock', 'delete-stock',
             'delete-salary-bill', 'open-pemasukan-detail',
+            'open-stock-history-modal',
             'close-selection-mode', 'toggle-selection', 'select-all-items',
             'delete-selected-items', 'restore-selected', 'delete-permanent-selected',
             'open-selection-summary', 'forward-to-comments',

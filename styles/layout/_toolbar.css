@@ -179,8 +179,9 @@ body.selection-active .selection-bar {
 body.selection-active .dashboard-hero,
 body.selection-active .dashboard-hero-carousel,
 body.selection-active .list-hero,
-body.selection-active .quote-hero {
-    display: none !important;
+body.selection-active .quote-hero,
+body.selection-active .hero-stock {
+  display: none !important;
 }
 
 .dark-theme .selection-bar {

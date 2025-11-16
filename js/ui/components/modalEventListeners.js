@@ -15,7 +15,9 @@ export function attachModalEventListeners(type, data, closeModalFunc, contextEle
     const query = (selector) => contextElement.querySelector(selector);
     const queryAll = (selector) => Array.from(contextElement.querySelectorAll(selector));
 
-    const closeBtns = queryAll('.modal-close-btn, [data-action="close-modal"]');    closeBtns.forEach(btn => {
+    const closeSelectors = '.modal-close-btn, [data-action="close-modal"], [data-close-modal], [data-cancel-modal]';
+    const closeBtns = queryAll(closeSelectors);
+    closeBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             e.preventDefault(); // Hentikan aksi default jika ada

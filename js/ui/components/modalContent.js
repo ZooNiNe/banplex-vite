@@ -105,7 +105,8 @@ function getModalLayout(type, data = {}) {
             const body = data.content || '';
             const footer = data.footer || '';
             const contentHTML = _getBottomSheetContent(data.title || '', body, footer);
-            return { layoutClass: 'is-bottom-sheet', contentHTML };
+            const layoutClass = ['is-bottom-sheet', data.layoutClass].filter(Boolean).join(' ').trim();
+            return { layoutClass, contentHTML };
         },
         'payment': () => _getModalWithHeader(data.title, data.content, data.footer),
         'imageView': () => _getImageViewerHTML(data.src),
@@ -137,7 +138,6 @@ function _getModalWithHeader(title, content, footerContent = '') {
     const contentHTML = `
         <div class="modal-content">
             <div class="modal-header">
-                <h4>${title}</h4>
                 ${closeButtonHTML}
             </div>
             <div class="modal-body">${content}</div>
@@ -154,7 +154,6 @@ function _getSimpleDialogHTML(title, content, footer) {
     const contentHTML = `
         <div class="modal-content">
             <div class="modal-header">
-                <h4>${title}</h4>
                 ${closeButtonHTML}
             </div>
             <div class="modal-body">${content}</div>
@@ -208,6 +207,7 @@ function _getInvoiceItemsDetailHTML(data) {
 function _getBottomSheetContent(title, bodyContent, footerContent = '') {
     const footerHTML = footerContent ? `<div class="modal-footer">${footerContent}</div>` : '';
     const closeButtonHTML = `<button type="button" class="btn-icon modal-close-btn" data-action="close-modal">${createIcon('x', 20)}</button>`;
+    const titleHTML = title ? `<h4 class="modal-title">${title}</h4>` : '';
 
     return `
         <div class="modal-content">

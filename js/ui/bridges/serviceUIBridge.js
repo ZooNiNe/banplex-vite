@@ -119,6 +119,15 @@ export function initServiceUIBridge() {
         toast('error', 'Gagal membuka modal penyaluran stok.');
     }
   });
+  on('ui.modal.openStockHistoryDetail', async (dataset = {}) => {
+    try {
+        const { openStockHistoryDetailModal } = await import('../modals/stok/stockHistoryDetailModal.js');
+        openStockHistoryDetailModal(dataset);
+    } catch (e) {
+        console.error('Gagal membuka detail riwayat stok:', e);
+        toast('error', 'Gagal membuka detail riwayat stok.');
+    }
+  });
   on('data.stock.batchOut', async (materialId, transactions, dateStr) => {
       try {
           await processBatchStockOut(materialId, transactions, dateStr);
