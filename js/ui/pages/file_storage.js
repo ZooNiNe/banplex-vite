@@ -179,7 +179,7 @@ function renderPageShell() {
                     <div class="summary-copy">
                         <p class="summary-label">Total Data Tersimpan</p>
                         <div class="summary-value" id="file-storage-total-count">${list.length}</div>
-                        <p class="helper-text">Struktur mengikuti format file Excel "FORMAT PENERIMA MANFAAT_DSN JABAR 2025_NAMA YAYASAN_KECAMATAN".</p>
+                        <p class="helper-text">Calon Penerima Manfaat Makan Bergizi Gratis (MBG) YAYASAN AL FALAH JAMPANGTENGAH Cijiwa - Nangerang - Jampang Tengah</p>
                     </div>
                     <div class="summary-actions">
                         <div class="template-downloads">

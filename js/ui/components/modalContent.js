@@ -24,6 +24,12 @@ function getModalLayout(type, data = {}) {
         'confirmEdit': () => _getSimpleDialogHTML('Konfirmasi Perubahan', `<p class="confirm-modal-text">${data.message || 'Anda yakin ingin menyimpan perubahan?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Simpan</button>`),
         'confirmPayBill': () => _getSimpleDialogHTML('Konfirmasi Pembayaran', `<p class="confirm-modal-text">${data.message || 'Anda yakin ingin melanjutkan pembayaran ini?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Bayar</button>`),
         'confirmGenerateBill': () => _getSimpleDialogHTML('Konfirmasi Buat Tagihan', `<p class="confirm-modal-text">${data.message || 'Anda akan membuat tagihan gaji. Lanjutkan?'}</p>`, `<button type="button" class="btn btn-ghost" data-action="close-modal">Batal</button><button type="button" id="confirm-btn" class="btn btn-primary">Ya, Buat Tagihan</button>`),
+        'hrdApplicantDocuments': () => _getCustomContentModal(
+            data.title || 'Dokumen Pelamar',
+            data.content || getEmptyStateHTML({ icon: 'file', title: 'Tidak Ada Dokumen', desc: 'Pelamar ini belum memiliki lampiran.' }),
+            data.footer || '',
+            data.layoutClass || 'is-simple-dialog'
+        ),
 
         'confirmUserAction': () => {
             const hasStatusOverride = data.contextType === 'expense-submit';
@@ -161,6 +167,23 @@ function _getSimpleDialogHTML(title, content, footer) {
         </div>
     `;
     return { layoutClass: 'is-simple-dialog', contentHTML };
+}
+
+function _getCustomContentModal(title, content, footerContent = '', layoutClass = 'is-simple-dialog') {
+    const closeButtonHTML = `<button type="button" class="btn-icon modal-close-btn" data-action="close-modal" style="position: absolute; right: 0.75rem; top: 0.75rem;">${createIcon('x', 20)}</button>`;
+    const footerHTML = footerContent ? `<div class="modal-footer">${footerContent}</div>` : '';
+    const headerTitle = title ? `<h3 class="modal-title">${title}</h3>` : '';
+    const contentHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                ${headerTitle}
+                ${closeButtonHTML}
+            </div>
+            <div class="modal-body">${content}</div>
+            ${footerHTML}
+        </div>
+    `;
+    return { layoutClass, contentHTML };
 }
 
 
