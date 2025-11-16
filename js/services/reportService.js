@@ -26,6 +26,12 @@ async function __ensurePdfLibs() {
     await __pdfLibsReady;
 }
 
+export async function createPdfDoc(options = {}) {
+    await __ensurePdfLibs();
+    const { jsPDF } = window.jspdf;
+    return new jsPDF(options);
+}
+
 let __chartLibReady;
 async function __ensureChartLibForPdf() {
     if (typeof window.Chart !== 'undefined' && window.Chart && typeof window.Chart === 'function') return;

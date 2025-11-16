@@ -16,7 +16,7 @@ import { formatDate } from '../../utils/formatters.js';
 import { handleNavigation } from '../mainUI.js';
 import { APPLICANT_FIELD_KEYS as FIELD_KEYS } from './jobApplicantFieldMap.js';
 import * as XLSX from 'xlsx';
-import { downloadCustomTablePdf } from '../../services/reportService.js';
+import { createPdfDoc } from '../../services/reportService.js';
 
 const TABLE_COLUMNS = [
     { key: 'select', label: '', className: 'col-select' },
@@ -874,22 +874,28 @@ function exportApplicantsData(format = 'xlsx') {
 }
 
 async function handleApplicantsPdfExport() {
-    const { headers, rows, total } = collectApplicantExportData();
-    if (total === 0) {
+    const applicants = getFilteredList();
+    if (applicants.length === 0) {
         toast('info', 'Tidak ada data yang cocok dengan filter saat ini.');
         return;
     }
     const summary = getApplicantFilterSummary();
+    const generatedAt = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
     try {
-        await downloadCustomTablePdf({
-            title: 'Rekap Database Pelamar HRD',
-            subtitle: `Total data: ${total} • Filter: ${summary}`,
-            filename: `hrd_applicants_${new Date().toISOString().slice(0,10)}.pdf`,
-            sections: [{ headers, body: rows }]
+        const pdf = await createPdfDoc({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        applicants.forEach((applicant, index) => {
+            if (index > 0) pdf.addPage();
+            renderApplicantCvPage(pdf, applicant, {
+                pageNumber: index + 1,
+                totalPages: applicants.length,
+                filterSummary: summary,
+                generatedAt
+            });
         });
-        toast('success', 'PDF berhasil dibuat.');
+        pdf.save(`hrd_applicants_${new Date().toISOString().slice(0,10)}.pdf`);
+        toast('success', 'PDF CV berhasil dibuat.');
     } catch (error) {
-        console.error('[HrdApplicants] Gagal membuat PDF:', error);
+        console.error('[HrdApplicants] Gagal membuat PDF CV:', error);
         toast('error', 'Gagal membuat PDF.');
     }
 }
@@ -922,6 +928,181 @@ function getApplicantFilterSummary() {
     const genderLabel = gender === 'all' ? 'Semua Jenis Kelamin' : gender;
     const statusLabel = statusAplikasi === 'all' ? 'Semua Status' : statusAplikasi;
     return `${genderLabel} | ${statusLabel}`;
+}
+
+function renderApplicantCvPage(pdf, applicant, meta = {}) {
+    const margin = 16;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const primaryColor = [38, 166, 154];
+    const headerHeight = 46;
+
+    pdf.setFillColor(...primaryColor);
+    pdf.rect(0, 0, pageWidth, headerHeight, 'F');
+
+    const applicantName = getSafeString(pickValue(applicant, 'namaLengkap')) || 'Nama Pelamar Tidak Tersedia';
+    const appliedRole = getSafeString(pickValue(applicant, 'posisiDilamar')) || 'Posisi belum diisi';
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(18);
+    pdf.text(applicantName, margin, 20);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(11);
+    pdf.text(appliedRole, margin, 32);
+
+    const contactLine = buildApplicantContactLine(applicant);
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(255, 255, 255);
+    pdf.roundedRect(margin, headerHeight - 8, pageWidth - margin * 2, 14, 3, 3, 'F');
+    pdf.setTextColor(60, 72, 82);
+    pdf.setFontSize(9);
+    pdf.text(contactLine, margin + 4, headerHeight + 2);
+
+    const statusText = getSafeString(pickValue(applicant, 'statusAplikasi'));
+    if (statusText) {
+        const chipColor = getApplicantStatusColor(statusText);
+        const textWidth = pdf.getTextWidth(statusText) + 8;
+        pdf.setFillColor(...chipColor);
+        pdf.roundedRect(pageWidth - margin - textWidth, margin, textWidth, 10, 2, 2, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(8);
+        pdf.text(statusText, pageWidth - margin - textWidth + 4, margin + 7);
+    }
+
+    pdf.setTextColor(44, 62, 80);
+    let cursorY = headerHeight + 20;
+    cursorY = renderApplicantKeyValueSection(pdf, 'Informasi Pribadi', [
+        { label: 'NIK', value: getSafeString(pickValue(applicant, 'nik')) },
+        { label: 'Jenis Kelamin', value: getSafeString(pickValue(applicant, 'jenisKelamin')) },
+        { label: 'Tanggal Lahir', value: formatApplicantDateValue(pickValue(applicant, 'tanggalLahir')) },
+        { label: 'Tempat Lahir', value: getSafeString(pickValue(applicant, 'tempatLahir')) },
+        { label: 'Email', value: getSafeString(pickValue(applicant, 'email')) },
+        { label: 'Telepon', value: getSafeString(pickValue(applicant, 'noTelepon')) },
+    ], cursorY, margin);
+
+    cursorY = renderApplicantKeyValueSection(pdf, 'Profil Karier', [
+        { label: 'Posisi Dilamar', value: appliedRole },
+        { label: 'Sumber Lowongan', value: getSafeString(pickValue(applicant, 'sumberLowongan')) },
+        { label: 'Pendidikan Terakhir', value: getSafeString(pickValue(applicant, 'pendidikanTerakhir')) },
+        { label: 'Institusi', value: getSafeString(pickValue(applicant, 'namaInstitusiPendidikan')) },
+        { label: 'Jurusan', value: getSafeString(pickValue(applicant, 'jurusan')) },
+    ], cursorY, margin);
+
+    cursorY = renderApplicantParagraphSection(pdf, 'Alamat Domisili', buildApplicantAddress(applicant), cursorY, margin);
+    cursorY = renderApplicantParagraphSection(pdf, 'Ringkasan Pengalaman', getSafeString(pickValue(applicant, 'pengalamanKerja')), cursorY, margin);
+    cursorY = renderApplicantParagraphSection(pdf, 'Keahlian', formatApplicantSkills(pickValue(applicant, 'skills')), cursorY, margin);
+    cursorY = renderApplicantParagraphSection(pdf, 'Catatan HRD', getSafeString(pickValue(applicant, 'catatanHrd')), cursorY, margin);
+
+    pdf.setFontSize(8);
+    pdf.setTextColor(120, 130, 140);
+    const footerText = `Pelamar ${meta.pageNumber} dari ${meta.totalPages} • ${meta.filterSummary || ''}`.trim();
+    pdf.text(footerText, margin, pageHeight - 10);
+    if (meta.generatedAt) {
+        pdf.text(`Dicetak ${meta.generatedAt}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+    }
+}
+
+function buildApplicantContactLine(applicant) {
+    const email = getSafeString(pickValue(applicant, 'email'));
+    const phone = getSafeString(pickValue(applicant, 'noTelepon'));
+    if (email && phone) return `Email: ${email}   |   Telepon: ${phone}`;
+    if (email) return `Email: ${email}`;
+    if (phone) return `Telepon: ${phone}`;
+    return 'Kontak belum tersedia';
+}
+
+function renderApplicantKeyValueSection(pdf, title, rows, startY, margin) {
+    const sectionStart = drawApplicantSectionHeading(pdf, title, startY, margin);
+    const contentWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+    const labelWidth = 42;
+    let cursorY = sectionStart;
+    pdf.setFontSize(9);
+    rows.forEach(({ label, value }) => {
+        const sanitizedValue = value || '-';
+        const wrapped = pdf.splitTextToSize(sanitizedValue, contentWidth - labelWidth);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(120, 130, 140);
+        pdf.text(label, margin, cursorY);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(44, 62, 80);
+        wrapped.forEach((line, idx) => {
+            pdf.text(line, margin + labelWidth, cursorY + idx * 4);
+        });
+        cursorY += Math.max(wrapped.length * 4, 4) + 2;
+    });
+    return cursorY + 4;
+}
+
+function renderApplicantParagraphSection(pdf, title, value, startY, margin) {
+    const sectionStart = drawApplicantSectionHeading(pdf, title, startY, margin);
+    const sanitized = value && value.trim() ? value : 'Belum ada data.';
+    const contentWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    const wrapped = pdf.splitTextToSize(sanitized, contentWidth);
+    wrapped.forEach((line, idx) => {
+        pdf.text(line, margin, sectionStart + idx * 4);
+    });
+    return sectionStart + wrapped.length * 4 + 6;
+}
+
+function drawApplicantSectionHeading(pdf, title, startY, margin) {
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.setTextColor(44, 62, 80);
+    pdf.text(title, margin, startY);
+    pdf.setDrawColor(230, 230, 230);
+    pdf.setLineWidth(0.3);
+    pdf.line(margin, startY + 1.5, pdf.internal.pageSize.getWidth() - margin, startY + 1.5);
+    return startY + 6;
+}
+
+function formatApplicantDateValue(raw) {
+    if (!raw) return '-';
+    try {
+        return formatDate(raw, { day: '2-digit', month: 'long', year: 'numeric' });
+    } catch {
+        return getSafeString(raw);
+    }
+}
+
+function buildApplicantAddress(applicant) {
+    const segments = [];
+    const domisili = getSafeString(pickValue(applicant, 'alamatDomisili'));
+    const alamatLengkap = getSafeString(pickValue(applicant, 'alamatLengkap'));
+    if (domisili) segments.push(domisili);
+    if (alamatLengkap && alamatLengkap !== domisili) segments.push(alamatLengkap);
+    const hamlet = getSafeString(pickValue(applicant, 'hamlet'));
+    const rt = getSafeString(pickValue(applicant, 'rt'));
+    const rw = getSafeString(pickValue(applicant, 'rw'));
+    const areaParts = [];
+    if (hamlet) areaParts.push(hamlet);
+    if (rt) areaParts.push(`RT ${rt}`);
+    if (rw) areaParts.push(`RW ${rw}`);
+    if (areaParts.length) segments.push(areaParts.join(', '));
+    const adminParts = [
+        getSafeString(pickValue(applicant, 'village')),
+        getSafeString(pickValue(applicant, 'subDistrict')),
+        getSafeString(pickValue(applicant, 'district'))
+    ].filter(Boolean);
+    if (adminParts.length) segments.push(adminParts.join(', '));
+    return segments.join(' • ') || '-';
+}
+
+function formatApplicantSkills(raw) {
+    if (!raw) return '-';
+    if (Array.isArray(raw)) return raw.join(', ');
+    return getSafeString(raw);
+}
+
+function getApplicantStatusColor(statusText) {
+    const statusKey = getSafeString(statusText).toLowerCase();
+    const className = STATUS_CLASS_MAP[statusKey] || '';
+    if (className.includes('positive')) return [76, 175, 80];
+    if (className.includes('warn')) return [241, 196, 15];
+    if (className.includes('negative')) return [239, 83, 80];
+    return [41, 128, 185];
 }
 
 function downloadBlob(blob, filename) {

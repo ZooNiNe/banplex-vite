@@ -12,7 +12,7 @@ import { handleNavigation } from '../mainUI.js';
 import { FIELD_KEYS } from './fileStorageFieldMap.js';
 import { normalizeDistanceToMeters } from '../../utils/helpers.js';
 import * as XLSX from 'xlsx';
-import { downloadCustomTablePdf } from '../../services/reportService.js';
+import { createPdfDoc } from '../../services/reportService.js';
 
 const TABLE_COLUMNS = [
     { key: 'select', label: '', className: 'col-select' },
@@ -31,6 +31,19 @@ const TABLE_COLUMNS = [
     { key: 'dataStatus', label: 'STATUS', className: 'col-status' },
 ];
 const DOWNLOADABLE_COLUMNS = TABLE_COLUMNS.filter(col => !['select', 'rowNumber', 'actions'].includes(col.key));
+const FILE_STORAGE_COLUMN_WIDTH_HINTS = {
+    namaPenerima: 50,
+    nik: 42,
+    jenisKelamin: 28,
+    jenjang: 32,
+    namaInstansi: 50,
+    npsnNspp: 30,
+    jarak: 28,
+    tempatLahir: 30,
+    tanggalLahir: 32,
+    alamatLengkap: 90,
+    dataStatus: 32,
+};
 
 const GENDER_FILTER_OPTIONS = [
     { value: 'all', text: 'Semua Jenis Kelamin' },
@@ -840,19 +853,26 @@ function exportFileStorageData(format = 'xlsx') {
 }
 
 async function handleFileStoragePdfExport() {
-    const { headers, rows, total } = collectFileStorageExportData();
-    if (total === 0) {
+    const filtered = getFilteredList();
+    if (filtered.length === 0) {
         toast('info', 'Tidak ada data yang cocok dengan filter saat ini.');
         return;
     }
     const filterSummary = getFileStorageFilterSummary();
+    const columnGroups = buildFileStoragePdfColumnGroups();
+    const generatedAt = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
     try {
-        await downloadCustomTablePdf({
-            title: 'Rekap Database File Storage',
-            subtitle: `Total data: ${total} • Filter: ${filterSummary}`,
-            filename: `file_storage_${new Date().toISOString().slice(0,10)}.pdf`,
-            sections: [{ headers, body: rows }]
+        const pdf = await createPdfDoc({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        columnGroups.forEach((group, index) => {
+            if (index > 0) pdf.addPage();
+            renderFileStoragePdfPage(pdf, filtered, group, {
+                pageIndex: index,
+                totalParts: columnGroups.length,
+                filterSummary,
+                generatedAt
+            });
         });
+        pdf.save(`file_storage_${new Date().toISOString().slice(0,10)}.pdf`);
         toast('success', 'PDF berhasil dibuat.');
     } catch (error) {
         console.error('[FileStorage] Gagal membuat PDF:', error);
@@ -889,6 +909,93 @@ function getFileStorageFilterSummary() {
     const genderLabel = gender === 'all' ? 'Semua Jenis Kelamin' : gender;
     const jenjangLabel = jenjang === 'all' ? 'Semua Jenjang' : jenjang;
     return `${genderLabel} | ${jenjangLabel}`;
+}
+
+function buildFileStoragePdfColumnGroups(maxWidth = 230) {
+    const groups = [];
+    let current = [];
+    let widthSum = 0;
+    DOWNLOADABLE_COLUMNS.forEach(col => {
+        const estimatedWidth = FILE_STORAGE_COLUMN_WIDTH_HINTS[col.key] || 32;
+        if (current.length && widthSum + estimatedWidth > maxWidth) {
+            groups.push(current);
+            current = [];
+            widthSum = 0;
+        }
+        current.push(col);
+        widthSum += estimatedWidth;
+    });
+    if (current.length) groups.push(current);
+    return groups.length ? groups : [DOWNLOADABLE_COLUMNS];
+}
+
+function renderFileStoragePdfPage(pdf, dataRows, columns, meta = {}) {
+    const margin = 14;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const head = [columns.map(col => col.label)];
+    const body = dataRows.map(item => columns.map(col => formatExportValue(col.key, item)));
+    const columnStyles = buildFileStorageColumnStyles(columns);
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.setTextColor(44, 62, 80);
+    pdf.text('Rekap Database File Storage', margin, 18);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    if (meta.filterSummary) {
+        pdf.text(`Filter: ${meta.filterSummary} • Total: ${dataRows.length} data`, margin, 26);
+    } else {
+        pdf.text(`Total: ${dataRows.length} data`, margin, 26);
+    }
+    const partLabel = `Bagian ${meta.pageIndex + 1} dari ${meta.totalParts}`;
+    pdf.text(partLabel, pageWidth - margin, 18, { align: 'right' });
+    pdf.setFontSize(8);
+    pdf.text(`Kolom: ${columns.map(col => col.label).join(', ')}`, pageWidth - margin, 26, { align: 'right' });
+
+    const didDrawPage = (data) => {
+        pdf.setFontSize(8);
+        pdf.setTextColor(120, 130, 140);
+        pdf.text(`Halaman ${data.pageNumber}`, margin, pdf.internal.pageSize.height - 8);
+        if (meta.generatedAt) {
+            pdf.text(`Dicetak: ${meta.generatedAt}`, pageWidth - margin, pdf.internal.pageSize.height - 8, { align: 'right' });
+        }
+    };
+
+    pdf.autoTable({
+        head,
+        body,
+        startY: 32,
+        margin: { left: margin, right: margin, top: 32 },
+        styles: {
+            fontSize: 8,
+            cellPadding: 2,
+            overflow: 'linebreak',
+            valign: 'middle'
+        },
+        columnStyles,
+        headStyles: {
+            fillColor: [38, 166, 154],
+            textColor: 255,
+            fontStyle: 'bold'
+        },
+        alternateRowStyles: {
+            fillColor: [247, 248, 248]
+        },
+        theme: 'grid',
+        didDrawPage
+    });
+}
+
+function buildFileStorageColumnStyles(columns) {
+    const styles = {};
+    columns.forEach((col, index) => {
+        const baseWidth = FILE_STORAGE_COLUMN_WIDTH_HINTS[col.key];
+        styles[index] = {
+            cellWidth: baseWidth || 'auto',
+            halign: ['jarak'].includes(col.key) ? 'right' : (col.key === 'tanggalLahir' ? 'center' : 'left')
+        };
+    });
+    return styles;
 }
 
 function downloadBlob(blob, filename) {

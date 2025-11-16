@@ -43,10 +43,49 @@
   gap: calc(var(--spacing) * 0.75);
 }
 
+.attendance-daily-card .wa-card-v2 {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.attendance-daily-card .wa-card-v2__main {
+  width: 100%;
+}
+
+.attendance-daily-card .wa-card-v2__header {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.attendance-daily-card .wa-card-v2__title {
+  white-space: normal;
+  max-width: 100%;
+}
+
 .attendance-daily-card .wa-card-v2__body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  max-height: none;
+  overflow: visible;
+  width: 100%;
+}
+
+.attendance-daily-card .wa-card-v2__meta {
+  display: none;
+}
+
+.attendance-daily-card .wa-card-v2__actions {
+  margin-left: auto;
+}
+
+@media (max-width: 600px) {
+  .attendance-daily-card .wa-card-v2__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 .attendance-timeline-card {
@@ -124,6 +163,27 @@
   font-weight: 600;
   font-size: 0.95rem;
   color: var(--primary);
+}
+
+.attendance-hours-chip.is-running {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  min-width: 120px;
+}
+
+.attendance-hours-chip.is-running .running-status {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.attendance-hours-chip.is-running .running-time {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  font-size: 1rem;
+  color: var(--text);
 }
 
 .attendance-priority-note {

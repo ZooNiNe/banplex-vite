@@ -23,6 +23,8 @@ let pageDataController = null;
 let pageEventListenerController = null;
 let unsubscribeLiveQuery = null;
 let debouncedRender = null;
+let runningTimerInterval = null;
+const RUNNING_TIMER_INTERVAL_MS = 1000;
 
 function createIcon(iconName, size = 18, classes = '') {
   const icons = {
@@ -391,12 +393,19 @@ function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateSt
 
     const buildTimelineHTML = (attendance) => {
         const isTimestampRecord = attendance?.type === 'timestamp';
-        const checkInText = isTimestampRecord && attendance?.checkIn ? formatTimeLabel(attendance.checkIn) : '--:--';
+        const checkInDate = attendance?.checkIn ? getJSDate(attendance.checkIn) : null;
+        const checkInText = isTimestampRecord && checkInDate ? formatTimeLabel(checkInDate) : '--:--';
         const checkOutText = isTimestampRecord && attendance?.checkOut ? formatTimeLabel(attendance.checkOut) : '--:--';
+        let runningStartMs = null;
+        if (isTimestampRecord && attendance?.status === 'checked_in' && checkInDate instanceof Date && !Number.isNaN(checkInDate)) {
+            runningStartMs = checkInDate.getTime();
+        }
         let hoursLabel = '-';
         if (isTimestampRecord) {
             if (attendance?.workHours && attendance.workHours > 0) {
                 hoursLabel = `${attendance.workHours.toFixed(1)} jam`;
+            } else if (runningStartMs) {
+                hoursLabel = _formatRunningDuration(runningStartMs);
             } else if (attendance?.status === 'checked_in') {
                 hoursLabel = 'Sedang berjalan';
             } else {
@@ -408,6 +417,12 @@ function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateSt
             hoursLabel = '½ Hari';
         }
 
+        const runningAttributes = runningStartMs ? ` data-running-start="${runningStartMs}"` : '';
+        const runningClass = runningStartMs ? ' is-running' : '';
+        const hoursChipInner = runningStartMs
+            ? `<span class="running-status">Sedang berjalan</span><span class="running-time" data-running-time>${hoursLabel}</span>`
+            : hoursLabel;
+
         return `
             <div class="attendance-timeline">
                 <div class="attendance-time-slot">
@@ -418,7 +433,7 @@ function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateSt
                     <span class="label">Pulang</span>
                     <strong class="value">${checkOutText}</strong>
                 </div>
-                <div class="attendance-hours-chip" title="Durasi kerja hari ini">${hoursLabel}</div>
+                <div class="attendance-hours-chip${runningClass}" title="Durasi kerja hari ini"${runningAttributes}>${hoursChipInner}</div>
             </div>
         `;
     };
@@ -555,6 +570,55 @@ function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateSt
             el.setAttribute('data-animated', '');
         }
     });
+    _ensureAttendanceRunningTimers();
+}
+
+function _formatRunningDuration(startMs, nowMs = Date.now()) {
+    const diffMs = Math.max(0, nowMs - startMs);
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+    const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+    const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+}
+
+function _refreshAttendanceRunningTimers() {
+    const chips = document.querySelectorAll('.attendance-hours-chip[data-running-start]');
+    if (!chips.length) {
+        _stopAttendanceRunningTimers();
+        return;
+    }
+    const now = Date.now();
+    chips.forEach(chip => {
+        const start = Number(chip.dataset.runningStart);
+        if (!start || Number.isNaN(start)) return;
+        const label = _formatRunningDuration(start, now);
+        const timerNode = chip.querySelector('[data-running-time]');
+        if (timerNode) {
+            timerNode.textContent = label;
+        } else {
+            chip.textContent = label;
+        }
+    });
+}
+
+function _ensureAttendanceRunningTimers() {
+    const chips = document.querySelectorAll('.attendance-hours-chip[data-running-start]');
+    if (!chips.length) {
+        _stopAttendanceRunningTimers();
+        return;
+    }
+    _refreshAttendanceRunningTimers();
+    if (!runningTimerInterval) {
+        runningTimerInterval = setInterval(_refreshAttendanceRunningTimers, RUNNING_TIMER_INTERVAL_MS);
+    }
+}
+
+function _stopAttendanceRunningTimers() {
+    if (runningTimerInterval) {
+        clearInterval(runningTimerInterval);
+        runningTimerInterval = null;
+    }
 }
 
 function _renderDateAndSelectionUI(activeDateStr) {
@@ -633,6 +697,7 @@ async function renderAbsensiView(view, options = {}) {
         if (!appState.selectionMode.active || appState.selectionMode.pageContext !== 'absensi') {
             _activateSelectionMode('absensi');
         }
+        _stopAttendanceRunningTimers();
     } else {
         if (appState.selectionMode.active && appState.selectionMode.pageContext === 'absensi') {
             deactivateSelectionMode(true);
@@ -949,8 +1014,9 @@ function initAbsensiPage() {
         
         const fabContainer = $('#fab-container');
         if (fabContainer) fabContainer.innerHTML = '';
-        
+
         appState.pendingAttendance?.clear();
+        _stopAttendanceRunningTimers();
 
         off('app.unload.absensi', cleanupAbsensi);
         off('ui.absensi.renderContent', renderAbsensiPageContent);

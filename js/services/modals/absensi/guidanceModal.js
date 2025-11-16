@@ -13,9 +13,10 @@ export function openAttendanceGuidanceModal() {
             <p style="margin:0 0 1rem 0; line-height:1.55;">
                 Untuk mengedit data absensi yang sudah masuk ke dalam rekap gaji (invoice), Anda <strong>HARUS</strong> menghapus data rekap gaji tersebut secara permanen di halaman <strong>Tagihan</strong> terlebih dahulu. Ini akan membuka kunci absensi agar dapat diedit dengan aman.
             </p>
-            <label style="display:flex; align-items:center; gap:0.5rem; font-weight:500;">
+            <label class="custom-checkbox-label" style="font-weight:600;">
                 <input type="checkbox" id="attendance-guidance-hide" />
-                Jangan tampilkan lagi di sesi ini
+                <span class="custom-checkbox-visual"></span>
+                <span>Jangan tampilkan lagi di sesi ini</span>
             </label>
         </div>
     `;
