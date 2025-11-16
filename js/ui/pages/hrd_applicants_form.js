@@ -17,12 +17,7 @@ import { isValidNikKk, sanitizeDigits, sanitizePhone } from '../../utils/helpers
 import * as XLSX from 'xlsx';
 import { APPLICANT_FIELD_KEYS as FIELD_KEYS } from './jobApplicantFieldMap.js';
 
-import { storage } from '../../config/firebase.js';
-import {
-    ref,
-    uploadBytesResumable,
-    getDownloadURL
-} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-storage.js';
+import { _uploadFileToCloudinary } from '../../services/fileService.js';
 
 let unloadHandler = null;
 let cleanupFns = [];
@@ -616,65 +611,79 @@ function attachFormListeners() {
 }
 
 
-function handleAttachmentUpload(file, fileTypeKey, inputId) {
+async function handleAttachmentUpload(file, fileTypeKey, inputId) {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
         toast('error', 'Ukuran file terlalu besar (Maks 5MB).');
         const fileInput = $(`#${inputId}`);
-        if(fileInput) fileInput.value = ''; // Reset input
+        if (fileInput) fileInput.value = '';
         return;
     }
 
-    const storagePath = `hrd_attachments/${fileTypeKey}/${Date.now()}-${file.name}`;
-    const storageRef = ref(storage, storagePath);
-    const uploadTask = uploadBytesResumable(storageRef, file);
-
     const previewEl = $(`#${inputId}-preview`);
     const hiddenInput = $(`#${fileTypeKey}`);
+    const fileInput = $(`#${inputId}`);
 
     activeUploads++;
     setSubmittingState(true, 'uploading');
 
-    uploadTask.on('state_changed',
-        (snapshot) => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            if (previewEl) {
-                previewEl.innerHTML = `<span class="attachment-info">Mengunggah: ${progress.toFixed(0)}%</span>`;
-            }
-        },
-        (error) => {
-            console.error(`[FileUpoad] Gagal mengunggah ${fileTypeKey}:`, error);
-            toast('error', `Gagal mengunggah ${file.name}.`);
-            if (previewEl) {
-                previewEl.innerHTML = `<span class="attachment-info attachment-error">Upload Gagal</span>`;
-            }
-            activeUploads--;
-            if (activeUploads < 0) activeUploads = 0;
-            setSubmittingState(activeUploads > 0, 'uploading');
-        },
-        () => {
-            getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-                if (previewEl) {
-                    previewEl.innerHTML = `
-                        <span class="attachment-info">
-                            <a href="${downloadURL}" target="_blank" rel="noopener noreferrer">${file.name}</a>
-                        </span>
-                        <button type="button" class="btn-icon btn-ghost btn-icon--danger" data-action="remove-attachment" data-key="${fileTypeKey}" data-input-id="${inputId}">
-                            Ganti
-                        </button>
-                    `;
-                }
-                if (hiddenInput) {
-                    hiddenInput.value = downloadURL;
-                }
-                toast('success', `${file.name} berhasil diunggah.`);
-                activeUploads--;
-                if (activeUploads < 0) activeUploads = 0;
-                setSubmittingState(activeUploads > 0, 'uploading');
-            });
+    let uploadError = null;
+
+    try {
+        if (previewEl) {
+            previewEl.innerHTML = '<span class="attachment-info">Mengunggah: 0%</span>';
         }
-    );
+
+        const downloadURL = await _uploadFileToCloudinary(file, {
+            silent: true,
+            onProgress: (percent) => {
+                if (!previewEl) return;
+                const rounded = Math.max(0, Math.min(100, Math.round(percent)));
+                previewEl.innerHTML = `<span class="attachment-info">Mengunggah: ${rounded}%</span>`;
+            },
+            onError: (error) => {
+                uploadError = error;
+            }
+        });
+
+        if (!downloadURL) {
+            throw uploadError || new Error('Upload gagal. Tidak ada URL lampiran.');
+        }
+
+        if (previewEl) {
+            previewEl.innerHTML = `
+                <span class="attachment-info">
+                    <a href="${downloadURL}" target="_blank" rel="noopener noreferrer">${file.name}</a>
+                </span>
+                <button type="button" class="btn-icon btn-ghost btn-icon--danger" data-action="remove-attachment" data-key="${fileTypeKey}" data-input-id="${inputId}">
+                    Ganti
+                </button>
+            `;
+        }
+
+        if (hiddenInput) {
+            hiddenInput.value = downloadURL;
+        }
+
+        toast('success', `${file.name} berhasil diunggah.`);
+    } catch (error) {
+        console.error(`[FileUpload] Gagal mengunggah ${fileTypeKey}:`, error);
+        toast('error', `Gagal mengunggah ${file.name}. ${error?.message || ''}`.trim());
+        if (previewEl) {
+            previewEl.innerHTML = '<span class="attachment-info attachment-error">Upload Gagal</span>';
+        }
+        if (hiddenInput) {
+            hiddenInput.value = '';
+        }
+        if (fileInput) {
+            fileInput.value = '';
+        }
+    } finally {
+        activeUploads--;
+        if (activeUploads < 0) activeUploads = 0;
+        setSubmittingState(activeUploads > 0, 'uploading');
+    }
 }
 
 

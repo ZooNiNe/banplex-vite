@@ -76,13 +76,9 @@ async function _uploadFileToFirebaseStorage(file, folder = 'attachments') {
              };
              xhr.ontimeout = () => {
                  console.error('[Cloudinary] XHR ontimeout triggered.');
-                 // --- PERBAIKAN ERROR 2 START ---
                  reject(new Error('Koneksi ke server upload timeout. Coba lagi atau periksa jaringan.'));
-                 // --- PERBAIKAN ERROR 2 END ---
              };
-             // --- PERBAIKAN ERROR 2: Tambah timeout ---
              xhr.timeout = 120000; // Tingkatkan ke 120 detik (2 menit)
-             // --- PERBAIKAN ERROR 2 END ---
 
              xhr.send(formData);
         });

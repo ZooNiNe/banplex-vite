@@ -71,6 +71,7 @@ const STATUS_CLASS_MAP = {
 };
 const PER_PAGE_OPTIONS = [20, 50, 100];
 const FILE_STORAGE_PER_PAGE_KEY = 'fileStorage.perPage';
+const SELECT_FILTER_KEYS = new Set(['gender', 'jenjang', 'agency']);
 
 function createIcon(iconName, size = 16, classes = '') {
     const icons = {
@@ -90,6 +91,7 @@ let requestToken = 0;
 let lastRenderedItems = [];
 let isDeletingRecords = false;
 let lastFilterCount = 0;
+let agencyFilterCleanup = null;
 
 function ensureFileStorageState() {
     if (!appState.fileStorage) {
@@ -99,6 +101,7 @@ function ensureFileStorageState() {
                 search: '',
                 gender: 'all',
                 jenjang: 'all',
+                agency: 'all',
             },
             isLoading: false,
             view: {
@@ -119,6 +122,7 @@ function ensureFileStorageState() {
         search: '',
         gender: 'all',
         jenjang: 'all',
+        agency: 'all',
         ...(appState.fileStorage.filters || {}),
     };
     if (typeof appState.fileStorage.isLoading !== 'boolean') {
@@ -165,6 +169,7 @@ function renderPageShell() {
     const searchValue = filters.search || '';
     const genderValue = filters.gender || 'all';
     const jenjangValue = filters.jenjang || 'all';
+    const agencyValue = filters.agency || 'all';
 
     container.innerHTML = `
         <div class="content-panel file-storage-panel">
@@ -203,6 +208,7 @@ function renderPageShell() {
                     </div>
                     ${createMasterDataSelect('file-storage-gender-filter', 'Jenis Kelamin', GENDER_FILTER_OPTIONS, genderValue, null, false, false)}
                     ${createMasterDataSelect('file-storage-jenjang-filter', 'Jenjang', JENJANG_FILTER_OPTIONS, jenjangValue, null, false, false)}
+                    <div id="file-storage-agency-filter-wrapper"></div>
                     <div class="filter-stats">
                         <span class="filter-count-label">Menampilkan</span>
                         <span class="filter-count-value" id="file-storage-visible-count">0</span>
@@ -216,9 +222,60 @@ function renderPageShell() {
         </div>
     `;
 
+    renderAgencyFilterControl(agencyValue, { skipInit: true });
     try {
         initCustomSelects(container);
     } catch (_) {}
+}
+
+function getAgencyFilterOptions() {
+    const { list = [] } = appState.fileStorage || {};
+    const unique = new Set();
+    list.forEach(item => {
+        const name = getSafeString(pickValue(item, 'namaInstansi'));
+        if (name) {
+            unique.add(name);
+        }
+    });
+    const sorted = Array.from(unique).sort((a, b) => a.localeCompare(b, 'id', { sensitivity: 'base' }));
+    return [
+        { value: 'all', text: 'Semua Instansi' },
+        ...sorted.map(name => ({ value: name, text: name }))
+    ];
+}
+
+function renderAgencyFilterControl(selectedValue = 'all', options = {}) {
+    const wrapper = $('#file-storage-agency-filter-wrapper');
+    if (!wrapper) return;
+    if (agencyFilterCleanup) {
+        agencyFilterCleanup();
+        agencyFilterCleanup = null;
+    }
+    const agencyOptions = getAgencyFilterOptions();
+    const availableValues = new Set(agencyOptions.map(opt => opt.value));
+    const normalizedValue = availableValues.has(selectedValue) ? selectedValue : 'all';
+    wrapper.innerHTML = createMasterDataSelect(
+        'file-storage-agency-filter',
+        'Instansi',
+        agencyOptions,
+        normalizedValue,
+        null,
+        false,
+        false
+    );
+    const agencyInput = wrapper.querySelector('#file-storage-agency-filter');
+    if (agencyInput) {
+        const handler = (event) => handleFilterChange('agency', event.target.value);
+        agencyInput.addEventListener('change', handler);
+        agencyFilterCleanup = () => {
+            agencyInput.removeEventListener('change', handler);
+        };
+    }
+    if (!options.skipInit) {
+        try {
+            initCustomSelects(wrapper);
+        } catch (_) {}
+    }
 }
 
 function attachEventListeners() {
@@ -311,7 +368,8 @@ function handleFilterChange(key, value) {
 function setFilter(key, value) {
     ensureFileStorageState();
     const normalizedValue = (value || '').toString().trim();
-    appState.fileStorage.filters[key] = normalizedValue === '' ? (key === 'gender' || key === 'jenjang' ? 'all' : '') : normalizedValue;
+    const shouldUseAll = SELECT_FILTER_KEYS.has(key);
+    appState.fileStorage.filters[key] = normalizedValue === '' ? (shouldUseAll ? 'all' : '') : normalizedValue;
     if (appState.fileStorage.view) {
         appState.fileStorage.view.currentPage = 1;
     }
@@ -348,6 +406,7 @@ function fetchFileStorageList(force = false) {
                 return 0;
             });
             appState.fileStorage.list = normalized;
+            renderAgencyFilterControl(getFilters().agency || 'all');
             clearSelection();
             appState.fileStorage.isLoading = false;
             renderFileStorageTable();
@@ -457,10 +516,11 @@ function getVisibleItemsSnapshot() {
 
 function getFilteredList() {
     const { list = [] } = appState.fileStorage || {};
-    const { search = '', gender = 'all', jenjang = 'all' } = getFilters();
+    const { search = '', gender = 'all', jenjang = 'all', agency = 'all' } = getFilters();
     const searchTerm = search.trim().toLowerCase();
     const genderFilter = gender.toLowerCase();
     const jenjangFilter = jenjang.toLowerCase();
+    const agencyFilter = agency.toLowerCase();
 
     return list.filter(item => {
         if (genderFilter !== 'all') {
@@ -470,6 +530,10 @@ function getFilteredList() {
         if (jenjangFilter !== 'all') {
             const jenjangValue = getSafeString(pickValue(item, 'jenjang')).toLowerCase();
             if (jenjangValue !== jenjangFilter) return false;
+        }
+        if (agencyFilter !== 'all') {
+            const agencyValue = getSafeString(pickValue(item, 'namaInstansi')).toLowerCase();
+            if (agencyValue !== agencyFilter) return false;
         }
         if (!searchTerm) return true;
         const haystack = [
@@ -606,6 +670,10 @@ function cleanupFileStoragePage() {
     if (searchDebounceTimer) {
         clearTimeout(searchDebounceTimer);
         searchDebounceTimer = null;
+    }
+    if (agencyFilterCleanup) {
+        agencyFilterCleanup();
+        agencyFilterCleanup = null;
     }
     cleanupFns.forEach(fn => fn?.());
     cleanupFns = [];
@@ -906,10 +974,11 @@ function formatExportValue(key, item) {
 }
 
 function getFileStorageFilterSummary() {
-    const { gender = 'all', jenjang = 'all' } = getFilters();
+    const { gender = 'all', jenjang = 'all', agency = 'all' } = getFilters();
     const genderLabel = gender === 'all' ? 'Semua Jenis Kelamin' : gender;
     const jenjangLabel = jenjang === 'all' ? 'Semua Jenjang' : jenjang;
-    return `${genderLabel} | ${jenjangLabel}`;
+    const agencyLabel = agency === 'all' ? 'Semua Instansi' : agency;
+    return `${genderLabel} | ${jenjangLabel} | ${agencyLabel}`;
 }
 
 function buildFileStoragePdfColumnGroups(maxWidth = 230) {
@@ -1140,6 +1209,7 @@ function removeRecordsFromState(ids = []) {
     const idSet = new Set(ids);
     appState.fileStorage.list = (appState.fileStorage.list || []).filter(item => !idSet.has(item.id));
     ids.forEach(id => selection.ids.delete(id));
+    renderAgencyFilterControl(getFilters().agency || 'all');
 }
 
 export { initFileStoragePage };

@@ -81,7 +81,6 @@ const STATUS_FILTER_OPTIONS = [
     ...STATUS_APLIKASI_OPTIONS.map(opt => ({ value: opt, text: opt }))
 ];
 
-// --- Pemetaan Status Baru ---
 const STATUS_CLASS_MAP = {
     'lamaran diterima': 'status-badge info',
     'screening': 'status-badge info',
@@ -96,6 +95,9 @@ const STATUS_CLASS_MAP = {
 
 const PER_PAGE_OPTIONS = [20, 50, 100];
 const HRD_APPLICANTS_PER_PAGE_KEY = 'hrdApplicants.perPage';
+const pdfAssetCache = new Map();
+const imageDataCache = new Map();
+let applicantPhotoPlaceholderDataUrl = null;
 
 function createIcon(iconName, size = 16, classes = '') {
     // (Fungsi createIcon tidak berubah)
@@ -885,22 +887,36 @@ async function handleApplicantsPdfExport() {
     const summary = getApplicantFilterSummary();
     const generatedAt = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
     try {
+        const assetBundle = await prepareApplicantPdfAssets();
         const pdf = await createPdfDoc({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        applicants.forEach((applicant, index) => {
+        for (let index = 0; index < applicants.length; index += 1) {
+            const applicant = applicants[index];
             if (index > 0) pdf.addPage();
-            renderApplicantCvPage(pdf, applicant, {
+            // renderApplicantCvPage now handles logo + foto placeholder
+            await renderApplicantCvPage(pdf, applicant, {
                 pageNumber: index + 1,
                 totalPages: applicants.length,
                 filterSummary: summary,
                 generatedAt
-            });
-        });
+            }, assetBundle);
+        }
         pdf.save(`hrd_applicants_${new Date().toISOString().slice(0,10)}.pdf`);
         toast('success', 'PDF CV berhasil dibuat.');
     } catch (error) {
         console.error('[HrdApplicants] Gagal membuat PDF CV:', error);
         toast('error', 'Gagal membuat PDF.');
     }
+}
+
+async function prepareApplicantPdfAssets() {
+    const [headerLogo, photoPlaceholder] = await Promise.all([
+        loadHrdApplicantPdfAsset('logo-header-pdf.png'),
+        Promise.resolve(getApplicantPhotoPlaceholder())
+    ]);
+    return {
+        headerLogo,
+        photoPlaceholder
+    };
 }
 
 function collectApplicantExportData() {
@@ -933,44 +949,69 @@ function getApplicantFilterSummary() {
     return `${genderLabel} | ${statusLabel}`;
 }
 
-function renderApplicantCvPage(pdf, applicant, meta = {}) {
+async function renderApplicantCvPage(pdf, applicant, meta = {}, assets = {}) {
     const margin = 16;
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const primaryColor = [38, 166, 154];
-    const headerHeight = 46;
+    const photoBox = {
+        width: 34,
+        height: 42,
+        x: pageWidth - margin - 34,
+        y: margin
+    };
+    const headerHeight = Math.max(52, photoBox.y + photoBox.height + 8);
+    const headerLogoSize = 26;
 
     pdf.setFillColor(...primaryColor);
     pdf.rect(0, 0, pageWidth, headerHeight, 'F');
 
     const applicantName = getSafeString(pickValue(applicant, 'namaLengkap')) || 'Nama Pelamar Tidak Tersedia';
     const appliedRole = getSafeString(pickValue(applicant, 'posisiDilamar')) || 'Posisi belum diisi';
+    const headerLogoX = margin;
+    const headerLogoY = margin - 4;
+    const headerTextStartX = assets.headerLogo ? headerLogoX + headerLogoSize + 6 : margin;
+
+    if (assets.headerLogo) {
+        try {
+            pdf.addImage(assets.headerLogo, 'PNG', headerLogoX, headerLogoY, headerLogoSize, headerLogoSize, undefined, 'FAST');
+        } catch (error) {
+            console.warn('[HrdApplicants] Gagal memuat logo header PDF:', error);
+        }
+    }
+
+    await renderApplicantPhotoSection(pdf, applicant, photoBox, assets.photoPlaceholder);
 
     pdf.setTextColor(255, 255, 255);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(18);
-    pdf.text(applicantName, margin, 20);
+    pdf.text(applicantName, headerTextStartX, margin + 4);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(11);
-    pdf.text(appliedRole, margin, 32);
+    pdf.text(appliedRole, headerTextStartX, margin + 16);
 
     const contactLine = buildApplicantContactLine(applicant);
+    const contactBoxWidth = Math.max(pageWidth - margin * 2 - photoBox.width - 10, 80);
+    const contactBoxX = margin;
+    const contactBoxY = headerHeight - 12;
     pdf.setFillColor(255, 255, 255);
     pdf.setDrawColor(255, 255, 255);
-    pdf.roundedRect(margin, headerHeight - 8, pageWidth - margin * 2, 14, 3, 3, 'F');
+    pdf.roundedRect(contactBoxX, contactBoxY, contactBoxWidth, 14, 3, 3, 'F');
     pdf.setTextColor(60, 72, 82);
     pdf.setFontSize(9);
-    pdf.text(contactLine, margin + 4, headerHeight + 2);
+    pdf.text(contactLine, contactBoxX + 4, contactBoxY + 10);
 
     const statusText = getSafeString(pickValue(applicant, 'statusAplikasi'));
     if (statusText) {
         const chipColor = getApplicantStatusColor(statusText);
         const textWidth = pdf.getTextWidth(statusText) + 8;
         pdf.setFillColor(...chipColor);
-        pdf.roundedRect(pageWidth - margin - textWidth, margin, textWidth, 10, 2, 2, 'F');
+        const statusAreaRight = photoBox.x - 6;
+        const chipX = Math.max(margin, statusAreaRight - textWidth);
+        pdf.roundedRect(chipX, margin, textWidth, 10, 2, 2, 'F');
         pdf.setTextColor(255, 255, 255);
         pdf.setFontSize(8);
-        pdf.text(statusText, pageWidth - margin - textWidth + 4, margin + 7);
+        pdf.text(statusText, chipX + 4, margin + 7);
     }
 
     pdf.setTextColor(44, 62, 80);
@@ -1004,6 +1045,153 @@ function renderApplicantCvPage(pdf, applicant, meta = {}) {
     if (meta.generatedAt) {
         pdf.text(`Dicetak ${meta.generatedAt}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
     }
+}
+
+async function renderApplicantPhotoSection(pdf, applicant, box, fallbackDataUrl) {
+    pdf.setDrawColor(255, 255, 255);
+    pdf.setLineWidth(0.4);
+    pdf.roundedRect(box.x - 2, box.y - 2, box.width + 4, box.height + 4, 3, 3, 'S');
+    const attachmentUrls = normalizeAttachmentValue(pickValue(applicant, 'urlPasFoto'));
+    const otherCandidates = [
+        getSafeString(pickValue(applicant, 'fotoUrl')),
+        getSafeString(pickValue(applicant, 'photoUrl'))
+    ].filter(Boolean);
+    const candidates = [...attachmentUrls, ...otherCandidates];
+    let asset = null;
+    for (const url of candidates) {
+        asset = await fetchImageDataForPdf(url);
+        if (asset) break;
+    }
+    if (!asset && fallbackDataUrl) {
+        asset = {
+            dataUrl: fallbackDataUrl,
+            format: detectImageFormatFromSource(fallbackDataUrl, 'PNG')
+        };
+    }
+    if (asset?.dataUrl) {
+        try {
+            pdf.addImage(asset.dataUrl, asset.format || 'PNG', box.x, box.y, box.width, box.height, undefined, 'FAST');
+            return;
+        } catch (error) {
+            console.warn('[HrdApplicants] Gagal menambahkan foto pelamar:', error);
+        }
+    }
+    pdf.setDrawColor(220, 228, 235);
+    pdf.setFillColor(245, 247, 250);
+    pdf.rect(box.x, box.y, box.width, box.height, 'FD');
+    pdf.setTextColor(160, 170, 180);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(8);
+    pdf.text('FOTO', box.x + box.width / 2, box.y + box.height / 2, { align: 'center', baseline: 'middle' });
+}
+
+async function loadHrdApplicantPdfAsset(path) {
+    if (!path) return null;
+    if (pdfAssetCache.has(path)) return pdfAssetCache.get(path);
+    const tryPaths = [`/${path}`, path, `./${path}`];
+    for (const candidate of tryPaths) {
+        try {
+            const response = await fetch(candidate, { cache: 'force-cache' });
+            if (!response?.ok) continue;
+            const blob = await response.blob();
+            const dataUrl = await blobToDataUrl(blob);
+            pdfAssetCache.set(path, dataUrl);
+            return dataUrl;
+        } catch (error) {
+            console.warn('[HrdApplicants] Gagal memuat asset PDF:', candidate, error);
+        }
+    }
+    pdfAssetCache.set(path, null);
+    return null;
+}
+
+async function fetchImageDataForPdf(url) {
+    const safeUrl = getSafeString(url);
+    if (!safeUrl) return null;
+    if (imageDataCache.has(safeUrl)) return imageDataCache.get(safeUrl);
+    try {
+        const response = await fetch(safeUrl, { mode: 'cors' });
+        if (!response?.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const dataUrl = await blobToDataUrl(blob);
+        const asset = {
+            dataUrl,
+            format: detectImageFormatFromSource(blob.type || safeUrl)
+        };
+        imageDataCache.set(safeUrl, asset);
+        return asset;
+    } catch (error) {
+        console.warn('[HrdApplicants] Gagal memuat gambar lampiran:', error);
+        imageDataCache.set(safeUrl, null);
+        return null;
+    }
+}
+
+function detectImageFormatFromSource(source, fallback = 'JPEG') {
+    const value = (source || '').toString().toLowerCase();
+    if (value.includes('png')) return 'PNG';
+    if (value.includes('webp')) return 'WEBP';
+    if (value.includes('gif')) return 'GIF';
+    if (value.includes('bmp')) return 'BMP';
+    if (value.includes('svg')) return 'SVG';
+    if (value.includes('jpg') || value.includes('jpeg')) return 'JPEG';
+    const dataMatch = value.match(/^data:image\/([a-z0-9+]+);/);
+    if (dataMatch && dataMatch[1]) {
+        const mime = dataMatch[1];
+        if (mime.includes('png')) return 'PNG';
+        if (mime.includes('webp')) return 'WEBP';
+        if (mime.includes('gif')) return 'GIF';
+        if (mime.includes('bmp')) return 'BMP';
+        if (mime.includes('svg')) return 'SVG';
+        if (mime.includes('jpg') || mime.includes('jpeg')) return 'JPEG';
+    }
+    const extMatch = value.match(/\.([a-z0-9]+)(?:[\?#]|$)/);
+    if (extMatch && extMatch[1]) {
+        const ext = extMatch[1];
+        if (ext.includes('png')) return 'PNG';
+        if (ext.includes('webp')) return 'WEBP';
+        if (ext.includes('gif')) return 'GIF';
+        if (ext.includes('bmp')) return 'BMP';
+        if (ext.includes('svg')) return 'SVG';
+    }
+    return fallback;
+}
+
+function getApplicantPhotoPlaceholder() {
+    if (applicantPhotoPlaceholderDataUrl) return applicantPhotoPlaceholderDataUrl;
+    if (typeof document === 'undefined') return null;
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 200;
+        canvas.height = 260;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+        ctx.fillStyle = '#e9eff7';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#d5deea';
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, 90, 50, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#d5deea';
+        ctx.fillRect(35, 150, canvas.width - 70, 70);
+        ctx.fillStyle = '#c3cedd';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('FOTO', canvas.width / 2, 145);
+        applicantPhotoPlaceholderDataUrl = canvas.toDataURL('image/png');
+        return applicantPhotoPlaceholderDataUrl;
+    } catch (_) {
+        return null;
+    }
+}
+
+function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
 }
 
 function buildApplicantContactLine(applicant) {
@@ -1256,12 +1444,11 @@ function openApplicantDocumentModal(recordId) {
             const trigger = modal.querySelector(`[data-doc-index="${docIndex}"][data-url-index="${urlIndex}"]`);
             if (!trigger) return;
             trigger.addEventListener('click', () => {
-                try {
-                    window.open(url, '_blank', 'noopener');
-                } catch (error) {
-                    console.error('[HrdApplicants] Gagal membuka lampiran:', error);
-                    toast('error', 'Tidak dapat membuka dokumen.');
-                }
+                confirmApplicantAttachmentDownload({
+                    url,
+                    label: doc.label,
+                    applicantName,
+                });
             });
         });
     });
@@ -1287,6 +1474,72 @@ function buildApplicantAttachmentList(record) {
         });
     }
     return attachments;
+}
+
+function confirmApplicantAttachmentDownload({ url, label, applicantName }) {
+    if (!url) {
+        toast('error', 'Dokumen tidak tersedia untuk diunduh.');
+        return;
+    }
+    const safeLabel = escapeHtml(label || 'Lampiran');
+    const safeName = escapeHtml(applicantName || 'Pelamar');
+    createModal('confirmUserAction', {
+        title: 'Unduh Lampiran?',
+        message: `Anda akan mengunduh <strong>${safeLabel}</strong> milik ${safeName}. Lanjutkan?`,
+        confirmLabel: 'Unduh',
+        confirmClass: 'btn-primary',
+        isUtility: true,
+        onConfirm: () => downloadApplicantAttachment(url, label, applicantName)
+    });
+}
+
+async function downloadApplicantAttachment(url, label, applicantName) {
+    const safeUrl = getSafeString(url);
+    if (!safeUrl) {
+        toast('error', 'URL dokumen tidak valid.');
+        return false;
+    }
+    const loader = startGlobalLoading('Menyiapkan unduhan dokumen...');
+    try {
+        const response = await fetch(safeUrl, { mode: 'cors' });
+        if (!response?.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const filename = buildAttachmentFileName(applicantName, label, safeUrl, blob.type);
+        downloadBlob(blob, filename);
+        toast('success', `${label || 'Lampiran'} berhasil diunduh.`);
+        return true;
+    } catch (error) {
+        console.error('[HrdApplicants] Gagal mengunduh lampiran:', error);
+        toast('error', 'Tidak dapat mengunduh dokumen. Coba lagi.');
+        return false;
+    } finally {
+        loader?.close?.();
+    }
+}
+
+function buildAttachmentFileName(applicantName, docLabel, url, mimeType) {
+    const namePart = slugifyFileNamePart(applicantName) || 'pelamar';
+    const labelPart = slugifyFileNamePart(docLabel) || 'dokumen';
+    const extension = guessFileExtensionFromSource(mimeType, url);
+    return extension ? `${namePart}-${labelPart}.${extension}` : `${namePart}-${labelPart}`;
+}
+
+function guessFileExtensionFromSource(mimeType, url = '') {
+    const mime = (mimeType || '').toLowerCase();
+    if (mime.includes('pdf')) return 'pdf';
+    if (mime.includes('png')) return 'png';
+    if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
+    if (mime.includes('webp')) return 'webp';
+    if (mime.includes('gif')) return 'gif';
+    const urlHint = (url || '').toLowerCase();
+    const match = urlHint.match(/\.([a-z0-9]+)(?:[\?#]|$)/);
+    return match ? match[1] : '';
+}
+
+function slugifyFileNamePart(input) {
+    const safe = getSafeString(input).toLowerCase();
+    const slug = safe.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return slug;
 }
 
 function normalizeAttachmentValue(raw) {
