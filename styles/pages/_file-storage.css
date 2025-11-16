@@ -403,9 +403,9 @@
 .file-storage-bulk-actions {
   display: none;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--line-soft);
   background: var(--surface);
@@ -421,26 +421,47 @@
   gap: 0.5rem;
   font-weight: 600;
   color: var(--text);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.file-storage-bulk-actions .bulk-summary span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .file-storage-bulk-actions .bulk-actions {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0.35rem;
+  flex: 0 0 auto;
   justify-content: flex-end;
+  align-items: center;
 }
 
-.file-storage-bulk-actions .bulk-summary,
-.file-storage-bulk-actions .bulk-actions {
-  flex: 1 1 220px;
+.file-storage-bulk-actions .btn-icon-only,
+.applicant-doc-modal .btn-icon-only {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-@media (max-width: 640px) {
-  .file-storage-bulk-actions .bulk-actions {
-    justify-content: flex-start;
+.file-storage-bulk-actions .btn-icon-only svg,
+.applicant-doc-modal .btn-icon-only svg {
+  pointer-events: none;
+}
+
+@media (max-width: 520px) {
+  .file-storage-bulk-actions {
+    gap: 0.5rem;
   }
-  .file-storage-bulk-actions .bulk-actions .btn {
-    flex: 1 1 140px;
+  .file-storage-bulk-actions .bulk-summary span {
+    font-size: 0.85rem;
   }
 }
 
@@ -458,6 +479,83 @@
 .file-storage-pagination .pagination-info {
   font-size: 0.95rem;
   color: var(--text-dim);
+}
+
+.applicant-doc-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.applicant-doc-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.applicant-doc-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.applicant-doc-role {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.applicant-doc-meta {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.applicant-doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.applicant-doc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-soft);
+  background: var(--surface-muted);
+}
+
+.applicant-doc-item .doc-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.doc-item-title {
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+}
+
+.doc-item-status {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.doc-item-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.applicant-doc-empty {
+  text-align: center;
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px dashed var(--line-soft);
+  color: var(--text-dim);
+  background: var(--surface-muted);
 }
 
 .file-storage-pagination .pagination-controls {

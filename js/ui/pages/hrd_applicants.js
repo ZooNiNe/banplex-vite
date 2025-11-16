@@ -9,7 +9,7 @@ import { createPageToolbarHTML } from '../components/toolbar.js';
 import { getApplicants, deleteApplicant } from '../../services/data/hrdApplicantService.js';
 import { getEmptyStateHTML } from '../components/emptyState.js';
 import { toast } from '../components/toast.js';
-import { startGlobalLoading } from '../components/modal.js';
+import { startGlobalLoading, createModal } from '../components/modal.js';
 import { emit, on, off } from '../../state/eventBus.js';
 import { createMasterDataSelect, initCustomSelects } from '../components/forms/index.js';
 import { formatDate } from '../../utils/formatters.js';
@@ -561,6 +561,9 @@ function formatCellValue(column, item, index) {
         const disabledAttr = item?.id ? '' : 'disabled';
         return `
             <div class="fs-row-actions">
+                <button type="button" class="btn-icon btn-ghost" data-action="fs-open-documents" data-id="${item?.id || ''}" title="Dokumen Pelamar" aria-label="Dokumen Pelamar" ${disabledAttr}>
+                    ${createIcon('download', 16)}
+                </button>
                 <button type="button" class="btn-icon btn-ghost" data-action="fs-edit-record" data-id="${item?.id || ''}" title="Edit data pelamar" ${disabledAttr}>
                     ${createIcon('edit', 16)}
                 </button>
@@ -1141,6 +1144,10 @@ function handleTableClick(event) {
     if (!action || !action.startsWith('fs-')) return;
     event.preventDefault();
     const recordId = actionTarget.dataset.id;
+    if (action === 'fs-open-documents') {
+        openApplicantDocumentModal(recordId);
+        return;
+    }
     if (action === 'fs-edit-record') {
         startEditRecord(recordId);
         return;
@@ -1181,6 +1188,133 @@ function startEditRecord(recordId) {
     ensureHrdApplicantsState();
     appState.hrdApplicants.editingRecord = { ...record };
     handleNavigation('hrd_applicants_form');
+}
+
+function openApplicantDocumentModal(recordId) {
+    if (!recordId) return;
+    const record = getRecordById(recordId);
+    if (!record) {
+        toast('error', 'Data pelamar tidak ditemukan.');
+        return;
+    }
+    const attachments = buildApplicantAttachmentList(record);
+    const isMobile = window.matchMedia ? window.matchMedia('(max-width: 599px)').matches : false;
+    const layoutClass = isMobile ? 'is-bottom-sheet' : 'is-simple-dialog';
+    const applicantName = escapeHtml(getSafeString(pickValue(record, 'namaLengkap')) || 'Pelamar');
+    const applicantRole = escapeHtml(getSafeString(pickValue(record, 'posisiDilamar')) || 'Posisi belum diisi');
+    const docListHTML = attachments.map((doc, docIndex) => {
+        const hasFiles = doc.urls.length > 0;
+        const statusText = hasFiles ? (doc.urls.length > 1 ? `${doc.urls.length} file` : 'Siap diunduh') : 'Belum ada lampiran';
+        const actionsHTML = hasFiles
+            ? doc.urls.map((url, urlIndex) => `
+                    <button type="button"
+                        class="btn btn-ghost btn-icon-only"
+                        data-doc-index="${docIndex}"
+                        data-url-index="${urlIndex}"
+                        title="Unduh ${doc.label}${doc.urls.length > 1 ? ` #${urlIndex + 1}` : ''}"
+                        aria-label="Unduh ${doc.label}${doc.urls.length > 1 ? ` #${urlIndex + 1}` : ''}">
+                        ${createIcon('download', 16)}
+                    </button>
+                `).join('')
+            : `<button type="button" class="btn btn-ghost btn-icon-only" disabled title="Belum ada dokumen">${createIcon('download', 16)}</button>`;
+        return `
+            <div class="applicant-doc-item">
+                <div class="doc-item-info">
+                    <span class="doc-item-title">${escapeHtml(doc.label)}</span>
+                    <span class="doc-item-status">${escapeHtml(statusText)}</span>
+                </div>
+                <div class="doc-item-actions">
+                    ${actionsHTML}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const content = `
+        <div class="applicant-doc-modal">
+            <div class="applicant-doc-header">
+                <span class="applicant-doc-name">${applicantName}</span>
+                <span class="applicant-doc-role">${applicantRole}</span>
+                <p class="applicant-doc-meta">Unduh CV dan lampiran resmi pelamar. Dokumen akan dibuka pada tab baru.</p>
+            </div>
+            <div class="applicant-doc-list">
+                ${docListHTML}
+            </div>
+        </div>
+    `;
+
+    const modal = createModal('hrdApplicantDocuments', {
+        title: 'Dokumen Pelamar',
+        content,
+        layoutClass,
+        isUtility: true
+    });
+    if (!modal) return;
+
+    attachments.forEach((doc, docIndex) => {
+        doc.urls.forEach((url, urlIndex) => {
+            const trigger = modal.querySelector(`[data-doc-index="${docIndex}"][data-url-index="${urlIndex}"]`);
+            if (!trigger) return;
+            trigger.addEventListener('click', () => {
+                try {
+                    window.open(url, '_blank', 'noopener');
+                } catch (error) {
+                    console.error('[HrdApplicants] Gagal membuka lampiran:', error);
+                    toast('error', 'Tidak dapat membuka dokumen.');
+                }
+            });
+        });
+    });
+}
+
+function buildApplicantAttachmentList(record) {
+    const baseDocs = [
+        { key: 'urlCv', label: 'Curriculum Vitae' },
+        { key: 'urlKtp', label: 'KTP' },
+        { key: 'urlKk', label: 'Kartu Keluarga' },
+        { key: 'urlPasFoto', label: 'Pas Foto' },
+        { key: 'urlSuratSehat', label: 'Surat Keterangan Sehat' }
+    ];
+    const attachments = baseDocs.map(doc => ({
+        label: doc.label,
+        urls: normalizeAttachmentValue(pickValue(record, doc.key))
+    }));
+    const otherDocs = normalizeAttachmentValue(pickValue(record, 'urlLainnya'));
+    if (otherDocs.length) {
+        attachments.push({
+            label: 'Lampiran Lainnya',
+            urls: otherDocs
+        });
+    }
+    return attachments;
+}
+
+function normalizeAttachmentValue(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) {
+        return raw.map(value => getSafeString(value)).filter(Boolean);
+    }
+    if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (!trimmed) return [];
+        if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) {
+                    return parsed.map(value => getSafeString(value)).filter(Boolean);
+                }
+            } catch (_) {}
+        }
+        const newlineParts = trimmed.split(/\r?\n/).map(part => part.trim()).filter(Boolean);
+        if (newlineParts.length > 1) return newlineParts;
+        const commaParts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
+        if (commaParts.length > 1) return commaParts;
+        return [trimmed];
+    }
+    if (typeof raw === 'object' && raw.url) {
+        return [getSafeString(raw.url)];
+    }
+    return [];
 }
 
 function getRecordById(recordId) {

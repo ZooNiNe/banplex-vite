@@ -37,6 +37,7 @@ const APPLICANT_FIELD_KEYS = {
     skills: ['skills', 'keahlian', 'skill', 'kompetensi'],
     
     // --- BARU: URL Lampiran ---
+    urlCv: ['urlCv', 'cvUrl', 'linkCv', 'cv', 'curriculumVitae'],
     urlKtp: ['urlKtp', 'url_ktp', 'linkKtp', 'ktp'],
     urlKk: ['urlKk', 'url_kk', 'linkKk', 'kk'],
     urlPasFoto: ['urlPasFoto', 'url_pas_foto', 'linkPasFoto', 'pasFoto'],

@@ -10,8 +10,31 @@ import {
     where,
     writeBatch,
 } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js';
+import { sanitizeDigits } from '../../utils/helpers.js';
 
 const BATCH_SIZE = 400;
+
+function normalizeApplicantNik(value) {
+    return sanitizeDigits(value || '');
+}
+
+async function getExistingApplicantMapByNik(nikList = []) {
+    const uniqueNiks = Array.from(new Set(nikList.filter(Boolean)));
+    const nikMap = new Map();
+    if (uniqueNiks.length === 0) return nikMap;
+    for (let i = 0; i < uniqueNiks.length; i += 10) {
+        const chunk = uniqueNiks.slice(i, i + 10);
+        const nikQuery = query(hrdApplicantsCol, where('nik', 'in', chunk));
+        const snapshot = await getDocs(nikQuery);
+        snapshot.forEach((docSnap) => {
+            const docNik = normalizeApplicantNik(docSnap.data()?.nik);
+            if (docNik && !nikMap.has(docNik)) {
+                nikMap.set(docNik, docSnap.id);
+            }
+        });
+    }
+    return nikMap;
+}
 
 function buildApplicantQuery(filters = {}) {
     const constraints = [];
@@ -78,16 +101,59 @@ export async function batchImportApplicants(rows = []) {
     if (!Array.isArray(rows) || rows.length === 0) {
         throw new Error('Tidak ada data yang dapat diimpor.');
     }
-    const normalizedRows = rows.filter(Boolean).map((entry) => prepareApplicantPayload(entry, true));
-    if (normalizedRows.length === 0) {
+    const sanitizedRows = rows
+        .filter(Boolean)
+        .map((entry) => {
+            const nik = normalizeApplicantNik(entry.nik);
+            return nik ? { ...entry, nik } : { ...entry };
+        });
+    if (sanitizedRows.length === 0) {
         throw new Error('Format data pelamar tidak valid.');
     }
-    for (let i = 0; i < normalizedRows.length; i += BATCH_SIZE) {
+    const keyedEntries = new Map();
+    const newEntries = [];
+    sanitizedRows.forEach(entry => {
+        if (entry.nik) {
+            keyedEntries.set(entry.nik, entry);
+        } else {
+            newEntries.push(entry);
+        }
+    });
+
+    const existingMap = await getExistingApplicantMapByNik(Array.from(keyedEntries.keys()));
+    const inserts = [];
+    const updates = [];
+
+    keyedEntries.forEach((entry, nik) => {
+        if (existingMap.has(nik)) {
+            updates.push({
+                id: existingMap.get(nik),
+                payload: prepareApplicantPayload(entry, false)
+            });
+        } else {
+            inserts.push(prepareApplicantPayload(entry, true));
+        }
+    });
+
+    newEntries.forEach(entry => {
+        inserts.push(prepareApplicantPayload(entry, true));
+    });
+
+    for (let i = 0; i < inserts.length; i += BATCH_SIZE) {
         const batch = writeBatch(db);
-        const chunk = normalizedRows.slice(i, i + BATCH_SIZE);
+        const chunk = inserts.slice(i, i + BATCH_SIZE);
         chunk.forEach((payload) => {
             const docRef = doc(hrdApplicantsCol);
             batch.set(docRef, payload);
+        });
+        await batch.commit();
+    }
+
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = updates.slice(i, i + BATCH_SIZE);
+        chunk.forEach(({ id, payload }) => {
+            batch.update(doc(hrdApplicantsCol, id), payload);
         });
         await batch.commit();
     }

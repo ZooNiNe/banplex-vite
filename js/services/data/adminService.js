@@ -8,7 +8,7 @@ import { _isQuotaExceeded, _setQuotaExceededFlag, syncFromServer, requestSync } 
 import { localDB, loadAllLocalDataToState } from "../localDbService.js";
 import { fetchAndCacheData } from "./fetch.js";
 import { showDetailPane, startGlobalLoading } from "../../ui/components/modal.js";
-import { getJSDate } from "../../utils/helpers.js";
+import { getJSDate, sanitizeDigits } from "../../utils/helpers.js";
 import { queueOutbox } from "../outboxService.js";
 
 function createIcon(iconName, size = 18, classes = '') {
@@ -416,6 +416,28 @@ export async function handleDevResetAllData() {
 const BENEFICIARY_COLLECTION = 'penerimaManfaat';
 const CHUNK_SIZE = 400;
 
+function normalizeNikValue(value) {
+    return sanitizeDigits(value || '');
+}
+
+async function getExistingBeneficiaryMapByNik(nikList = []) {
+    const uniqueNiks = Array.from(new Set(nikList.filter(Boolean)));
+    const nikMap = new Map();
+    if (uniqueNiks.length === 0) return nikMap;
+    for (let i = 0; i < uniqueNiks.length; i += 10) {
+        const chunk = uniqueNiks.slice(i, i + 10);
+        const nikQuery = query(collection(db, BENEFICIARY_COLLECTION), where('nik', 'in', chunk));
+        const snapshot = await getDocs(nikQuery);
+        snapshot.forEach((docSnap) => {
+            const docNik = normalizeNikValue(docSnap.data()?.nik);
+            if (docNik && !nikMap.has(docNik)) {
+                nikMap.set(docNik, docSnap.id);
+            }
+        });
+    }
+    return nikMap;
+}
+
 function buildBeneficiaryQuery(filters = {}) {
     const collectionRef = collection(db, BENEFICIARY_COLLECTION);
     const constraints = [];
@@ -472,17 +494,60 @@ export async function batchImportBeneficiaries(dataArray = []) {
     if (!Array.isArray(dataArray) || dataArray.length === 0) {
         throw new Error('Tidak ada data yang dapat diimpor.');
     }
-    const rows = dataArray.filter(row => row && Object.keys(row).length > 0);
+    const rows = dataArray
+        .filter(row => row && Object.keys(row).length > 0)
+        .map(entry => {
+            const nik = normalizeNikValue(entry.nik);
+            return nik ? { ...entry, nik } : { ...entry };
+        });
     if (rows.length === 0) {
         throw new Error('Format data tidak valid.');
     }
     try {
-        for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+        const keyedEntries = new Map();
+        const newEntries = [];
+        rows.forEach(entry => {
+            if (entry.nik) {
+                keyedEntries.set(entry.nik, entry);
+            } else {
+                newEntries.push(entry);
+            }
+        });
+
+        const existingMap = await getExistingBeneficiaryMapByNik(Array.from(keyedEntries.keys()));
+        const inserts = [];
+        const updates = [];
+
+        keyedEntries.forEach((entry, nik) => {
+            if (existingMap.has(nik)) {
+                updates.push({
+                    id: existingMap.get(nik),
+                    payload: prepareBeneficiaryPayload(entry, false)
+                });
+            } else {
+                inserts.push(prepareBeneficiaryPayload(entry, true));
+            }
+        });
+
+        newEntries.forEach(entry => {
+            inserts.push(prepareBeneficiaryPayload(entry, true));
+        });
+
+        for (let i = 0; i < inserts.length; i += CHUNK_SIZE) {
             const batch = writeBatch(db);
-            const chunk = rows.slice(i, i + CHUNK_SIZE);
-            chunk.forEach((entry) => {
+            const chunk = inserts.slice(i, i + CHUNK_SIZE);
+            chunk.forEach((payload) => {
                 const docRef = doc(collection(db, BENEFICIARY_COLLECTION));
-                batch.set(docRef, prepareBeneficiaryPayload(entry, true));
+                batch.set(docRef, payload);
+            });
+            await batch.commit();
+        }
+
+        for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+            const batch = writeBatch(db);
+            const chunk = updates.slice(i, i + CHUNK_SIZE);
+            chunk.forEach(({ id, payload }) => {
+                batch.update(doc(db, BENEFICIARY_COLLECTION, id), payload);
             });
             await batch.commit();
         }

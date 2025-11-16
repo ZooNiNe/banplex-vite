@@ -769,10 +769,11 @@ function renderBulkActionsBar(selectedCount) {
                 <span><strong>${selectedCount}</strong> data dipilih</span>
             </div>
             <div class="bulk-actions">
-                <button type="button" class="btn btn-danger btn-ghost" data-action="fs-delete-selected" ${selectedCount === 0 ? 'disabled' : ''}>Hapus Terpilih</button>
-                <button type="button" class="btn btn-ghost" data-action="fs-clear-selection">
+                <button type="button" class="btn btn-danger btn-ghost btn-icon-only" data-action="fs-delete-selected" title="Hapus Terpilih" aria-label="Hapus Terpilih" ${selectedCount === 0 ? 'disabled' : ''}>
+                    ${createIcon('trash', 16)}
+                </button>
+                <button type="button" class="btn btn-ghost btn-icon-only" data-action="fs-clear-selection" title="Batalkan pilihan" aria-label="Batalkan pilihan">
                     ${createIcon('x', 16)}
-                    Batalkan
                 </button>
             </div>
         </div>

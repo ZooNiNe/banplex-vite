@@ -549,28 +549,74 @@ function getRecordFieldValue(record, key) {
 }
 
 function normalizeDateForInput(value) {
-    if (!value) return '';
+    if (value === undefined || value === null || value === '') return '';
+
+    const excelSerialToISO = (serial) => {
+        const numericSerial = Number(serial);
+        if (!Number.isFinite(numericSerial)) return '';
+        const epochOffset = 25569; // Days between Excel epoch and Unix epoch
+        const milliseconds = Math.round((numericSerial - epochOffset) * 86400000);
+        if (!Number.isFinite(milliseconds)) return '';
+        const dateObj = new Date(milliseconds);
+        if (Number.isNaN(dateObj.getTime())) return '';
+        return dateObj.toISOString().slice(0, 10);
+    };
+
+    if (value instanceof Date) {
+        if (Number.isNaN(value.getTime())) return '';
+        return value.toISOString().slice(0, 10);
+    }
+
+    if (typeof value === 'number') {
+        const iso = excelSerialToISO(value);
+        if (iso) return iso;
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toISOString().slice(0, 10);
+        }
+        return '';
+    }
+
+    if (typeof value === 'object') {
+        if (typeof value.toDate === 'function') {
+            const dateObj = value.toDate();
+            if (!Number.isNaN(dateObj.getTime())) {
+                return dateObj.toISOString().slice(0, 10);
+            }
+        }
+        if (value.seconds) {
+            const dateObj = new Date(value.seconds * 1000);
+            if (!Number.isNaN(dateObj.getTime())) {
+                return dateObj.toISOString().slice(0, 10);
+            }
+        }
+        return '';
+    }
+
     if (typeof value === 'string') {
         const trimmed = value.trim();
+        if (!trimmed) return '';
         if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+        if (/^\d+$/.test(trimmed)) {
+            const isoFromSerial = excelSerialToISO(Number(trimmed));
+            if (isoFromSerial) return isoFromSerial;
+        }
+        const dmy = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if (dmy) {
+            const year = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
+            const month = dmy[2].padStart(2, '0');
+            const day = dmy[1].padStart(2, '0');
+            const isoGuess = `${year}-${month}-${day}`;
+            const parsed = new Date(isoGuess);
+            if (!Number.isNaN(parsed.getTime())) return isoGuess;
+        }
         const parsed = new Date(trimmed);
         if (!Number.isNaN(parsed.getTime())) {
             return parsed.toISOString().slice(0, 10);
         }
         return '';
     }
-    if (typeof value === 'object') {
-        if (typeof value.toDate === 'function') {
-            return value.toDate().toISOString().slice(0, 10);
-        }
-        if (value.seconds) {
-            return new Date(value.seconds * 1000).toISOString().slice(0, 10);
-        }
-    }
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) {
-        return parsed.toISOString().slice(0, 10);
-    }
+
     return '';
 }
 
@@ -668,7 +714,12 @@ async function parseBeneficiarySpreadsheet(file) {
         Object.entries(aliases).forEach(([target, keys]) => {
             const matchedKey = findMatchingKey(row, keys);
             if (matchedKey) {
-                entry[target] = getSafeString(row[matchedKey]);
+                const rawValue = row[matchedKey];
+                if (target === 'tanggalLahir') {
+                    entry[target] = normalizeDateForInput(rawValue);
+                } else {
+                    entry[target] = getSafeString(rawValue);
+                }
             }
         });
         if (!entry.namaPenerima) return;
