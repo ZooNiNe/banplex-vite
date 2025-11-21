@@ -81,7 +81,9 @@ export const clickActions = {
     'open-new-comment-modal': () => { emit('ui.comments.openNewCommentModal'); },
     'open-filter-modal': () => { emit('ui.modal.showBillsFilter', () => emit('ui.tagihan.renderContent')); },
     'open-sort-modal': () => { emit('ui.modal.showBillsSort', () => emit('ui.tagihan.renderContent')); },
-    'open-sort-modal-pemasukan': () => { emit('ui.modal.showPemasukanSort', () => emit('ui.pemasukan.renderContent')); },    'open-attendance-filter-modal': () => { emit('ui.modal.showAttendanceFilter', () => emit('ui.absensi.renderContent')); },
+    'open-sort-modal-pemasukan': () => { emit('ui.modal.showPemasukanSort', () => emit('ui.pemasukan.renderContent')); },
+    'open-pemasukan-creditor-report': () => { emit('ui.pemasukan.openLoanReport'); },
+    'open-attendance-filter-modal': () => { emit('ui.modal.showAttendanceFilter', () => emit('ui.absensi.renderContent')); },
     'open-stock-sort-modal': () => { emit('ui.modal.showStockSort', () => emit('ui.stok.renderContent')); },
     'open-attendance-sort-modal': () => { emit('ui.modal.showAttendanceSort', () => emit('ui.absensi.renderContent')); },
     'view-pending-data': async (ctx) => {

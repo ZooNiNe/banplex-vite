@@ -4,6 +4,11 @@ import { toast } from "../components/toast.js";
 import { handleDeleteItem, _handleRestoreItems, _handleDeletePermanentItems, handleDeleteMultipleItems } from "../../services/data/recycleBinService.js";
 import { deactivateSelectionMode, handleSelectAll, handleOpenSelectionSummaryModal, _activateSelectionMode, _toggleCardSelection, _updateSelectionCount } from "../components/selection.js";
 
+let selectionActionHandler = null;
+let selectionActivatedHandler = null;
+let selectionDeactivateHandler = null;
+let selectionUpdateCountHandler = null;
+
 function createIcon(iconName, size = 20, classes = '') {
     const icons = {
         'check-check': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check ${classes}"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>`,
@@ -70,7 +75,14 @@ function updateGlobalSelectionActions(pageContext) {
 
 
 export function initializeSelectionListeners() {
-    on('ui.selection.handleAction', (action, context, event) => {
+    if (selectionActionHandler) {
+        off('ui.selection.handleAction', selectionActionHandler);
+    }
+    if (selectionActivatedHandler) off('ui.selection.activated', selectionActivatedHandler);
+    if (selectionDeactivateHandler) off('ui.selection.deactivate', selectionDeactivateHandler);
+    if (selectionUpdateCountHandler) off('ui.selection.updateCount', selectionUpdateCountHandler);
+
+    selectionActionHandler = (action, context, event) => {
         if (event && ['toggle-selection', 'select-all-items', 'delete-selected-items', 'restore-selected', 'delete-permanent-selected', 'activate-selection-mode', 'close-selection-mode'].includes(action)) {
             event.stopPropagation();
             event.preventDefault();
@@ -192,12 +204,14 @@ export function initializeSelectionListeners() {
                      deactivateSelectionMode();
                 }
                 break;
-             default:
-                 console.log(`[Selection Listener] Unhandled selection action: ${action}`);
+            default:
+                console.log(`[Selection Listener] Unhandled selection action: ${action}`);
         }
-    });
+    };
 
-    on('ui.selection.activated', (context) => {
+    on('ui.selection.handleAction', selectionActionHandler);
+
+    selectionActivatedHandler = (context) => {
         let selectionBar = document.getElementById('selection-bar');
         if (!selectionBar) {
              console.error("Selection bar element not found!");
@@ -206,8 +220,23 @@ export function initializeSelectionListeners() {
         selectionBar.classList.add('show');
         _updateSelectionCount();
         updateGlobalSelectionActions(context);
-    });
-    on('ui.selection.deactivate', () => deactivateSelectionMode());
-    on('ui.selection.updateCount', () => _updateSelectionCount());
+    };
+    selectionDeactivateHandler = () => deactivateSelectionMode();
+    selectionUpdateCountHandler = () => _updateSelectionCount();
+
+    on('ui.selection.activated', selectionActivatedHandler);
+    on('ui.selection.deactivate', selectionDeactivateHandler);
+    on('ui.selection.updateCount', selectionUpdateCountHandler);
+}
+
+export function cleanupSelectionListeners() {
+    if (selectionActionHandler) off('ui.selection.handleAction', selectionActionHandler);
+    if (selectionActivatedHandler) off('ui.selection.activated', selectionActivatedHandler);
+    if (selectionDeactivateHandler) off('ui.selection.deactivate', selectionDeactivateHandler);
+    if (selectionUpdateCountHandler) off('ui.selection.updateCount', selectionUpdateCountHandler);
+    selectionActionHandler = null;
+    selectionActivatedHandler = null;
+    selectionDeactivateHandler = null;
+    selectionUpdateCountHandler = null;
 }
 

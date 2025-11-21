@@ -10,6 +10,23 @@ const getActiveProjects = () => (appState.projects || []).filter(p => !p.isDelet
 const getActiveWorkers = () => (appState.workers || []).filter(w => !w.isDeleted);
 const getActiveAttendance = () => (appState.attendanceRecords || []).filter(r => !r.isDeleted);
 
+const getOutstandingSalaryInstallments = () => {
+    const salaryBills = getActiveBills().filter(bill => bill.type === 'gaji' || bill.type === 'fee');
+    const unpaidSalaryBills = salaryBills.reduce((sum, bill) => {
+        if (bill.status !== 'paid') {
+            const outstanding = Math.max(0, (bill.amount || 0) - (bill.paidAmount || 0));
+            return sum + outstanding;
+        }
+        return sum;
+    }, 0);
+
+    const unpaidAttendance = getActiveAttendance()
+        .filter(rec => (rec.isPaid === false || rec.isPaid === 0 || rec.isPaid == null) && (rec.totalPay || 0) > 0)
+        .reduce((sum, rec) => sum + (rec.totalPay || 0), 0);
+
+    return unpaidSalaryBills + unpaidAttendance;
+};
+
 export async function calculateAndCacheDashboardTotals() {
     const unpaidBills = getActiveBills().filter(bill => bill.status === 'unpaid');
     const totalBills = getActiveBills(); 
@@ -41,13 +58,18 @@ export async function calculateAndCacheDashboardTotals() {
     const totalExpenseAllTime = allExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
 
     const salaryFeeBills = getActiveBills().filter(bill => bill.type === 'gaji' || bill.type === 'fee');
-    const totalWagesPaid = salaryFeeBills.filter(b => b.status === 'paid').reduce((sum, bill) => sum + (bill.amount || 0), 0);
-    const totalWagesUnpaid = salaryFeeBills.filter(b => b.status === 'unpaid').reduce((sum, bill) => sum + Math.max(0, (bill.amount || 0) - (bill.paidAmount || 0)), 0);
+    const totalWagesPaid = salaryFeeBills.reduce((sum, bill) => sum + (bill.paidAmount || 0), 0);
+    const totalWagesUnpaid = salaryFeeBills.reduce((sum, bill) => {
+        const outstanding = Math.max(0, (bill.amount || 0) - (bill.paidAmount || 0));
+        return sum + outstanding;
+    }, 0);
 
     const totalAllExpensesForComparison = totalExpenseAllTime + totalWagesPaid + totalWagesUnpaid;
 
     const totalFundingAllTime = getActiveFundingSources()
         .reduce((sum, f) => sum + (f.totalAmount || 0), 0);
+
+    const outstandingSalaryInstallments = getOutstandingSalaryInstallments();
 
     const projectBudgets = getActiveProjects()
         .filter(p => p.budget && p.budget > 0)
@@ -101,6 +123,7 @@ export async function calculateAndCacheDashboardTotals() {
             totalWorkerDays,
             totalWagesPaid,
             totalWagesUnpaid,
+            outstandingSalaryInstallments,
         },
         trends: {},
         budgets: projectBudgets,

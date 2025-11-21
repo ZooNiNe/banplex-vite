@@ -342,7 +342,7 @@ async function renderDashboardContent() {
                      <button class="btn-icon refresh-btn" data-action="refresh-dashboard-card" data-card-type="paid_wages" data-tooltip="Refresh Upah Dibayar">${createIcon('list_refresh', 14)}</button>
                  </div>
                  <strong class="stat-value">${fmtIDR(summary?.totalWagesPaid || 0)}</strong>
-                 <span class="stat-label">Total sudah lunas</span>
+                 <span class="stat-label">Termasuk cicilan terbayar</span>
                  <div class="stat-footer">
                      <span class="action-hint">Rekap</span>
                      <button class="btn-icon btn-sm" data-action="navigate" data-nav="jurnal&subpage=rekap_gaji" data-tooltip="Buka Rekap Gaji">${createIcon('arrow_right', 14)}</button>

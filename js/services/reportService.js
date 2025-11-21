@@ -2,6 +2,7 @@ import { emit } from "../state/eventBus.js";
 import { appState } from "../state/appState.js";
 import { settingsDocRef, projectsCol, billsCol, suppliersCol } from "../config/firebase.js";
 import { getDoc } from "../config/firebase.js";
+import { collection, doc, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { toast } from "../ui/components/toast.js";
 import { startGlobalLoading } from "../ui/components/modal.js";
 import { getJSDate, parseLocalDate } from "../utils/helpers.js";
@@ -9,6 +10,7 @@ import { fetchAndCacheData } from "./data/fetch.js";
 import { $ } from "../utils/dom.js";
 import { fmtIDR as fmtIDRFormat } from "../utils/formatters.js";
 import { parseFormattedNumber } from "../utils/formatters.js";
+import { localDB } from "./localDbService.js";
 
 let __pdfLibsReady;
 async function __ensurePdfLibs() {
@@ -367,6 +369,28 @@ async function _prepareUpahPekerjaDataForPdf() {
         ],
         foot: [] // Kosongkan footer
     };
+
+    let paymentSection = null;
+    try {
+        if (workerId !== 'all') {
+            const { payments, totalPaid } = await _getWorkerSalaryPayments(workerId, { startDate, endDate });
+            summarySection.body.push(["Total Pembayaran (Termasuk Cicilan)", { content: fmtIDRFormat(totalPaid), styles: { halign: 'right' } }]);
+            summarySection.body.push(["Sisa Belum Dibayar", { content: fmtIDRFormat(Math.max(0, totalUpah - totalPaid)), styles: { halign: 'right' } }]);
+            if (payments.length > 0) {
+                paymentSection = {
+                    sectionTitle: 'Riwayat Pembayaran Gaji',
+                    headers: ["Tanggal & Waktu", { content: "Jumlah", styles: { halign: 'right' } }, "Dibuat Oleh"],
+                    body: payments.map(p => [
+                        _formatFullTimestamp(p.date),
+                        { content: fmtIDRFormat(p.amount || 0), styles: { halign: 'right' } },
+                        p.createdByName || '-'
+                    ])
+                };
+            }
+        }
+    } catch (e) {
+        console.warn('Gagal menghitung pembayaran gaji pekerja', e);
+    }
     // --- AKHIR TAMBAHAN ---
 
     return {
@@ -380,7 +404,8 @@ async function _prepareUpahPekerjaDataForPdf() {
                 headers: ["Tanggal", "Pekerja", "Proyek", "Status", "Upah", "Status"],
                 body: bodyRows,
                 foot: [] // <-- PERUBAHAN: Footer dikosongkan
-            }
+            },
+            ...(paymentSection ? [paymentSection] : [])
         ]
     };
 }
@@ -914,6 +939,113 @@ export async function createSimulasiPDF() {
     }
 }
 
+function _calculateOutstandingSalaryInstallments({ inRange, byProject }) {
+    const salaryBills = (appState.bills || []).filter(b => !b.isDeleted && (b.type === 'gaji' || b.type === 'fee') && byProject(b.projectId) && inRange(b.createdAt || b.dueDate || b.date));
+    const outstandingBills = salaryBills.reduce((sum, bill) => sum + Math.max(0, (bill.amount || 0) - (bill.paidAmount || 0)), 0);
+
+    const outstandingAttendance = (appState.attendanceRecords || [])
+        .filter(rec => !rec.isDeleted && byProject(rec.projectId) && inRange(rec.date) && (rec.totalPay || 0) > 0 && (rec.isPaid === false || rec.isPaid === 0 || rec.isPaid == null))
+        .reduce((sum, rec) => sum + (rec.totalPay || 0), 0);
+
+    return outstandingBills + outstandingAttendance;
+}
+
+async function _fetchBillPayments(billId) {
+    const payments = [];
+    try {
+        const billRef = doc(billsCol, billId);
+        const paymentsRef = collection(billRef, 'payments');
+        const snap = await getDocs(query(paymentsRef, orderBy('date', 'asc')));
+        snap.forEach(d => {
+            const data = d.data() || {};
+            payments.push({
+                id: d.id,
+                amount: data.amount || 0,
+                date: data.date?.toDate ? data.date.toDate() : data.date,
+                createdBy: data.createdBy,
+                createdByName: data.createdByName || data.createdByUserName,
+                workerId: data.workerId
+            });
+        });
+    } catch (e) {
+        console.warn('Gagal mengambil payments bill', billId, e);
+    }
+    try {
+        const localPayments = await localDB.pending_payments.where({ billId }).toArray();
+        localPayments.forEach(p => payments.push({
+            id: `pending-${p.id}`,
+            amount: p.amount || 0,
+            date: p.date || p.createdAt,
+            createdAt: p.createdAt,
+            createdBy: p.createdBy,
+            createdByName: p.createdByName || p.workerName,
+            workerId: p.workerId
+        }));
+    } catch (e) {
+        console.warn('Gagal mengambil pending payments lokal', e);
+    }
+    return payments;
+}
+
+function _formatFullTimestamp(dateInput) {
+    const d = getJSDate(dateInput);
+    if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '-';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mmm = d.toLocaleString('id-ID', { month: 'short' });
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${dd}/${mmm}/${yyyy} ${hh}:${mm}:${ss}`;
+}
+
+async function _getWorkerSalaryPayments(workerId, { startDate, endDate }) {
+    const relevantBills = (appState.bills || []).filter(bill => {
+        if (bill.isDeleted || bill.type !== 'gaji') return false;
+        const isDirect = bill.workerId === workerId;
+        const inDetails = Array.isArray(bill.workerDetails) && bill.workerDetails.some(w => (w.id === workerId || w.workerId === workerId));
+        return isDirect || inDetails;
+    });
+
+    const payments = [];
+    for (const bill of relevantBills) {
+        const billPayments = await _fetchBillPayments(bill.id);
+        billPayments.forEach(p => {
+            const payDate = getJSDate(p.date || p.createdAt || bill.paidAt || bill.createdAt);
+            if (payDate instanceof Date && !Number.isNaN(payDate.getTime())) {
+                if (startDate && payDate < startDate) return;
+                if (endDate && payDate > endDate) return;
+            }
+            const targetWorkerId = p.workerId || bill.workerId;
+            if (targetWorkerId && targetWorkerId !== workerId) return;
+            payments.push({
+                billId: bill.id,
+                amount: p.amount || 0,
+                date: payDate,
+                createdByName: p.createdByName || p.createdBy || '-'
+            });
+        });
+
+        if (billPayments.length === 0 && (bill.paidAmount || 0) > 0) {
+            const payDate = getJSDate(bill.paidAt || bill.updatedAt || bill.createdAt);
+            if (payDate instanceof Date && !Number.isNaN(payDate.getTime())) {
+                if (startDate && payDate < startDate) continue;
+                if (endDate && payDate > endDate) continue;
+            }
+            payments.push({
+                billId: bill.id,
+                amount: bill.paidAmount || bill.amount || 0,
+                date: payDate,
+                createdByName: bill.updatedByName || bill.createdByName || '-'
+            });
+        }
+    }
+
+    payments.sort((a, b) => getJSDate(a.date) - getJSDate(b.date));
+    const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    return { payments, totalPaid };
+}
+
 
 // ---------- Accounting Statements (P&L, CF, Balance Sheet) ----------
 async function _prepareAccountingStatementsPdf() {
@@ -943,6 +1075,7 @@ async function _prepareAccountingStatementsPdf() {
     const wagesPaid = bills.filter(b => (b.type === 'gaji' || b.type === 'fee') && b.status === 'paid').reduce((s,b)=>s+(b.amount||0),0);
     const unpaidBillsAmount = bills.filter(b => b.status==='unpaid').reduce((s,b)=>s+Math.max(0,(b.amount||0)-(b.paidAmount||0)),0);
     const unpaidLoansAmount = (appState.fundingSources || []).filter(l => !l.isDeleted && l.status==='unpaid' && inRange(l.createdAt||l.date)).reduce((s,l)=>s+Math.max(0,(l.totalAmount||0)-(l.paidAmount||0)),0);
+    const outstandingSalaryInstallments = _calculateOutstandingSalaryInstallments({ inRange, byProject });
     const cogs = expCat.material || 0;
     const grossProfit = revenue - cogs;
     const opex = (expCat.operasional||0) + (expCat.lainnya||0) + wagesPaid;
@@ -978,7 +1111,8 @@ async function _prepareAccountingStatementsPdf() {
         body: [
             ['Aset: Kas (perubahan bersih periode)', { content: fmtIDRFormat(cashNetChange), styles: { halign: 'right' } }],
             ['Kewajiban: Utang Usaha (Tagihan Belum Lunas)', { content: fmtIDRFormat(unpaidBillsAmount), styles: { halign: 'right' } }],
-            ['Kewajiban: Pinjaman Belum Lunas', { content: fmtIDRFormat(unpaidLoansAmount), styles: { halign: 'right' } }]
+            ['Kewajiban: Pinjaman Belum Lunas', { content: fmtIDRFormat(unpaidLoansAmount), styles: { halign: 'right' } }],
+            ['Kewajiban: Cicilan Gaji/Upah Belum Lunas', { content: fmtIDRFormat(outstandingSalaryInstallments), styles: { halign: 'right' } }]
         ]
     });
     sections.push({

@@ -48,6 +48,7 @@ async function retryDexieOperation(operation, maxRetries = 1, delay = 100) {
 
 const WIB_OFFSET_MINUTES = 420; // UTC+7
 const QUOTA_RETRY_STORAGE_KEY = 'quotaRetry.lastAttempt';
+let quotaNotified = false;
 
 function isQuotaError(error) {
     if (!error) return false;
@@ -524,6 +525,7 @@ async function syncToServer(options = {}) {
             }
         }
         _setQuotaExceededFlag(false); // Reset quota flag on successful sync
+        quotaNotified = false;
          if (!silent) toast('success', 'Sinkronisasi selesai.');
 
     } catch (error) {
@@ -535,7 +537,10 @@ async function syncToServer(options = {}) {
             console.error('Error during sync to server:', error);
             if (error.code === 'resource-exhausted' || error.__quotaExceeded || isQuotaError(error)) {
                  _setQuotaExceededFlag(true);
-                  if (!silent) toast('error', 'Kuota server habis. Sinkronisasi ditunda.');
+                 if (!silent && !quotaNotified) {
+                    toast('info', 'Kuota server habis. Data tetap tersimpan di perangkat dan akan dikirim otomatis saat kuota tersedia.');
+                    quotaNotified = true;
+                 }
             } else if (error.name === 'DatabaseClosedError') {
                  if (!silent) emit('ui.toast', { args: ['error', 'Database lokal error saat sinkronisasi.'] });
             } else {

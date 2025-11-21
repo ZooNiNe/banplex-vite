@@ -15,6 +15,9 @@ import { createListSkeletonHTML } from '../components/skeleton.js';
 import { createModal, closeModal } from '../components/modal.js';
 import { ensureMasterDataFresh } from '../../services/data/ensureMasters.js';
 import { getPendingQuotaMaps } from '../../services/pendingQuotaService.js';
+import { downloadCustomTablePdf } from '../../services/reportService.js';
+import { toast } from '../components/toast.js';
+import { createModalSelectField, initModalSelects } from '../components/forms/index.js';
 
 const ITEMS_PER_PAGE = 15;
 const INITIAL_LOAD_THRESHOLD = 20;
@@ -129,6 +132,134 @@ function appendIncomeGroups(wrapper, groups, type, pendingMaps = {}) {
         }
     });
     return inserted;
+}
+
+function _safeDate(value) {
+    const parsed = getJSDate(value);
+    return (parsed instanceof Date && !Number.isNaN(parsed.getTime())) ? parsed : new Date(0);
+}
+
+function _prepareLoanReportConfig(creditorId = 'all') {
+    const loans = (appState.fundingSources || []).filter(item => !item.isDeleted);
+    const filteredLoans = creditorId === 'all' ? loans : loans.filter(item => item.creditorId === creditorId);
+
+    if (!filteredLoans.length) {
+        toast('info', 'Tidak ada pinjaman untuk filter kreditur tersebut.');
+        return null;
+    }
+
+    const creditorMap = new Map((appState.fundingCreditors || []).filter(c => !c.isDeleted).map(c => [c.id, c]));
+    const creditorName = creditorId === 'all' ? 'Semua Kreditur' : (creditorMap.get(creditorId)?.creditorName || 'Kreditur Tidak Diketahui');
+    const summary = filteredLoans.reduce((acc, loan) => {
+        const principal = Number(loan.totalAmount ?? 0);
+        const repayable = Number(loan.totalRepaymentAmount ?? principal);
+        const paid = Number(loan.paidAmount ?? 0);
+        acc.principal += principal;
+        acc.repayable += repayable;
+        acc.paid += paid;
+        acc.remaining += Math.max(0, repayable - paid);
+        return acc;
+    }, { principal: 0, repayable: 0, paid: 0, remaining: 0 });
+
+    const detailRows = filteredLoans
+        .slice()
+        .sort((a, b) => _safeDate(b.date) - _safeDate(a.date))
+        .map(loan => {
+            const principal = Number(loan.totalAmount ?? 0);
+            const repayable = Number(loan.totalRepaymentAmount ?? principal);
+            const paid = Number(loan.paidAmount ?? 0);
+            const remaining = Math.max(0, repayable - paid);
+            const creditorLabel = creditorMap.get(loan.creditorId)?.creditorName || 'Kreditur Tidak Diketahui';
+            const dateObj = getJSDate(loan.date);
+            const hasValidDate = (dateObj instanceof Date) && !Number.isNaN(dateObj.getTime());
+            const dateLabel = hasValidDate ? dateObj.toLocaleDateString('id-ID') : '-';
+            const statusLabel = loan.status === 'paid' ? 'Lunas' : 'Belum Lunas';
+            return [
+                dateLabel,
+                creditorLabel,
+                loan.description || 'Pinjaman',
+                fmtIDR(principal),
+                fmtIDR(repayable),
+                fmtIDR(paid),
+                fmtIDR(remaining),
+                statusLabel
+            ];
+        });
+
+    const filenameCreditor = creditorName.replace(/[\s/]+/g, '-').replace(/[^a-zA-Z0-9_-]/g, '');
+    const today = new Date().toISOString().slice(0, 10);
+
+    return {
+        title: 'Laporan Pinjaman per Kreditur',
+        subtitle: `Kreditur: ${creditorName}`,
+        filename: `Laporan-Pinjaman-${filenameCreditor || 'Kreditur'}-${today}.pdf`,
+        sections: [
+            {
+                sectionTitle: 'Ringkasan Pinjaman',
+                headers: ['Deskripsi', { content: 'Jumlah', styles: { halign: 'right' } }],
+                body: [
+                    ['Total Pokok Pinjaman', { content: fmtIDR(summary.principal), styles: { halign: 'right' } }],
+                    ['Total Pengembalian', { content: fmtIDR(summary.repayable), styles: { halign: 'right' } }],
+                    ['Sudah Dibayar', { content: fmtIDR(summary.paid), styles: { halign: 'right' } }],
+                    ['Sisa Tagihan', { content: fmtIDR(summary.remaining), styles: { halign: 'right' } }],
+                ],
+            },
+            {
+                sectionTitle: 'Rincian Pinjaman',
+                headers: ['Tanggal', 'Kreditur', 'Deskripsi', 'Pokok', 'Total Bayar', 'Sudah Dibayar', 'Sisa', 'Status'],
+                body: detailRows,
+            },
+        ],
+    };
+}
+
+async function _handleDownloadLoanReport(creditorId = 'all') {
+    const reportConfig = _prepareLoanReportConfig(creditorId);
+    if (!reportConfig) return false;
+    await downloadCustomTablePdf(reportConfig);
+    return true;
+}
+
+async function _openLoanReportModal() {
+    try {
+        await ensureMasterDataFresh(['fundingCreditors']);
+    } catch (_) {}
+
+    const creditors = (appState.fundingCreditors || []).filter(c => !c.isDeleted);
+    const options = [{ value: 'all', label: 'Semua Kreditur' }, ...creditors.map(c => ({ value: c.id, label: c.creditorName || 'Kreditur Tanpa Nama' }))];
+    const dropdownHTML = createModalSelectField({
+        id: 'loan-report-creditor',
+        label: 'Filter Kreditur',
+        options,
+        value: 'all',
+        placeholder: 'Pilih kreditur'
+    });
+    const content = `
+        <form id="loan-report-form">
+            ${dropdownHTML}
+            <p class="helper-text" style="margin-top: 0;">Pilih "Semua Kreditur" untuk merangkum seluruh pinjaman.</p>
+        </form>
+    `;
+    const isMobile = window.matchMedia('(max-width: 599px)').matches;
+    const modalEl = createModal(isMobile ? 'actionsPopup' : 'formView', {
+        title: 'Unduh Laporan Pinjaman',
+        content,
+        footer: `<button type="submit" class="btn btn-primary" form="loan-report-form">Unduh PDF</button>`,
+        isUtility: true,
+        layoutClass: isMobile ? 'is-bottom-sheet' : ''
+    });
+
+    initModalSelects(modalEl);
+
+    const form = modalEl?.querySelector('#loan-report-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const selectedCreditor = form.querySelector('#loan-report-creditor')?.value || 'all';
+        const success = await _handleDownloadLoanReport(selectedCreditor);
+        if (success) closeModal(modalEl);
+    });
 }
 
 
@@ -427,7 +558,10 @@ function initPemasukanPage() {
     appState.pagination.pemasukan_pinjaman = { isLoading: false, hasMore: true, page: 0 };
 
     const pageToolbarHTML = createPageToolbarHTML({
-        title: 'Pemasukan'
+        title: 'Pemasukan',
+        actions: [
+            { action: 'open-pemasukan-creditor-report', icon: 'download', label: 'Unduh Laporan Pinjaman' }
+        ]
     });
 
     const mainTabsData = [
@@ -574,6 +708,7 @@ function initPemasukanPage() {
     on('ui.pemasukan.renderContent', () => renderPemasukanContent(false), { signal: listenerSignal });
     on('request-more-data', loadMorePemasukan, { signal: listenerSignal });
     on('ui.modal.showPemasukanSort', (onApply) => _showPemasukanSortModal(onApply), { signal: listenerSignal });
+    on('ui.pemasukan.openLoanReport', () => _openLoanReportModal(), { signal: listenerSignal });
 }
 
 export { initPemasukanPage };

@@ -124,6 +124,19 @@ export function renderBottomNav() {
 export function handleNavigation(targetPage, options = {}) {
     const { source = 'user', push = true } = options;
 
+    if (appState.selectionMode?.active && source === 'user') {
+        emit('ui.modal.create', 'confirmUserAction', {
+            title: 'Tutup Mode Pilih?',
+            message: 'Selesaikan atau tutup mode pilih sebelum berpindah halaman.',
+            confirmText: 'Tutup & Lanjut',
+            onConfirm: () => {
+                emit('ui.selection.deactivate', { force: true });
+                handleNavigation(targetPage, { source: 'system', push });
+            }
+        });
+        return;
+    }
+
     const isOverlayOpen = document.body.classList.contains('modal-open') 
                        || document.body.classList.contains('detail-view-active') 
                        || document.body.classList.contains('detail-pane-open');
