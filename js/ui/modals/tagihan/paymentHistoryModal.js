@@ -8,7 +8,7 @@ import { getDocs, collection, doc, query, orderBy } from "https://www.gstatic.co
 import { appState } from "../../../state/appState.js";
 import { emit } from "../../../state/eventBus.js";
 import { getEmptyStateHTML } from "../../components/emptyState.js";
-import { aggregateSalaryBillWorkers, getSalarySummaryStats } from "../../components/cards.js";
+import { aggregateSalaryBillWorkers } from "../../components/cards.js";
 
 function createIcon(iconName, size = 18, classes = '') {
     const icons = {
@@ -20,6 +20,20 @@ function createIcon(iconName, size = 18, classes = '') {
         'calendar-x-2': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-x-2 ${classes}"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m14.5 14.5-5 5"/><path d="m9.5 14.5 5 5"/></svg>`,
     };
     return icons[iconName] || '';
+}
+
+function formatRangeLabelForModal(start, end) {
+    const startDate = start ? getJSDate(start) : null;
+    const endDate = end ? getJSDate(end) : null;
+    const formatter = (date) => date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+    if (startDate && endDate) {
+        const sameDay = startDate.toISOString().slice(0, 10) === endDate.toISOString().slice(0, 10);
+        if (sameDay) return formatter(startDate);
+        return `${formatter(startDate)} - ${formatter(endDate)}`;
+    }
+    if (startDate) return formatter(startDate);
+    if (endDate) return formatter(endDate);
+    return 'Rentang tidak tersedia';
 }
 
 async function getPaymentHistory(billId) {
@@ -110,6 +124,7 @@ export async function handleOpenPaymentHistoryModal(dataset = {}) {
   let recapListHTML = '';
   let workerChipLabel = recipientName;
   let workerTotalAmount = 0;
+  const normalizedPaidAmount = Number(realTotalPaid) || 0;
   
   if (isSalaryBill) {
     const allSalaryBills = targetBillIds
@@ -122,51 +137,106 @@ export async function handleOpenPaymentHistoryModal(dataset = {}) {
     const workerSummary = aggregates.find(s => s.workerId === workerId);
 
     const aggregatedBillAmount = allSalaryBills.reduce((sum, salaryBill) => sum + (Number(salaryBill?.amount) || 0), 0);
-    const fallbackTotalAmount = Math.max(
-      aggregatedBillAmount,
-      bill.amount || 0,
-      workerSummary?.totalAmount || 0
-    );
+    const candidateTotalAmount = workerSummary?.totalAmount ?? Math.max(aggregatedBillAmount, bill.amount || 0);
+    workerTotalAmount = Number.isFinite(candidateTotalAmount) ? candidateTotalAmount : 0;
 
     if (workerSummary) {
       workerChipLabel = workerSummary.workerName || recipientName;
-      workerTotalAmount = workerSummary.totalAmount;
-    } else {
-      workerTotalAmount = fallbackTotalAmount;
     }
 
-    const outstanding = Math.max(0, workerTotalAmount - realTotalPaid);
+    const outstanding = Math.max(0, workerTotalAmount - normalizedPaidAmount);
     const statusColor = outstanding > 0 ? 'var(--danger, #ef4444)' : 'var(--success, #22c55e)';
 
     workerOverviewHTML = `
       <div style="background:var(--surface-sunken); border-radius:12px; padding:16px; margin-bottom:20px;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:24px; align-items:flex-start;">
            <div>
-              <div style="font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:2px;">Pekerja</div>
+              <div style="font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:4px;">Pekerja</div>
               <div style="font-weight:600; font-size:1.1rem; color:var(--text-main);">${workerChipLabel}</div>
            </div>
-           <div style="text-align:right;">
-              <div style="font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:2px;">Total Outstanding</div>
-              <div style="font-weight:700; font-size:1.1rem; color:var(--text-main);">${fmtIDR(outstanding)}</div>
-           </div>
-        </div>
-        
-        <div style="display:flex; flex-direction:column; gap:8px; border-top:1px dashed var(--line); padding-top:12px;">
-           <div style="display:flex; justify-content:space-between; font-size:0.9rem;">
-              <span style="color:var(--text-dim);">Sudah Dibayar</span>
-              <span style="font-weight:600; color:var(--success);">${fmtIDR(realTotalPaid)}</span>
-           </div>
-           <div style="display:flex; justify-content:space-between; font-size:1rem;">
-              <span style="color:var(--text-dim); font-weight:500;">Sisa Pembayaran</span>
-              <span style="font-weight:700; color:${statusColor};">${fmtIDR(outstanding)}</span>
+           <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end;">
+              <div style="text-align:right;">
+                 <div style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase;">Total Tagihan</div>
+                 <div style="font-weight:700; font-size:1rem;">${fmtIDR(workerTotalAmount)}</div>
+              </div>
+              <div style="text-align:right;">
+                 <div style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase;">Sudah Dibayar</div>
+                 <div style="font-weight:700; font-size:1rem; color:var(--success);">${fmtIDR(normalizedPaidAmount)}</div>
+              </div>
+              <div style="text-align:right;">
+                 <div style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase;">Sisa Pembayaran</div>
+                 <div style="font-weight:700; font-size:1rem; color:${statusColor};">${fmtIDR(outstanding)}</div>
+              </div>
            </div>
         </div>
       </div>
     `;
 
+    const summaryCandidates = Array.isArray(workerSummary?.summaries) ? [...workerSummary.summaries] : [];
+    const fallbackSummaries = allSalaryBills.map((salaryBill) => {
+      const startDate = salaryBill.startDate || salaryBill.date;
+      const endDate = salaryBill.endDate || salaryBill.date;
+      return {
+        billId: salaryBill.id,
+        amount: Number(salaryBill.amount || 0),
+        uniqueAmount: Number(salaryBill.amount || 0),
+        startDate,
+        endDate,
+        rangeLabel: formatRangeLabelForModal(startDate, endDate),
+        status: salaryBill.status || 'unpaid',
+        recordCount: Array.isArray(salaryBill.recordIds) ? salaryBill.recordIds.length : 0,
+        attendanceSummary: {}
+      };
+    });
+    const summaryEntries = summaryCandidates.length ? summaryCandidates : fallbackSummaries;
+    const sortedSummaries = summaryEntries.slice();
+    sortedSummaries.sort((a, b) => getJSDate(b.startDate || b.endDate) - getJSDate(a.startDate || a.endDate));
+
+    const summaryListHTML = sortedSummaries.length
+      ? sortedSummaries.map((summary, index) => {
+          const rawAmount = Number(summary.uniqueAmount ?? summary.amount ?? 0);
+          const amountValue = Number.isFinite(rawAmount) ? rawAmount : 0;
+          const attendanceSummary = summary.attendanceSummary || {};
+          const attendanceParts = [];
+          if (attendanceSummary.full) attendanceParts.push(`${attendanceSummary.full} Hadir`);
+          if (attendanceSummary.half) attendanceParts.push(`${attendanceSummary.half} 1/2 Hari`);
+          if (attendanceSummary.absent) attendanceParts.push(`${attendanceSummary.absent} Absen`);
+          if (summary.recordCount) attendanceParts.push(`${summary.recordCount} Absensi`);
+          const attendanceText = attendanceParts.length ? attendanceParts.join(' · ') : 'Tanpa data absensi';
+          const rangeLabel = summary.rangeLabel || formatRangeLabelForModal(summary.startDate, summary.endDate);
+          const isPaidSummary = summary.status === 'paid';
+          return `
+            <div style="padding:10px 0; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                <div style="flex:1;">
+                  <div style="font-weight:600; font-size:0.95rem;">Rekap ${index + 1}${summary.billId ? ` • ${summary.billId}` : ''}</div>
+                  <div style="font-size:0.8rem; color:var(--text-dim);">${rangeLabel}</div>
+                </div>
+                <span style="font-size:0.75rem; padding:2px 10px; border-radius:999px; border:1px solid ${isPaidSummary ? 'var(--success)' : 'var(--danger)'}; color:${isPaidSummary ? 'var(--success)' : 'var(--danger)'};">
+                  ${isPaidSummary ? 'Lunas' : 'Belum Lunas'}
+                </span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="font-size:1rem; color:var(--text-main);">${fmtIDR(amountValue)}</strong>
+                <span style="font-size:0.75rem; color:var(--text-dim);">${attendanceText}</span>
+              </div>
+            </div>
+          `;
+        }).join('')
+      : `<div style="padding:10px 0; color:var(--text-dim); font-style:italic;">Belum ada rangkuman tagihan.</div>`;
+
+    recapListHTML = `
+      <div class="payment-history-summary-section" style="margin-bottom:20px;">
+        <h4 style="margin:0 0 12px 0; font-size:1rem; border-bottom:2px solid var(--surface-sunken); padding-bottom:6px;">Rincian Rekap ${workerChipLabel}</h4>
+        <div class="payment-history-summary-list">
+          ${summaryListHTML}
+        </div>
+      </div>
+    `;
+
   } else {
-      workerTotalAmount = bill.amount || 0;
-      const outstanding = Math.max(0, workerTotalAmount - realTotalPaid);
+      workerTotalAmount = Number(bill.amount || 0);
+      const outstanding = Math.max(0, workerTotalAmount - normalizedPaidAmount);
       const statusColor = outstanding > 0 ? 'var(--danger)' : 'var(--success)';
        workerOverviewHTML = `
         <div style="background:var(--surface-sunken); border-radius:12px; padding:16px; margin-bottom:20px;">
@@ -252,6 +322,7 @@ export async function handleOpenPaymentHistoryModal(dataset = {}) {
   const content = `
       <div class="payment-history-wrapper">
           ${workerOverviewHTML}
+          ${recapListHTML}
           <h4 style="margin:0 0 10px 0; font-size:1rem; border-bottom:2px solid var(--surface-sunken); padding-bottom:8px;">Riwayat Pembayaran</h4>
           <div class="history-list">
               ${listHTML}

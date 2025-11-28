@@ -664,10 +664,53 @@ export function aggregateSalaryBillWorkers(items = []) {
     const workerLookup = new Map((appState.workers || []).map(worker => [worker.id, worker.workerName]));
     const grouped = new Map();
 
+    const UNKNOWN_WORKER_KEY = '__unknown-worker__';
+    const UNKNOWN_WORKER_LABEL = 'Unknown Worker';
+
+    const normalizeDateValue = (value) => {
+        if (value === undefined || value === null) return null;
+        if (value instanceof Date) {
+            return Number.isNaN(value.getTime()) ? null : value;
+        }
+        if (typeof value === 'object') {
+            if (typeof value.toDate === 'function') {
+                const converted = value.toDate();
+                if (converted instanceof Date && !Number.isNaN(converted.getTime())) return converted;
+            }
+            const seconds = value.seconds ?? value._seconds;
+            if (typeof seconds === 'number') {
+                const nanoseconds = value.nanoseconds ?? value._nanoseconds ?? 0;
+                const parsed = new Date(seconds * 1000 + nanoseconds / 1000000);
+                if (!Number.isNaN(parsed.getTime())) return parsed;
+            }
+        }
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            const parsed = new Date(value);
+            if (!Number.isNaN(parsed.getTime())) return parsed;
+            return null;
+        }
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (!trimmed) return null;
+            const direct = new Date(trimmed);
+            if (!Number.isNaN(direct.getTime())) return direct;
+            const normalized = trimmed.replace(/[.]/g, '-');
+            const altDirect = new Date(normalized);
+            if (!Number.isNaN(altDirect.getTime())) return altDirect;
+            const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (slashMatch) {
+                const [, day, month, year] = slashMatch;
+                const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+                if (!Number.isNaN(parsed.getTime())) return parsed;
+            }
+        }
+        return null;
+    };
+
     const resolveComparableTime = (bill = {}) => {
         const sourceDate = bill.updatedAt || bill.createdAt || bill.endDate || bill.dueDate || bill.date;
-        const parsed = getJSDate(sourceDate);
-        return (parsed instanceof Date && !Number.isNaN(parsed.getTime())) ? parsed.getTime() : 0;
+        const parsed = normalizeDateValue(sourceDate);
+        return parsed ? parsed.getTime() : 0;
     };
 
     const salaryItems = (Array.isArray(items) ? items : [])
@@ -678,21 +721,30 @@ export function aggregateSalaryBillWorkers(items = []) {
         const billTotal = Number(item.amount) || 0;
         const billPaid = Number(item.paidAmount) || 0;
         const paidRatio = billTotal > 0 ? Math.min(1, Math.max(0, billPaid / billTotal)) : 0;
+        const fallbackWorkerName = item.workerDetails?.[0]?.name || item.workerName || item.description || UNKNOWN_WORKER_LABEL;
         const detailWorkers = Array.isArray(item.workerDetails) && item.workerDetails.length > 0
             ? item.workerDetails
-            : (item.workerId ? [{ workerId: item.workerId, name: workerLookup.get(item.workerId) || 'Pekerja', amount: item.amount, recordIds: item.recordIds || [] }] : []);
+            : [{
+                workerId: item.workerId,
+                id: item.workerId,
+                name: fallbackWorkerName,
+                amount: item.amount,
+                recordIds: item.recordIds || []
+            }];
         const fallbackAmount = Number(item.amount) || 0;
-        const billStart = item.startDate ? getJSDate(item.startDate) : null;
-        const billEnd = item.endDate ? getJSDate(item.endDate) : null;
+        const billStart = normalizeDateValue(item.startDate);
+        const billEnd = normalizeDateValue(item.endDate);
 
         detailWorkers.forEach(detail => {
-            const workerId = detail.workerId || detail.id || detail.name;
-            if (!workerId) return;
+            const detailDisplayName = detail.name || detail.workerName;
+            const resolvedWorkerId = detail.workerId || detail.id;
+            const workerKey = resolvedWorkerId || detailDisplayName || UNKNOWN_WORKER_KEY;
+            const workerName = detailDisplayName || (resolvedWorkerId ? workerLookup.get(resolvedWorkerId) : null) || (workerKey === UNKNOWN_WORKER_KEY ? UNKNOWN_WORKER_LABEL : 'Pekerja');
             const detailAmount = Number(detail.amount ?? fallbackAmount) || (fallbackAmount > 0 ? fallbackAmount / detailWorkers.length : 0);
-            if (!grouped.has(workerId)) {
-                grouped.set(workerId, {
-                    workerId,
-                    workerName: detail.name || workerLookup.get(workerId) || 'Pekerja',
+            if (!grouped.has(workerKey)) {
+                grouped.set(workerKey, {
+                    workerId: workerKey,
+                    workerName,
                     totalAmount: 0,
                     totalPaid: 0,
                     statusSet: new Set(),
@@ -706,7 +758,7 @@ export function aggregateSalaryBillWorkers(items = []) {
                     overallRangeEnd: null
                 });
             }
-            const summary = grouped.get(workerId);
+            const summary = grouped.get(workerKey);
             const recordIds = Array.isArray(detail.recordIds) && detail.recordIds.length > 0
                 ? detail.recordIds
                 : (item.recordIds || []);
@@ -719,13 +771,10 @@ export function aggregateSalaryBillWorkers(items = []) {
             summary.totalPaid += appliedAmount * paidRatio;
             summary.statusSet.add(item.status || 'unpaid');
             if (item.id) summary.billIds.add(item.id);
-            const candidateDate = item.dueDate || item.date;
+            const candidateDate = normalizeDateValue(item.dueDate || item.date);
             if (candidateDate) {
-                const parsed = getJSDate(candidateDate);
-                if (parsed instanceof Date && !Number.isNaN(parsed.getTime())) {
-                    if (!summary.dueDate || parsed < summary.dueDate) {
-                        summary.dueDate = parsed;
-                    }
+                if (!summary.dueDate || candidateDate < summary.dueDate) {
+                    summary.dueDate = candidateDate;
                 }
             }
             const attendanceSummary = { full: 0, half: 0, absent: 0 };
@@ -738,8 +787,8 @@ export function aggregateSalaryBillWorkers(items = []) {
                     const projName = projectMap.get(record.projectId) || record.projectId;
                     summary.projectNames.add(projName);
                 }
-                const recordDate = record ? getJSDate(record.date) : null;
-                if (recordDate && !Number.isNaN(recordDate.getTime())) {
+                const recordDate = record ? normalizeDateValue(record.date) : null;
+                if (recordDate) {
                     if (!rangeStart || recordDate < rangeStart) rangeStart = recordDate;
                     if (!rangeEnd || recordDate > rangeEnd) rangeEnd = recordDate;
                 }
