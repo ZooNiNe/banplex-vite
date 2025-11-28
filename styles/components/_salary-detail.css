@@ -1,0 +1,265 @@
+/* =========================================
+   Salary & Bill Card Components
+   ========================================= */
+
+/* --- Aggregate Summary Card (Header Detail) --- */
+.salary-aggregate-summary {
+    background: var(--surface-sunken);
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    border: 1px solid var(--line);
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.summary-row.main {
+    align-items: flex-end;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--line);
+}
+
+.summary-label {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-weight: 500;
+}
+
+.summary-value {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+
+.summary-value.big {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1.2;
+}
+
+/* --- Recap List Item (Kartu Rincian Rekap) --- */
+.worker-recap-summary-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.sub-recap-item {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sub-recap-item:active {
+    background-color: var(--surface-hover);
+}
+
+.recap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+    gap: 8px;
+}
+
+.recap-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.recap-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+.recap-date-range {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+
+.recap-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.recap-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    background: var(--surface-sunken);
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.recap-amount {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-main);
+    margin-left: auto; /* Push to right */
+}
+
+/* Actions Bar inside Recap Item */
+.recap-actions-bar {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    justify-content: flex-end;
+}
+
+.recap-actions-bar .btn-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--surface-sunken);
+    border-radius: 6px;
+}
+
+/* --- Payment History Minimalist --- */
+.payment-history-section {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 4px solid var(--surface-sunken);
+}
+
+.payment-history-entry.minimalist {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+}
+
+.payment-history-entry.minimalist:last-child {
+    border-bottom: none;
+}
+
+.pay-meta-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pay-date {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.pay-desc {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pay-amount-group {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.pay-amount {
+    font-weight: 700;
+    color: var(--success);
+    font-size: 0.95rem;
+}
+
+.pay-actions-mini {
+    display: flex;
+    gap: 4px;
+}
+
+.pay-actions-mini .btn-icon {
+    width: 24px;
+    height: 24px;
+    color: var(--text-muted);
+}
+
+/* --- Overview Card in List (Main Page) --- */
+.payroll-overview-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.payroll-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.payroll-stats-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.payroll-stat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 99px;
+    background: var(--surface-sunken);
+    color: var(--text-dim);
+    font-weight: 500;
+}
+
+.payroll-amount-row {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+}
+
+/* Mobile Small (< 360px) Adjustments */
+@media (max-width: 360px) {
+    .summary-value.big {
+        font-size: 1.15rem;
+    }
+    .recap-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .recap-actions-bar .btn {
+        flex: 1;
+        justify-content: center;
+    }
+    .payment-history-entry.minimalist {
+        grid-template-columns: 1fr;
+    }
+    .pay-amount-group {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 4px;
+    }
+}

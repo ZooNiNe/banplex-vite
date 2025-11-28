@@ -19,6 +19,7 @@ function buildFilterOptions() {
   const expenses = Array.isArray(appState.expenses) ? appState.expenses : [];
   const suppliers = Array.isArray(appState.suppliers) ? appState.suppliers : [];
   const projects = Array.isArray(appState.projects) ? appState.projects : [];
+  const workers = Array.isArray(appState.workers) ? appState.workers : [];
 
   const expenseMap = new Map(expenses.map(exp => [exp.id, exp]));
   let relevantItems = [];
@@ -63,11 +64,29 @@ function buildFilterOptions() {
   ];
   const categoryOptions = categoryBase.filter(opt => opt.value === 'all' || categoryIds.has(opt.value));
 
-  return { supplierOptions, projectOptions, categoryOptions };
+  const workerIds = new Set();
+  relevantItems.forEach(item => {
+      if (item.type !== 'gaji') return;
+      const detailWorkers = Array.isArray(item.workerDetails) ? item.workerDetails : [];
+      detailWorkers.forEach(detail => {
+          if (detail.id) workerIds.add(detail.id);
+          if (detail.workerId) workerIds.add(detail.workerId);
+      });
+      if (!detailWorkers.length && item.workerId) {
+          workerIds.add(item.workerId);
+      }
+  });
+
+  const workerOptions = [
+      { value: 'all', text: 'Semua Pekerja' },
+      ...workers.filter(w => workerIds.has(w.id)).map(w => ({ value: w.id, text: w.workerName }))
+  ];
+
+  return { supplierOptions, projectOptions, categoryOptions, workerOptions };
 }
 
 async function _showBillsFilterModal(onApply) {
-  const { supplierOptions, projectOptions, categoryOptions } = buildFilterOptions();
+  const { supplierOptions, projectOptions, categoryOptions, workerOptions } = buildFilterOptions();
   const selectProject = createModalSelectField({
     id: 'filter-project-id',
     label: 'Filter Proyek',
@@ -82,6 +101,13 @@ async function _showBillsFilterModal(onApply) {
     value: appState.billsFilter.supplierId || 'all',
     placeholder: 'Semua supplier'
   });
+  const selectWorker = createModalSelectField({
+    id: 'filter-worker-id',
+    label: 'Filter Pekerja',
+    options: workerOptions.map(opt => ({ value: opt.value, label: opt.text })),
+    value: appState.billsFilter.workerId || 'all',
+    placeholder: 'Semua pekerja'
+  });
   const selectCategory = createModalSelectField({
     id: 'filter-category',
     label: 'Kategori',
@@ -92,9 +118,10 @@ async function _showBillsFilterModal(onApply) {
 
   const content = `
         <form id="bills-filter-form">
-            ${selectProject}
-            ${selectSupplier}
-            ${selectCategory}
+        ${selectProject}
+        ${selectSupplier}
+        ${selectWorker}
+        ${selectCategory}
         </form>
     `;
 
@@ -122,7 +149,8 @@ async function _showBillsFilterModal(onApply) {
     const nextFilters = {
       projectId: form.querySelector('#filter-project-id')?.value || 'all',
       supplierId: form.querySelector('#filter-supplier-id')?.value || 'all',
-      category: form.querySelector('#filter-category')?.value || 'all'
+      category: form.querySelector('#filter-category')?.value || 'all',
+      workerId: form.querySelector('#filter-worker-id')?.value || 'all'
     };
     appState.billsFilter = {
       ...appState.billsFilter,
@@ -144,6 +172,7 @@ async function _showBillsFilterModal(onApply) {
       projectId: 'all',
       supplierId: 'all',
       category: 'all',
+      workerId: 'all',
       searchTerm: '',
       status: 'all',
       dateStart: '',

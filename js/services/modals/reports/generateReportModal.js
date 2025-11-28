@@ -102,14 +102,18 @@ async function handleGenerateReportModal() {
     
     // --- AWAL PERUBAHAN ---
     } else if (reportType === 'upah_pekerja') {
-      // Menambahkan filter pekerja untuk laporan upah
-      await ensureMasterDataFresh(['workers']);
+      // Menambahkan filter pekerja dan proyek untuk laporan upah
+      await ensureMasterDataFresh(['workers', 'projects']);
       const workerOptions = [
           { value: 'all', text: 'Semua Pekerja' }, 
-          // Filter pekerja yang aktif atau pernah aktif (tidak terhapus)
           ...appState.workers.filter(w => !w.isDeleted).map(w => ({ value: w.id, text: w.workerName }))
       ];
+      const projectOptions = [
+          { value: 'all', text: 'Semua Proyek' },
+          ...appState.projects.filter(p => !p.isDeleted).map(p => ({ value: p.id, text: p.projectName }))
+      ];
       filtersHTML += createMasterDataSelect('report-worker-id', 'Filter Pekerja', workerOptions, 'all');
+      filtersHTML += createMasterDataSelect('report-project-id', 'Filter Proyek', projectOptions, 'all');
     // --- AKHIR PERUBAHAN ---
 
     } else if (reportType === 'material_supplier') {

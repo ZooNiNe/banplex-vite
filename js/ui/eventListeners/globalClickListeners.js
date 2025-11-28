@@ -138,6 +138,7 @@ export function initializeGlobalClickListeners() {
             'open-item-actions-modal',
             'view-jurnal-harian', 'view-worker-recap',
             'open-generate-worker-bill-confirm',
+            'open-salary-payment-panel', 'open-salary-payment-history',
             'view-log-detail',
             'manage-master',
             'open-pemasukan-form',

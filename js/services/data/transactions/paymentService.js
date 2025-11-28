@@ -71,6 +71,7 @@ export async function handleProcessBillPayment(formElement) {
     }
 
     const { recipient: initialRecipientName, description: billDescription, workerDetail } = _getBillRecipientDetails(billId, appState);
+    let paymentLogged = false;
     
     // Idempotency key
     let clientPaymentId = formElement.dataset.paymentId;
@@ -176,25 +177,33 @@ export async function handleProcessBillPayment(formElement) {
                                 }
                                 
                                 // Tambahkan pending payment
-                                await localDB.pending_payments.add({ 
-                                    billId, amount: amountToPay, date, 
-                                    localAttachmentId, createdAt: new Date(), paymentId: clientPaymentId,
-                                    // Detail Gaji Individual (Jika ada)
-                                    ...(workerDetail?.id && { workerId: workerDetail.id, workerName: workerDetail.name, paymentType: 'salary' }),
-                                });
+                            await localDB.pending_payments.add({ 
+                                billId, amount: amountToPay, date, 
+                                localAttachmentId, createdAt: new Date(), paymentId: clientPaymentId,
+                                // Detail Gaji Individual (Jika ada)
+                                ...(workerDetail?.id && { workerId: workerDetail.id, workerName: workerDetail.name, paymentType: 'salary' }),
                             });
-                            
-                            _logActivity(`Membayar ${initialBill.type === 'gaji' ? `Gaji ${workerDetail.name}` : 'Tagihan'} (Offline)`, { billId, amount: amountToPay });
-                            requestSync({ silent: true });
-                        } catch(error){
-                            console.error("[processPayment - Offline] Error:", error);
-                            throw error;
-                        }
+                        });
+                        
+                        _logActivity(`Membayar ${initialBill.type === 'gaji' ? `Gaji ${workerDetail.name}` : 'Tagihan'} (Offline)`, { billId, amount: amountToPay });
+                        paymentLogged = true;
+                        requestSync({ silent: true });
+                    } catch(error){
+                        console.error("[processPayment - Offline] Error:", error);
+                        throw error;
+                    }
                     }
                 };
 
                 await processPayment();
                 await loadAllLocalDataToState();
+                if (!paymentLogged) {
+                    const actionLabel = initialBill.type === 'gaji'
+                        ? `Membayar Gaji ${workerDetail?.name || initialRecipientName}`
+                        : 'Membayar Tagihan';
+                    _logActivity(actionLabel, { billId, amount: amountToPay, mode: 'online' });
+                    paymentLogged = true;
+                }
 
                 const updatedBill = await localDB.bills.get(billId);
                 if (!updatedBill) throw new Error("Data tagihan tidak ditemukan setelah pemrosesan.");

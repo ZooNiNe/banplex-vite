@@ -42,9 +42,50 @@ function createIcon(iconName, size = 18, classes = '') {
     return icons[iconName] || '';
 }
 
+async function fetchBillPaymentsById(billId) {
+    if (!billId) return [];
+    const pendingPaymentsTable = localDB.pending_payments;
+    const pending = pendingPaymentsTable
+        ? await pendingPaymentsTable.where({ billId }).toArray().catch(() => [])
+        : [];
+    let serverPayments = [];
+    try {
+        const billRef = doc(db, 'teams', TEAM_ID, 'bills', billId);
+        const paymentQuery = query(collection(billRef, 'payments'), orderBy('date', 'desc'));
+        const snap = await getDocs(paymentQuery);
+        serverPayments = snap.docs.map(d => ({
+            id: d.id,
+            billId,
+            ...d.data(),
+            _source: 'server'
+        }));
+    } catch (error) {
+        console.warn("[fetchBillPaymentsById] Gagal mengambil pembayaran server:", error);
+    }
+    const normalizedPending = pending.map(p => ({
+        ...p,
+        billId: p.billId || billId,
+        id: p.paymentId || p.id,
+        _source: 'pending'
+    }));
+    const combined = [...serverPayments, ...normalizedPending];
+    combined.sort((a, b) => getJSDate(b.date || b.createdAt) - getJSDate(a.date || a.createdAt));
+    return combined;
+}
+
 export async function handleOpenBillDetail(context) {
     const { itemId, expenseId } = context || {};
-    const billId = itemId;
+    let billId = itemId;
+    const parseIdList = (value) => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean);
+        if (typeof value === 'string') return value.split(',').map(part => part.trim()).filter(Boolean);
+        return [];
+    };
+    const aggregatedBillIds = parseIdList(context?.billIds || context?.['bill-ids']);
+    const workerIdFromContext = context?.workerId || context?.['worker-id'] || '';
+    const aggregateIdFromContext = context?.aggregateId || context?.['aggregate-id'] || '';
+    const primaryBillIdFromContext = context?.primaryBillId || context?.['primary-bill-id'] || '';
     const isMobile = window.matchMedia('(max-width: 599px)').matches;
     const loaderContent = `<div class="skeleton-wrapper" style="padding: 1.5rem; display: flex; flex-direction: column; height: 100%;">${_getSkeletonLoaderHTML('detail-tagihan')}</div>`;
     const titleText = 'Memuat Detail Tagihan...';
@@ -72,8 +113,23 @@ export async function handleOpenBillDetail(context) {
             fetchAndCacheData('workers', workersCol, 'workerName')
         ]);
 
+        const searchBillIds = [];
+        if (billId) searchBillIds.push(billId);
+        aggregatedBillIds.forEach(id => {
+            if (!searchBillIds.includes(id)) searchBillIds.push(id);
+        });
+
         let bill = null;
-        if (billId) {
+        if (searchBillIds.length > 0) {
+            for (const candidateId of searchBillIds) {
+                bill = appState.bills?.find(b => b.id === candidateId) || await localDB.bills.get(candidateId);
+                if (bill) {
+                    billId = candidateId;
+                    break;
+                }
+            }
+        }
+        if (!bill && billId) {
             bill = appState.bills?.find(b => b.id === billId) || await localDB.bills.get(billId);
         }
         if (!bill && expenseId) {
@@ -108,34 +164,30 @@ export async function handleOpenBillDetail(context) {
         let content, title;
         if (bill && bill.type === 'gaji') {
             let payments = [];
+            const targetPaymentIds = searchBillIds.length ? searchBillIds : [bill.id];
             try {
-                 const billRef = doc(billsCol, bill.id);
-                 const paymentsSnap = await getDocs(query(collection(billRef, 'payments'), orderBy('date', 'desc')));
-                 payments = paymentsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                const paymentResults = await Promise.all(
+                    targetPaymentIds.map(id => fetchBillPaymentsById(id))
+                );
+                payments = paymentResults.flat();
             } catch (paymentError) {
-
+                console.warn("[handleOpenBillDetail] Gagal mengambil riwayat pembayaran gaji:", paymentError);
             }
-            content = _createSalaryBillDetailContentHTML(bill, payments);
+            const detailOptions = {
+                billIds: searchBillIds,
+                workerId: workerIdFromContext,
+                aggregateId: aggregateIdFromContext,
+                primaryBillId: primaryBillIdFromContext || bill?.primaryBillId || '',
+            };
+            content = _createSalaryBillDetailContentHTML(bill, payments, detailOptions);
             
             try {
-                const formatRingkas = (d) => {
-                    if (!d) return '??/??';
-                    const date = getJSDate(d);
-                    const day = String(date.getDate()).padStart(2, '0');
-                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                    return `${day}/${month}`;
-                };
-                
-                if (bill.startDate && bill.endDate) {
-                    const start = formatRingkas(bill.startDate);
-                    const end = formatRingkas(bill.endDate);
-                    title = `Gaji (${start} - ${end})`;
-                } else {
-                    const workerName = bill.workerDetails && bill.workerDetails.length === 1 ? bill.workerDetails[0].name : (bill.workerDetails ? `${bill.workerDetails.length} Pekerja` : 'Pekerja');
-                    title = `Detail Gaji: ${workerName}`;
-                }
+                const workerName = bill.workerDetails && bill.workerDetails.length === 1
+                    ? bill.workerDetails[0].name
+                    : (bill.workerDetails ? `${bill.workerDetails.length} Pekerja` : 'Pekerja');
+                title = `Rekap Gaji: ${workerName}`;
             } catch (e) {
-                title = `Detail Tagihan Gaji`; // Fallback akhir
+                title = `Rekap Tagihan Gaji`; // Fallback akhir
             }
 
         } else {

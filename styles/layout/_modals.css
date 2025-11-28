@@ -94,6 +94,8 @@
   align-items: center;
   flex-shrink: 0;
   position: relative;
+  background: linear-gradient(135deg, rgba(11,107,203,0.12), rgba(11,107,203,0.04));
+  border-bottom: 1px solid var(--line);
 }
 .modal-header h4 {
   font-size: 1.1rem;
@@ -345,12 +347,15 @@
 /* Payment modal specifics */
 .quick-pay-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: .75rem;
     padding: 0 1.25rem 1.25rem;
 }
 .payment-form-body {
-    padding: 0 1.25rem;
+    padding: 0 1.25rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
 .payment-form-body .upload-buttons {

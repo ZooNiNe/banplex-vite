@@ -434,9 +434,8 @@ export function createLaporanPageSkeletonHTML() {
         <div class="content-panel">
             <div class="panel-header">
                 ${_createStandardToolbarSkeleton('Laporan')}
-                ${createHeroSkeleton('110px')}
             </div>
-            <div id="sub-page-content" class="panel-body scrollable-content">
+            <div id="sub-page-content" class="panel-body scrollable-content has-padding">
                 <div class="card card-pad skeleton" id="report-filter-card" style="height: 80px; margin-bottom: 1rem;"></div>
                 <div class="report-summary-header skeleton" id="report-summary-header" style="height: 50px; margin-bottom: 1rem;"></div>
                 <div class="dashboard-grid-layout" id="report-summary-grid">

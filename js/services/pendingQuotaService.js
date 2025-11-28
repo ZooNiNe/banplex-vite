@@ -12,6 +12,58 @@ function normalizeTypes(types) {
     return types.filter(Boolean);
 }
 
+function mergePendingEntry(existing, incoming) {
+    if (!existing) return incoming;
+    return {
+        ...existing,
+        ...incoming,
+        status: existing.status || incoming.status,
+        message: existing.message || incoming.message,
+        dataPayload: incoming.dataPayload || existing.dataPayload || null,
+        operation: existing.operation || incoming.operation
+    };
+}
+
+async function attachOutboxSnapshots(grouped, normalizedTypes = []) {
+    if (!localDB?.outbox) return;
+    const typeFilter = normalizedTypes.length > 0 ? new Set(normalizedTypes) : null;
+    let rows = [];
+    try {
+        rows = await localDB.outbox.toArray();
+    } catch (err) {
+        console.error('[PendingQuota] Gagal membaca outbox untuk snapshot quota:', err);
+        return;
+    }
+
+    const relevantRows = rows.filter(job => {
+        if (typeFilter && !typeFilter.has(job.table)) return false;
+        return job.status === 'pending' || job.quotaBlocked === 1;
+    });
+
+    for (const job of relevantRows) {
+        let payload = job.payload;
+        if (!payload && job.table && localDB[job.table]) {
+            try {
+                payload = await localDB[job.table].get(job.docId);
+            } catch (_) {}
+        }
+        const type = job.table || 'unknown';
+        const typeMap = ensureMap(grouped, type);
+        const existing = typeMap.get(job.docId);
+        const merged = mergePendingEntry(existing, {
+            id: existing?.id || `outbox-${job.id || job.docId}`,
+            status: existing?.status || (job.quotaBlocked ? 'pending_quota' : 'pending_local'),
+            dataType: type,
+            dataId: job.docId,
+            dataPayload: payload || null,
+            operation: job.op || existing?.operation || 'upsert',
+            lastAttempt: job.lastTriedAt || existing?.lastAttempt || Date.now(),
+            message: existing?.message || (job.quotaBlocked ? 'Perubahan tertahan hingga kuota server tersedia.' : 'Perubahan belum disinkron.')
+        });
+        typeMap.set(job.docId, merged);
+    }
+}
+
 export async function getPendingQuotaMap(dataType) {
     const maps = await getPendingQuotaMaps(dataType ? [dataType] : []);
     if (dataType) {
@@ -36,11 +88,15 @@ export async function getPendingQuotaMaps(dataTypes = []) {
             const typeMap = ensureMap(grouped, type);
             if (!typeMap.has(log.dataId)) {
                 typeMap.set(log.dataId, log);
+            } else {
+                const existing = typeMap.get(log.dataId);
+                typeMap.set(log.dataId, mergePendingEntry(existing, log));
             }
         });
     } catch (err) {
         console.error('[PendingQuota] Gagal mengambil data pending quota:', err);
     }
+    await attachOutboxSnapshots(grouped, normalizedTypes);
     return grouped;
 }
 

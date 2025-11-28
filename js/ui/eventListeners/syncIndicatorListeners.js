@@ -1,6 +1,6 @@
 import { emit, on } from "../../state/eventBus.js";
 import { appState } from "../../state/appState.js";
-import { updateSyncIndicator } from "../../services/syncService.js";
+import { updateSyncIndicator, checkAndPushQueuedData } from "../../services/syncService.js";
 import { showLoadingModal, hideLoadingModal, updateLoadingModal } from "../components/modal.js";
 
 let __capsuleTimer = null;
@@ -68,6 +68,22 @@ export function initializeSyncIndicatorListeners() {
         } catch (e) { console.error(e); }
     });
 
-    window.addEventListener('online', () => { try { (window.appState || appState).isOnline = true; updateSyncIndicator(); } catch(_) {} });
-    window.addEventListener('offline', () => { try { (window.appState || appState).isOnline = false; updateSyncIndicator(); } catch(_) {} });
+    window.addEventListener('online', () => {
+        try {
+            (window.appState || appState).isOnline = true;
+            updateSyncIndicator();
+            checkAndPushQueuedData({ silent: true, showModalOnBlock: true, forceQuotaRetry: true }).catch((err) => console.error('Auto sync on reconnect failed:', err));
+        } catch(_) {}
+    });
+    window.addEventListener('offline', () => {
+        try {
+            (window.appState || appState).isOnline = false;
+            updateSyncIndicator();
+            checkAndPushQueuedData({ silent: true, showModalOnBlock: true }).catch((err) => console.error('Queue check on offline failed:', err));
+        } catch(_) {}
+    });
+
+    try {
+        checkAndPushQueuedData({ silent: true, showModalOnBlock: true }).catch((err) => console.error('Initial queue check failed:', err));
+    } catch (_) {}
 }

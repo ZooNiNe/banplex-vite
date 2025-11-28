@@ -49,6 +49,9 @@ async function retryDexieOperation(operation, maxRetries = 1, delay = 100) {
 const WIB_OFFSET_MINUTES = 420; // UTC+7
 const QUOTA_RETRY_STORAGE_KEY = 'quotaRetry.lastAttempt';
 let quotaNotified = false;
+const PENDING_TABLES = ['expenses', 'bills', 'incomes', 'funding_sources', 'attendance_records', 'stock_transactions', 'comments'];
+let _lastQueueModalAt = 0;
+const QUEUE_MODAL_COOLDOWN = 10000;
 
 function isQuotaError(error) {
     if (!error) return false;
@@ -541,6 +544,7 @@ async function syncToServer(options = {}) {
                     toast('info', 'Kuota server habis. Data tetap tersimpan di perangkat dan akan dikirim otomatis saat kuota tersedia.');
                     quotaNotified = true;
                  }
+                 _notifyPendingQueue('quota');
             } else if (error.name === 'DatabaseClosedError') {
                  if (!silent) emit('ui.toast', { args: ['error', 'Database lokal error saat sinkronisasi.'] });
             } else {
@@ -559,6 +563,158 @@ async function syncToServer(options = {}) {
         }
 
     }
+}
+
+function _formatCount(n = 0) {
+    try {
+        return Number(n || 0).toLocaleString('id-ID');
+    } catch (_) {
+        return String(n || 0);
+    }
+}
+
+async function getQueuedDataSnapshot() {
+    const breakdown = {};
+    let pendingLocal = 0;
+    for (const tableName of PENDING_TABLES) {
+        let count = 0;
+        try {
+            count = await localDB[tableName].where('syncState').anyOf('pending_create', 'pending_update', 'pending_delete').count();
+        } catch (_) {}
+        breakdown[tableName] = count;
+        pendingLocal += count;
+    }
+
+    let outboxCount = 0;
+    let pendingPayments = 0;
+    try { outboxCount = await localDB.outbox.count(); } catch (_) {}
+    try { pendingPayments = await localDB.pending_payments.count(); } catch (_) {}
+
+    const total = outboxCount + pendingPayments + pendingLocal;
+    return {
+        outboxCount,
+        pendingPayments,
+        pendingLocal,
+        total,
+        breakdown
+    };
+}
+
+function _buildQueueModalContent(snapshot = {}, reason = 'quota') {
+    const reasonText = reason === 'offline'
+        ? 'Perangkat sedang offline. Data akan dikirim otomatis saat koneksi kembali.'
+        : 'Kuota server hari ini habis. Data tetap aman di perangkat dan akan dikirim otomatis saat kuota tersedia.';
+
+    return `
+        <div class="card card-pad">
+            <p>${reasonText}</p>
+            <div class="dense-list">
+                <div class="dense-list-item">
+                    <div>
+                        <strong>Outbox</strong>
+                        <div class="text-subtle">Job yang menunggu dikirim</div>
+                    </div>
+                    <span class="pill pill-neutral">${_formatCount(snapshot.outboxCount)} item</span>
+                </div>
+                <div class="dense-list-item">
+                    <div>
+                        <strong>Perubahan Lokal</strong>
+                        <div class="text-subtle">Data dengan status pending</div>
+                    </div>
+                    <span class="pill pill-neutral">${_formatCount(snapshot.pendingLocal)} item</span>
+                </div>
+                <div class="dense-list-item">
+                    <div>
+                        <strong>Pembayaran Tertunda</strong>
+                        <div class="text-subtle">Transaksi offline</div>
+                    </div>
+                    <span class="pill pill-neutral">${_formatCount(snapshot.pendingPayments)} item</span>
+                </div>
+            </div>
+            <p class="text-subtle" style="margin-top:0.75rem;">Total antrian: <strong>${_formatCount(snapshot.total)}</strong></p>
+        </div>
+    `;
+}
+
+function _showQueueNotificationModal(snapshot, reason) {
+    const now = Date.now();
+    if (now - _lastQueueModalAt < QUEUE_MODAL_COOLDOWN) return;
+    _lastQueueModalAt = now;
+
+    const content = _buildQueueModalContent(snapshot, reason);
+    const footer = `
+        <button type="button" class="btn btn-ghost" data-action="close-modal">Tutup</button>
+        <button type="button" class="btn btn-primary" data-action="queue-sync-now">Kirim Sekarang</button>
+    `;
+    const modal = emit('ui.modal.create', 'dataDetail', {
+        title: 'Sinkronisasi Ditunda',
+        content,
+        footer,
+        isUtility: true
+    });
+
+    if (modal) {
+        const triggerBtn = modal.querySelector('[data-action="queue-sync-now"]');
+        if (triggerBtn && !triggerBtn.__queueListenerAttached) {
+            triggerBtn.addEventListener('click', () => {
+                try {
+                    requestSync({ silent: false, forceQuotaRetry: true });
+                } catch (err) {
+                    console.error('Gagal memulai sinkronisasi manual dari modal antrian:', err);
+                    toast('error', 'Gagal memulai sinkronisasi.');
+                } finally {
+                    emit('ui.modal.close', modal);
+                }
+            });
+            triggerBtn.__queueListenerAttached = true;
+        }
+    }
+}
+
+async function _notifyPendingQueue(reason = 'quota') {
+    try {
+        const snapshot = await getQueuedDataSnapshot();
+        if (!snapshot || snapshot.total === 0) return;
+        _showQueueNotificationModal(snapshot, reason);
+    } catch (err) {
+        console.error('Gagal menyiapkan notifikasi antrian sinkron:', err);
+    }
+}
+
+async function checkAndPushQueuedData(options = {}) {
+    const {
+        showModalOnBlock = true,
+        notifyWhenEmpty = false,
+        silent = true,
+        forceQuotaRetry = false
+    } = options;
+
+    const snapshot = await getQueuedDataSnapshot();
+    if (!snapshot || snapshot.total === 0) {
+        if (notifyWhenEmpty) {
+            toast('info', 'Tidak ada data antrean untuk dikirim.');
+        }
+        return { hasQueue: false };
+    }
+
+    if (appState.isSyncing) {
+        return { skipped: true, reason: 'syncing', snapshot };
+    }
+
+    const offline = !navigator.onLine;
+    const quotaBlocked = _isQuotaExceeded() && !forceQuotaRetry;
+
+    if (!offline && !quotaBlocked) {
+        requestSync({ silent, forceQuotaRetry });
+        return { triggered: true, snapshot };
+    }
+
+    if (showModalOnBlock) {
+        _showQueueNotificationModal(snapshot, offline ? 'offline' : 'quota');
+    }
+
+    requestSync({ silent: true, forceQuotaRetry: forceQuotaRetry || quotaBlocked });
+    return { blocked: true, reason: offline ? 'offline' : 'quota', snapshot };
 }
 
 
@@ -619,7 +775,7 @@ function _setActiveListeners(pageSpecificListeners = []) {
     required.forEach(name => { if (!currentActive.has(name)) { const colRef = collectionRefs[name]; if (colRef) { let q; if (name === 'comments' && appState._commentsScope?.parentId) q = query(colRef, where('parentId', '==', appState._commentsScope.parentId)); else q = query(colRef); const unsub = onSnapshot(q, (snap) => { if (snap.empty && snap.metadata.fromCache) return; _processRealtimeChanges(snap.docChanges(), name); }, (err) => { console.error(`Gagal ${name}:`, err); if (err.code === 'permission-denied' && name !== 'members') { console.warn(`Denied ${name}. Off.`); const u = appState.activeListeners.get(name); if (u) u(); appState.activeListeners.delete(name); } else if (err.code === 'unauthenticated' || err.code === 'permission-denied') console.error("Auth gagal."); }); appState.activeListeners.set(name, unsub); listenerUnsubscribers.push(unsub); console.log(`+ Listener '${name}' diaktifkan.`); } } });
 }
 
-export { syncFromServer, syncToServer, updateSyncIndicator, subscribeToAllRealtimeData, _applyChangesToStateAndUI, getLastSyncTimestamp, setLastSyncTimestamp, _isQuotaExceeded, _setQuotaExceededFlag, _initQuotaResetScheduler, _forceRefreshDataFromServer, _setActiveListeners, requestSync };
+export { syncFromServer, syncToServer, updateSyncIndicator, subscribeToAllRealtimeData, _applyChangesToStateAndUI, getLastSyncTimestamp, setLastSyncTimestamp, _isQuotaExceeded, _setQuotaExceededFlag, _initQuotaResetScheduler, _forceRefreshDataFromServer, _setActiveListeners, requestSync, getQueuedDataSnapshot, checkAndPushQueuedData };
 
 async function _autoRebaseOnConflict(tableName, docRef, localData) {
     return await runTransaction(db, async (tx) => {
@@ -640,6 +796,10 @@ async function requestSync(options = {}) {
     if (options.silent) appState.isSilentSync = true;
     
     if (!navigator.onLine) { _scheduleSyncOnReconnect(); return; }
+    if (!options.forceQuotaRetry && _isQuotaExceeded()) {
+        console.warn('Sync skipped: firestore quota flag is active. Will retry after quota reset or manual force.');
+        return;
+    }
     if (appState.isSyncing) { _syncAgain = true; return; } const elapsed = Date.now() - _lastSyncAt;
     if (elapsed < MIN_SYNC_INTERVAL) { if (!_syncScheduled) { _syncScheduled = true; setTimeout(async () => { _syncScheduled = false; await syncToServer({ ...options, silent: true }); }, MIN_SYNC_INTERVAL - elapsed); } return; }
 

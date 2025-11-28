@@ -67,6 +67,7 @@ export function attachMenuActionListeners(menuElement) {
             'edit-surat-jalan',
             'view-invoice-items',
             'open-salary-payment-panel',
+            'open-salary-payment-history',
             'pay-individual-salary',    
             'edit-attendance',    
             'view-jurnal-harian',

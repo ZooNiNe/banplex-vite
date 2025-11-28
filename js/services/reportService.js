@@ -270,146 +270,131 @@ function getRecordDayValue(rec) {
     return rec.attendanceStatus && rec.attendanceStatus !== 'absent' ? 1 : 0;
 }
 
-async function _prepareUpahPekerjaDataForPdf() {
-    // --- PERUBAHAN: Mengambil filter dari DOM, sesuai file asli Anda ---
-    const startDateStr = $('#report-start-date')?.value;
-    const endDateStr = $('#report-end-date')?.value;
-    if (!startDateStr || !endDateStr) {
-        toast('error', 'Silakan pilih rentang tanggal laporan terlebih dahulu.');
-        return null;
-    }
-    // --- PERUBAHAN: Menggunakan parseLocalDate (sesuai import di file Anda) ---
-    const startDate = parseLocalDate(startDateStr); 
-    const endDate = parseLocalDate(endDateStr); 
-    const workerId = $('#report-worker-id')?.value || 'all'; // Ambil workerId
-    endDate.setHours(23, 59, 59, 999);
-    // --- AKHIR PERUBAHAN ---
+async function _prepareUpahPekerjaDataForPdf(filters = {}) {
+    const startDateStr = filters.start || $('#report-start-date')?.value;
+    const endDateStr = filters.end || $('#report-end-date')?.value;
+    if (!startDateStr || !endDateStr) {
+        toast('error', 'Silakan pilih rentang tanggal laporan terlebih dahulu.');
+        return null;
+    }
+    const startDate = parseLocalDate(startDateStr);
+    const endDate = parseLocalDate(endDateStr);
+    const workerId = filters.workerId || $('#report-worker-id')?.value || 'all';
+    const projectId = filters.projectId || $('#report-project-id')?.value || 'all';
+    if (!startDate || !endDate || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+        toast('error', 'Rentang tanggal tidak valid.');
+        return null;
+    }
+    endDate.setHours(23, 59, 59, 999);
 
-    let recordsInRange = (appState.attendanceRecords || [])
-        .filter(rec => {
-            if (rec.isDeleted) return false;
-            const recDate = getJSDate(rec.date);
-            // --- PERUBAHAN: Filter hanya absensi yang hadir/setengah hari ---
-            const isPresent = (rec.attendanceStatus === 'full_day' || rec.attendanceStatus === 'half_day');
-            // Pastikan status 'completed' tidak lagi digunakan untuk filter ini
-            return isPresent && recDate >= startDate && recDate <= endDate && (rec.totalPay || 0) > 0;
-        });
-        
-    if (workerId !== 'all') {
-        recordsInRange = recordsInRange.filter(rec => rec.workerId === workerId);
-    }
-    
-    recordsInRange = normalizeDailyAttendanceRecords(recordsInRange);
-    recordsInRange.sort((a,b) => getJSDate(a.date) - getJSDate(b.date));
+    let recordsInRange = (appState.attendanceRecords || [])
+        .filter(rec => {
+            if (rec.isDeleted) return false;
+            const recDate = getJSDate(rec.date);
+            if (!recDate || Number.isNaN(recDate.getTime())) return false;
+            const isPresent = rec.attendanceStatus === 'full_day' || rec.attendanceStatus === 'half_day';
+            return isPresent && recDate >= startDate && recDate <= endDate && (rec.totalPay || 0) > 0;
+        });
 
-    if (recordsInRange.length === 0) return null;
-    
-    // --- TAMBAHAN: Inisialisasi Total ---
+    if (workerId !== 'all') {
+        recordsInRange = recordsInRange.filter(rec => rec.workerId === workerId);
+    }
+    if (projectId !== 'all') {
+        recordsInRange = recordsInRange.filter(rec => rec.projectId === projectId);
+    }
+
+    recordsInRange = normalizeDailyAttendanceRecords(recordsInRange);
+    recordsInRange.sort((a, b) => getJSDate(a.date) - getJSDate(b.date));
+
+    if (recordsInRange.length === 0) return null;
+
     let totalUpah = 0;
     let totalHari = 0;
+    const billsMap = new Map((appState.bills || []).map(b => [b.id, b]));
+    const projectMap = new Map((appState.projects || []).map(p => [p.id, p.projectName]));
 
-    // --- PERUBAHAN: Buat Map dari tagihan untuk pencarian cepat ---
-    const billsMap = new Map((appState.bills || []).map(b => [b.id, b]));
+    const bodyRows = recordsInRange.map(rec => {
+        const worker = appState.workers.find(w => w.id === rec.workerId);
+        const recDate = getJSDate(rec.date);
+        const dateLabel = Number.isNaN(recDate.getTime()) ? '-' : recDate.toLocaleDateString('id-ID');
+        const projectName = projectMap.get(rec.projectId) || '-';
+        const statusText = rec.attendanceStatus === 'full_day' ? 'Hadir' : '1/2 Hari';
 
-    const bodyRows = recordsInRange.map(rec => {
-        const worker = appState.workers.find(w => w.id === rec.workerId);
-        const project = appState.projects.find(p => p.id === rec.projectId);
-        const statusText = (rec.attendanceStatus === 'full_day') ? 'Hadir' : '1/2 Hari';
-        
-        // --- PERUBAHAN: Logika Status Bayar Baru ---
-        let statusBayarText = 'Belum Direkap'; // Default
-        if (rec.billId) {
-            // 1. Ada tagihan terkait
-            const bill = billsMap.get(rec.billId);
-            if (bill) {
-                // 2. Cek status tagihan
-                if (bill.status === 'paid') {
-                    statusBayarText = 'Lunas';
-                } else {
-                    statusBayarText = 'Belum Lunas'; // Tagihan ada, tapi belum lunas
-                }
-            } else {
-                // Punya billId tapi tagihan tidak ditemukan (data anomali)
-                statusBayarText = 'Belum Lunas'; 
-            }
-        }
-        // --- AKHIR PERUBAHAN STATUS ---
+        let statusBayarText = 'Belum Direkap';
+        if (rec.billId) {
+            const bill = billsMap.get(rec.billId);
+            statusBayarText = bill ? (bill.status === 'paid' ? 'Lunas' : 'Belum Lunas') : 'Belum Lunas';
+        }
 
-        // --- TAMBAHAN: Akumulasi Total ---
         totalUpah += rec.totalPay || 0;
         if (rec.attendanceStatus === 'full_day') {
             totalHari += 1;
         } else if (rec.attendanceStatus === 'half_day') {
             totalHari += 0.5;
         }
-        // --- AKHIR TAMBAHAN TOTAL ---
 
-        return [
-            getJSDate(rec?.date).toLocaleDateString('id-ID'),
-            worker?.workerName || '-',
-            project?.projectName || '-',
-            statusText,
-            fmtIDRFormat(rec.totalPay || 0),
-            statusBayarText // Gunakan status baru
-        ];
-    });
-    
+        return [
+            dateLabel,
+            worker?.workerName || '-',
+            projectName,
+            statusText,
+            fmtIDRFormat(rec.totalPay || 0),
+            statusBayarText,
+        ];
+    });
 
-    // --- PERUBAHAN: Membuat subtitle di sini agar (generatePdfReport) bisa menggunakannya ---
-    const workerName = workerId !== 'all' ? (appState.workers.find(w => w.id === workerId)?.workerName || '-') : 'Semua Pekerja';
-    const subtitle = `Pekerja: ${workerName} | Periode: ${startDate.toLocaleDateString('id-ID')} s/d ${endDate.toLocaleDateString('id-ID')}`;
+    const workerLabel = workerId !== 'all' ? (appState.workers.find(w => w.id === workerId)?.workerName || '-') : 'Semua Pekerja';
+    const projectLabel = projectId !== 'all' ? (projectMap.get(projectId) || '-') : 'Semua Proyek';
+    const subtitle = `Pekerja: ${workerLabel} | Proyek: ${projectLabel} | Periode: ${startDate.toLocaleDateString('id-ID')} s/d ${endDate.toLocaleDateString('id-ID')}`;
 
-    // --- TAMBAHAN: Buat Bagian (Section) untuk Total (DI ATAS) ---
     const summarySection = {
-        sectionTitle: 'Ringkasan Total', // Judul untuk tabel total
-        headers: ["Deskripsi", { content: 'Total', styles: { halign: 'right' } }],
+        sectionTitle: 'Ringkasan Total',
+        headers: ['Deskripsi', { content: 'Total', styles: { halign: 'right' } }],
         body: [
-            ["Total Hari Kerja", { content: `${totalHari.toLocaleString('id-ID')} Hari`, styles: { halign: 'right' } }],
-            ["Total Upah Gaji", { content: fmtIDRFormat(totalUpah), styles: { halign: 'right' } }]
+            ['Total Hari Kerja', { content: `${totalHari.toLocaleString('id-ID')} Hari`, styles: { halign: 'right' } }],
+            ['Total Upah Gaji', { content: fmtIDRFormat(totalUpah), styles: { halign: 'right' } }],
         ],
-        foot: [] // Kosongkan footer
+        foot: [],
     };
 
     let paymentSection = null;
     try {
         if (workerId !== 'all') {
             const { payments, totalPaid } = await _getWorkerSalaryPayments(workerId, { startDate, endDate });
-            summarySection.body.push(["Total Pembayaran (Termasuk Cicilan)", { content: fmtIDRFormat(totalPaid), styles: { halign: 'right' } }]);
-            summarySection.body.push(["Sisa Belum Dibayar", { content: fmtIDRFormat(Math.max(0, totalUpah - totalPaid)), styles: { halign: 'right' } }]);
+            summarySection.body.push(['Total Pembayaran (Termasuk Cicilan)', { content: fmtIDRFormat(totalPaid), styles: { halign: 'right' } }]);
+            summarySection.body.push(['Sisa Belum Dibayar', { content: fmtIDRFormat(Math.max(0, totalUpah - totalPaid)), styles: { halign: 'right' } }]);
             if (payments.length > 0) {
                 paymentSection = {
                     sectionTitle: 'Riwayat Pembayaran Gaji',
-                    headers: ["Tanggal & Waktu", { content: "Jumlah", styles: { halign: 'right' } }, "Dibuat Oleh"],
+                    headers: ['Tanggal & Waktu', { content: 'Jumlah', styles: { halign: 'right' } }, 'Dibuat Oleh'],
                     body: payments.map(p => [
                         _formatFullTimestamp(p.date),
                         { content: fmtIDRFormat(p.amount || 0), styles: { halign: 'right' } },
-                        p.createdByName || '-'
-                    ])
+                        p.createdByName || '-',
+                    ]),
                 };
             }
         }
     } catch (e) {
         console.warn('Gagal menghitung pembayaran gaji pekerja', e);
     }
-    // --- AKHIR TAMBAHAN ---
 
-    return {
-        title: 'Laporan Rincian Upah Pekerja',
-        subtitle: subtitle, // <-- PERUBAHAN: Menambahkan subtitle
-        filename: `Laporan-Upah-${new Date().toISOString().slice(0, 10)}.pdf`,
-        sections: [
-            summarySection, // <-- PERUBAHAN: Total ditaruh di atas
+    return {
+        title: 'Laporan Rincian Upah Pekerja',
+        subtitle: subtitle,
+        filename: `Laporan-Upah-${new Date().toISOString().slice(0, 10)}.pdf`,
+        sections: [
+            summarySection,
             {
-                sectionTitle: 'Rincian Absensi', // <-- Judul untuk tabel rincian
-                headers: ["Tanggal", "Pekerja", "Proyek", "Status", "Upah", "Status"],
-                body: bodyRows,
-                foot: [] // <-- PERUBAHAN: Footer dikosongkan
-            },
-            ...(paymentSection ? [paymentSection] : [])
-        ]
-    };
+                sectionTitle: 'Rincian Absensi',
+                headers: ['Tanggal', 'Pekerja', 'Proyek', 'Status', 'Upah', 'Status'],
+                body: bodyRows,
+                foot: [],
+            },
+            ...(paymentSection ? [paymentSection] : []),
+        ],
+    };
 }
-
 async function _prepareMaterialSupplierDataForPdf() {
     const startDateStr = $('#report-start-date')?.value;
     const endDateStr = $('#report-end-date')?.value;
@@ -624,7 +609,7 @@ async function _prepareAnalisisBebanDataForPdf() {
     };
 }
 
-export async function handleDownloadReport(format, reportType) {
+export async function handleDownloadReport(format, reportType, filters = {}) {
     if (format === 'csv') {
         toast('info', 'Fitur unduh CSV sedang dalam pengembangan.');
         return;
@@ -642,7 +627,7 @@ export async function handleDownloadReport(format, reportType) {
             reportConfig = await _prepareAnalisisBebanDataForPdf();
             break;
         case 'upah_pekerja':
-            reportConfig = await _prepareUpahPekerjaDataForPdf();
+            reportConfig = await _prepareUpahPekerjaDataForPdf(filters);
             break;
         case 'material_supplier':
             reportConfig = await _prepareMaterialSupplierDataForPdf();

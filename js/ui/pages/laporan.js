@@ -13,6 +13,8 @@ import { ensureMasterDataFresh } from '../../services/data/ensureMasters.js';
 import { _getSkeletonLoaderHTML } from '../components/skeleton.js';
 import { showDetailPane, createModal } from '../components/modal.js';
 
+let teardownProjectDropdown = null;
+
 async function renderLaporanContent() {
     const container = $('#sub-page-content');
     if (!container) return;
@@ -23,60 +25,80 @@ async function renderLaporanContent() {
         const ymd = d => (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10);
 
         const projectOptions = [
-            `<option value="all">Semua Proyek</option>`,
-            ...((appState.projects || []).filter(p => !p.isDeleted).map(p => `<option value="${p.id}">${p.projectName}</option>`))
-        ].join('');
+            { value: 'all', label: 'Semua Proyek' },
+            ...((appState.projects || [])
+                .filter(p => !p.isDeleted)
+                .map(p => ({ value: p.id, label: p.projectName })))
+        ];
+        const defaultProjectId = projectOptions[0]?.value || 'all';
+        const initialFilterNote = formatFilterRangeNote(ymd(firstDay), ymd(today), defaultProjectId);
 
         const isAccounting = !!appState.reportAccountingMode;
-        const hideReportsHero = (function(){ try { return localStorage.getItem('ui.hideHero.reports') === '1'; } catch(_) { return false; } })();
-        const headerHTML = hideReportsHero ? '' : `
-            <div class="dashboard-hero" style="margin-bottom: 1rem; position: relative;">
-                <button class="hero-close-btn" data-action="close-hero" data-hero-id="reports" title="Tutup"></button>
-                <div class="hero-content">
-                    <h1>${isAccounting ? 'Laporan Akuntansi' : 'Ringkasan & Analisis'}</h1>
-                    <p>${isAccounting ? 'Tampilan profesional akuntansi proyek (P&L, Arus Kas, Neraca).' : 'Analisis komprehensif dari semua data yang diinput.'}</p>
-                </div>
-            </div>`;
+        const headerHTML = '';
 
         const filterHTML = `
-            <section class="panel panel-pad" id="report-filter-card">
+            <section class="panel panel-pad report-filter-card" id="report-filter-card">
                 <div class="report-filter" role="group" aria-label="Filter Laporan">
-                    <div class="date-range-group" role="group" aria-label="Rentang Tanggal">
-                        <label for="laporan-start-date" class="sr-only">Mulai</label>
-                        <input type="date" id="laporan-start-date" value="${ymd(firstDay)}" />
-                        <span class="sep" aria-hidden="true"></span>
-                        <label for="laporan-end-date" class="sr-only">Selesai</label>
-                        <input type="date" id="laporan-end-date" value="${ymd(today)}" />
+                    <div class="report-filter__primary">
+                        <div class="filter-field filter-field--dates">
+                            <label for="laporan-start-date">Rentang</label>
+                            <div class="date-range-group" role="group" aria-label="Rentang Tanggal">
+                                <input type="date" id="laporan-start-date" value="${ymd(firstDay)}" />
+                                <span class="range-sep" aria-hidden="true">s/d</span>
+                                <input type="date" id="laporan-end-date" value="${ymd(today)}" />
+                            </div>
+                        </div>
+                        <div class="filter-field filter-field--project">
+                            <label for="laporan-project-trigger">Proyek</label>
+                            <div class="custom-select" data-dropdown="laporan-project">
+                                <button class="custom-select__trigger" type="button" id="laporan-project-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span id="laporan-project-label">${projectOptions[0]?.label || 'Semua Proyek'}</span>
+                                    ${createIcon('chevron-down', 16)}
+                                </button>
+                                <ul class="custom-select__list" id="laporan-project-options" role="listbox">
+                                    ${projectOptions.map(opt => `<li role="option" data-value="${opt.value}" class="${opt.value === defaultProjectId ? 'selected' : ''}">${opt.label}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <input type="hidden" id="laporan-project-id" value="${defaultProjectId}" />
+                        </div>
                     </div>
-                    <div class="form-group project-select">
-                        <label for="laporan-project-id" class="sr-only">Proyek</label>
-                        <select id="laporan-project-id">${projectOptions}</select>
+                    <div class="report-filter__quick" role="group" aria-label="Rentang cepat">
+                        <span class="filter-label">Rentang Cepat</span>
+                        <div class="quick-chip-group">
+                            <button class="chip-button" id="btn-quick-7" type="button">7 Hari</button>
+                            <button class="chip-button" id="btn-quick-30" type="button">30 Hari</button>
+                            <button class="chip-button ghost" id="btn-reset-range" type="button">Reset</button>
+                        </div>
                     </div>
-
-                    <div class="report-actions">
-                        <button class="btn btn-primary" id="btn-apply-report-filter" data-tooltip="Terapkan Filter">
-                            ${createIcon('check', 18)}<span class="btn-label">Terapkan</span>
+                    <div class="report-filter__actions">
+                        <button class="btn btn-primary btn-full" id="btn-apply-report-filter" data-tooltip="Terapkan Filter">
+                            ${createIcon('check', 18)}<span>Terapkan Filter</span>
                         </button>
-                        <button class="btn btn-light icon-only" id="btn-quick-7" data-tooltip="7 Hari">
-                            ${createIcon('calendar', 18)}<span class="btn-label">7 Hari</span>
-                        </button>
-                        <button class="btn btn-light icon-only" id="btn-quick-30" data-tooltip="30 Hari">
-                            ${createIcon('calendar', 18)}<span class="btn-label">30 Hari</span>
-                        </button>
-                        <button class="btn btn-light icon-only" id="btn-reset-range" data-tooltip="Reset Rentang">
-                            ${createIcon('rotate_ccw', 18)}<span class="btn-label">Reset</span>
-                        </button>
+                        <p class="filter-hint">Unduh laporan dari toolbar kapan saja.</p>
                     </div>
-                    <div class="filter-hint" title="Tombol unduh laporan ada di Toolbar (kanan atas)">Unduh via Toolbar</div>
+                    <p class="filter-range-note" id="report-filter-note" role="status" aria-live="polite">${initialFilterNote}</p>
                 </div>
             </section>`;
 
         const summaryHeaderHTML = `
-            <section class="panel panel-pad" id="report-summary-card">
-                <div class="report-summary-header" id="report-summary-header">
-                    <div class="kpi"><span class="kpi-label">Masuk</span><span class="kpi-value" id="kpi-income">-</span></div>
-                    <div class="kpi"><span class="kpi-label">Keluar</span><span class="kpi-value" id="kpi-expense">-</span></div>
-                    <div class="kpi"><span class="kpi-label">Net</span><span class="kpi-value" id="kpi-net">-</span></div>
+            <section class="panel panel-pad report-kpi-card" id="report-summary-card">
+                <div class="report-kpi-tray report-summary-header" id="report-summary-header">
+                    <article class="kpi-pill">
+                        <span class="kpi-label">Masuk</span>
+                        <strong class="kpi-value" id="kpi-income">-</strong>
+                    </article>
+                    <article class="kpi-pill">
+                        <span class="kpi-label">Keluar</span>
+                        <strong class="kpi-value" id="kpi-expense">-</strong>
+                    </article>
+                    <article class="kpi-pill kpi-pill--ghost">
+                        <span class="kpi-label">Bunga Pinjaman</span>
+                        <strong class="kpi-value" id="kpi-interest">-</strong>
+                    </article>
+                    <article class="kpi-pill accent">
+                        <span class="kpi-label">Net</span>
+                        <strong class="kpi-value" id="kpi-net">-</strong>
+                    </article>
                 </div>
             </section>`;
 
@@ -117,135 +139,167 @@ async function renderLaporanContent() {
         }
 
         const contentHTML = `
-            <div class="dashboard-grid-layout" id="report-summary-grid">
-                <section class="panel panel-full-width" data-sticker="coins" data-animal="cat">
-                    <div class="card-header">
-                        <div class="card-icon balance">${createIcon('scale')}</div>
-                        <span class="card-title">Ringkasan Keuangan</span>
-                    </div>
-                    <div class="card-body" style="gap:1rem;">
-                        <div class="chart-summary-grid">
-                            <div class="summary-stat-card"><span class="label">Pemasukan</span><span class="value" id="sum-income">-</span></div>
-                            <div class="summary-stat-card"><span class="label">Pengeluaran</span><span class="value" id="sum-expense">-</span></div>
-                            <div class="summary-stat-card"><span class="label">Pendanaan</span><span class="value" id="sum-funding">-</span></div>
-                            <div class="summary-stat-card"><span class="label">Laba/Rugi</span><span class="value" id="sum-net">-</span></div>
+            <div class="insight-stack" id="report-summary-grid">
+                <section class="panel panel-pad insight-card accent-overview" data-sticker="coins" data-animal="cat">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Snapshot</p>
+                            <h3 class="card-title">Ringkasan Keuangan</h3>
+                            <p class="insight-subtext">Statistik periode terpilih dalam satu layar.</p>
                         </div>
-                        <div class="two-col-responsive">
-                            <div class="report-card-chart"><canvas id="financial-summary-chart"></canvas></div>
-                            <div style="display:flex; flex-direction:column; gap:.5rem;">
-                                <div class="summary-stat-card"><span class="label">Tagihan Belum Lunas (Jumlah)</span><span class="value" id="sum-unpaid-bills-count">-</span></div>
-                                <div class="summary-stat-card"><span class="label">Tagihan Belum Lunas (Nilai)</span><span class="value" id="sum-unpaid-bills-amount">-</span></div>
-                                <div class="summary-stat-card"><span class="label">Pinjaman Belum Lunas (Nilai)</span><span class="value" id="sum-unpaid-loans-amount">-</span></div>
-                                <div class="summary-stat-card"><span class="label">Upah Dibayar / Belum</span><span class="value" id="sum-wages">-</span></div>
+                        <span class="insight-tag">Realtime</span>
+                    </header>
+                    <div class="insight-body">
+                        <div class="insight-metric-grid">
+                            <div class="summary-stat-card"><span class="label">Pemasukan</span><span class="value" id="sum-income">-</span></div>
+                            <div class="summary-stat-card"><span class="label">Pengeluaran</span><span class="value value--expense" id="sum-expense">-</span></div>
+                            <div class="summary-stat-card"><span class="label">Pendanaan</span><span class="value" id="sum-funding">-</span></div>
+                            <div class="summary-stat-card accent"><span class="label">Laba/Rugi</span><span class="value" id="sum-net">-</span></div>
+                        </div>
+                        <div class="insight-split">
+                            <div class="report-card-chart mellow"><canvas id="financial-summary-chart"></canvas></div>
+                            <div class="insight-list">
+                                <div class="summary-stat-card subtle"><span class="label">Tagihan Belum Lunas (Jumlah)</span><span class="value" id="sum-unpaid-bills-count">-</span></div>
+                                <div class="summary-stat-card subtle"><span class="label">Tagihan Belum Lunas (Nilai)</span><span class="value" id="sum-unpaid-bills-amount">-</span></div>
+                                <div class="summary-stat-card subtle"><span class="label">Pinjaman Belum Lunas (Nilai)</span><span class="value" id="sum-unpaid-loans-amount">-</span></div>
+                                <div class="summary-stat-card subtle"><span class="label">Upah Dibayar / Belum</span><span class="value" id="sum-wages">-</span></div>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                <section class="panel panel-full-width" data-sticker="bars">
-                    <div class="card-header">
-                        <div class="card-icon">${createIcon('bar')}</div>
-                        <span class="card-title">Tren 7 Hari</span>
-                    </div>
-                    <div class="card-body card-body-chart"><canvas id="interactive-bar-chart"></canvas></div>
-                </section>
-
-                <section class="panel panel-full-width" data-sticker="line" data-animal="bird">
-                    <div class="card-header" style="gap:.5rem;">
-                        <div class="card-icon">${createIcon('wallet')}</div>
-                        <span class="card-title">Arus Kas per Periode</span>
-                    <div class="card-actions">
-                            <button class="btn btn-light btn-sm icon-only" id="btn-cf-weekly" data-tooltip="7D">${createIcon('calendar',16)}<span class="btn-label">7D</span></button>
-                            <button class="btn btn-light btn-sm icon-only" id="btn-cf-monthly" data-tooltip="30D">${createIcon('calendar',16)}<span class="btn-label">30D</span></button>
-                            <button class="btn btn-secondary btn-sm icon-only" id="btn-cf-csv" data-tooltip="Unduh CSV">${createIcon('download',16)}</button>
-                            <button class="btn btn-light btn-sm icon-only" data-action="open-report-detail" data-target="cashflow-period-table" data-tooltip="Lihat Detail">${createIcon('file',16)}<span class="btn-label">Detail</span></button>
+                <section class="panel panel-pad insight-card" data-sticker="bars">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Aktivitas Terbaru</p>
+                            <h3 class="card-title">Tren 7 Hari</h3>
+                            <p class="insight-subtext">Bandingkan pemasukan vs pengeluaran harian.</p>
                         </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="card-body card-body-chart" style="min-height:220px"><canvas id="cashflow-period-chart"></canvas></div>
-                        <div id="cashflow-period-table" class="table-like" style="margin-top:.75rem;"></div>
+                    </header>
+                    <div class="insight-body card-body-chart">
+                        <canvas id="interactive-bar-chart"></canvas>
                     </div>
                 </section>
 
-                <section class="panel panel-full-width" data-sticker="calendar">
-                    <div class="card-header">
-                        <div class="card-icon">${createIcon('receipt')}</div>
-                        <span class="card-title">Aging Tagihan Belum Lunas</span>
-                        <div class="card-actions">
-                            <button class="btn btn-light btn-sm icon-only" data-action="open-report-detail" data-target="aging-table" data-tooltip="Lihat Detail">${createIcon('file',16)}<span class="btn-label">Detail</span></button>
+                <section class="panel panel-pad insight-card" data-sticker="line" data-animal="bird">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Arus Kas</p>
+                            <h3 class="card-title">Arus Kas per Periode</h3>
+                            <p class="insight-subtext">Ubah mode mingguan/bulanan untuk melihat tren.</p>
                         </div>
+                        <div class="insight-actions">
+                            <div class="chip-toggle" role="group" aria-label="Mode arus kas">
+                                <button class="chip-button" id="btn-cf-weekly" type="button">7H</button>
+                                <button class="chip-button" id="btn-cf-monthly" type="button">30H</button>
+                            </div>
+                            <button class="icon-button" id="btn-cf-csv" data-tooltip="Unduh CSV" type="button">${createIcon('download',16)}</button>
+                            <button class="icon-button" data-action="open-report-detail" data-target="cashflow-period-table" data-tooltip="Lihat detail" type="button">${createIcon('file',16)}</button>
+                        </div>
+                    </header>
+                    <div class="insight-body">
+                        <div class="report-card-chart full"><canvas id="cashflow-period-chart"></canvas></div>
+                        <div id="cashflow-period-table" class="table-like"></div>
                     </div>
-                    <div class="card-body">
+                </section>
+
+                <section class="panel panel-pad insight-card" data-sticker="calendar">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Tagihan</p>
+                            <h3 class="card-title">Aging Tagihan Belum Lunas</h3>
+                            <p class="insight-subtext">Kelompokkan jatuh tempo untuk prioritas penagihan.</p>
+                        </div>
+                        <div class="insight-actions">
+                            <button class="icon-button" data-action="open-report-detail" data-target="aging-table" data-tooltip="Lihat detail" type="button">${createIcon('file',16)}</button>
+                        </div>
+                    </header>
+                    <div class="insight-body">
                         <div id="aging-table" class="table-like"></div>
                     </div>
                 </section>
 
-                <section class="panel panel-full-width" data-sticker="pie">
-                    <div class="card-header">
-                        <div class="card-icon">${createIcon('pie')}</div>
-                        <span class="card-title">Rincian Pengeluaran per Kategori</span>
-                        <div class="card-actions">
-                            <button class="btn btn-light btn-sm icon-only" data-action="open-report-detail" data-target="expense-category-table" data-tooltip="Lihat Detail">${createIcon('file',16)}<span class="btn-label">Detail</span></button>
+                <section class="panel panel-pad insight-card" data-sticker="pie">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Pengeluaran</p>
+                            <h3 class="card-title">Rincian per Kategori</h3>
+                            <p class="insight-subtext">Lihat kategori biaya terbesar secara instan.</p>
                         </div>
-                    </div>
-                    <div class="card-body">
+                        <div class="insight-actions">
+                            <button class="icon-button" data-action="open-report-detail" data-target="expense-category-table" data-tooltip="Lihat detail" type="button">${createIcon('file',16)}</button>
+                        </div>
+                    </header>
+                    <div class="insight-body">
                         <div id="expense-category-table" class="table-like"></div>
                     </div>
                 </section>
 
-                <section class="panel panel-full-width" data-sticker="grid">
-                    <div class="card-header">
-                        <div class="card-icon">${createIcon('truck')}</div>
-                        <span class="card-title">Belanja per Supplier (Top 5)</span>
-                        <div class="card-actions">
-                            <button class="btn btn-light btn-sm icon-only" data-action="open-report-detail" data-target="supplier-spend-table" data-tooltip="Lihat Detail">${createIcon('file',16)}<span class="btn-label">Detail</span></button>
+                <section class="panel panel-pad insight-card" data-sticker="grid">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Supplier</p>
+                            <h3 class="card-title">Belanja per Supplier (Top 5)</h3>
+                            <p class="insight-subtext">Pantau pemasok yang paling aktif.</p>
                         </div>
-                    </div>
-                    <div class="card-body">
+                        <div class="insight-actions">
+                            <button class="icon-button" data-action="open-report-detail" data-target="supplier-spend-table" data-tooltip="Lihat detail" type="button">${createIcon('file',16)}</button>
+                        </div>
+                    </header>
+                    <div class="insight-body">
                         <div id="supplier-spend-table" class="table-like"></div>
                     </div>
                 </section>
 
-                <section class="panel panel-full-width" data-sticker="grid">
-                    <div class="card-header">
-                        <div class="card-icon">${createIcon('package')}</div>
-                        <span class="card-title">Pemakaian Material Teratas</span>
-                        <div class="card-actions">
-                            <button class="btn btn-light btn-sm icon-only" data-action="open-report-detail" data-target="material-usage-table" data-tooltip="Lihat Detail">${createIcon('file',16)}<span class="btn-label">Detail</span></button>
+                <section class="panel panel-pad insight-card" data-sticker="grid">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Material</p>
+                            <h3 class="card-title">Pemakaian Material Teratas</h3>
+                            <p class="insight-subtext">Bantu tim gudang fokus pada material tinggi.</p>
                         </div>
-                    </div>
-                    <div class="card-body">
+                        <div class="insight-actions">
+                            <button class="icon-button" data-action="open-report-detail" data-target="material-usage-table" data-tooltip="Lihat detail" type="button">${createIcon('file',16)}</button>
+                        </div>
+                    </header>
+                    <div class="insight-body">
                         <div id="material-usage-table" class="table-like"></div>
                     </div>
                 </section>
 
-                <section class="panel panel-full-width" data-sticker="nodes">
-                    <div class="card-header">
-                        <div class="card-icon">${createIcon('boxes')}</div>
-                        <span class="card-title">Ringkasan per Proyek</span>
-                        <div class="card-actions">
-                            <button class="btn btn-light btn-sm icon-only" data-action="open-report-detail" data-target="project-summary-table" data-tooltip="Lihat Detail">${createIcon('file',16)}<span class="btn-label">Detail</span></button>
+                <section class="panel panel-pad insight-card" data-sticker="nodes">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Proyek</p>
+                            <h3 class="card-title">Ringkasan per Proyek</h3>
+                            <p class="insight-subtext">Bandingkan tiap proyek tanpa membuka tabel besar.</p>
                         </div>
-                    </div>
-                    <div class="card-body">
+                        <div class="insight-actions">
+                            <button class="icon-button" data-action="open-report-detail" data-target="project-summary-table" data-tooltip="Lihat detail" type="button">${createIcon('file',16)}</button>
+                        </div>
+                    </header>
+                    <div class="insight-body">
                         <div id="project-summary-table" class="table-like"></div>
                     </div>
                 </section>
 
-                <section class="panel panel-full-width" data-sticker="shield">
-                    <div class="card-header" style="gap:.5rem;">
-                        <div class="card-icon balance">${createIcon('scale')}</div>
-                        <span class="card-title">Kesehatan Proyek (Anggaran vs Realisasi)</span>
-                        <div class="card-actions" style="gap:.5rem;">
+                <section class="panel panel-pad insight-card" data-sticker="shield">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Kesehatan Proyek</p>
+                            <h3 class="card-title">Anggaran vs Realisasi</h3>
+                            <p class="insight-subtext">Soroti proyek berisiko dan segera tindak lanjuti.</p>
+                        </div>
+                        <div class="insight-actions">
                             <label class="health-toggle" title="Tampilkan hanya proyek berisiko">
                                 <input type="checkbox" id="toggle-health-risk-only" />
-                                <span>-</span>
+                                <span>Risiko</span>
                             </label>
-                            <button class="btn btn-secondary btn-sm icon-only" id="btn-health-csv" data-tooltip="Unduh CSV">${createIcon('download',16)}</button>
-                            <button class="btn btn-light btn-sm icon-only" data-action="open-report-detail" data-target="project-health-table" data-tooltip="Lihat Detail">${createIcon('file',16)}<span class="btn-label">Detail</span></button>
+                            <button class="icon-button" id="btn-health-csv" data-tooltip="Unduh CSV" type="button">${createIcon('download',16)}</button>
+                            <button class="icon-button" data-action="open-report-detail" data-target="project-health-table" data-tooltip="Lihat detail" type="button">${createIcon('file',16)}</button>
                         </div>
-                    </div>
-                    <div class="card-body">
+                    </header>
+                    <div class="insight-body">
                         <div id="project-health-table" class="table-like"></div>
                     </div>
                 </section>
@@ -254,65 +308,79 @@ async function renderLaporanContent() {
         `;
 
         const accountingHTML = `
-            <div class="dashboard-grid-layout" id="accounting-grid">
-                <section class="panel panel-full-width" data-sticker="ledger">
-                    <div class="card-header">
-                        <div class="card-icon">${createIcon('file')}</div>
-                        <span class="card-title">Laporan Laba Rugi</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="list" style="display:grid; grid-template-columns: 1fr auto; gap:.5rem;">
-                            <div>Pendapatan</div><div id="pl-revenue" style="text-align:right; font-weight:600;">-</div>
-                            <div>HPP (Material)</div><div id="pl-cogs" style="text-align:right;">-</div>
-                            <div class="text-dim">Laba Kotor</div><div id="pl-gross" style="text-align:right; font-weight:700;">-</div>
-                            <div>Beban Operasional + Lainnya + Upah</div><div id="pl-opex" style="text-align:right;">-</div>
-                            <div class="text-dim">Laba/Rugi Bersih</div><div id="pl-net" style="text-align:right; font-weight:700;">-</div>
+            <div class="insight-stack" id="accounting-grid">
+                <section class="panel panel-pad insight-card" data-sticker="ledger">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Performa</p>
+                            <h3 class="card-title">Laporan Laba Rugi</h3>
+                            <p class="insight-subtext">Ringkasan P&amp;L versi mobile.</p>
+                        </div>
+                    </header>
+                    <div class="insight-body">
+                        <div class="insight-table">
+                            <div class="insight-row"><span class="label">Pendapatan</span><span class="value" id="pl-revenue">-</span></div>
+                            <div class="insight-row"><span class="label">HPP (Material)</span><span class="value" id="pl-cogs">-</span></div>
+                            <div class="insight-row highlight"><span class="label">Laba Kotor</span><span class="value" id="pl-gross">-</span></div>
+                            <div class="insight-row"><span class="label">Beban Operasional + Lainnya + Upah</span><span class="value" id="pl-opex">-</span></div>
+                            <div class="insight-row highlight"><span class="label">Laba/Rugi Bersih</span><span class="value" id="pl-net">-</span></div>
                         </div>
                     </div>
                 </section>
 
-                <section class="panel panel-full-width" data-sticker="line">
-                    <div class="card-header" style="gap:.5rem;">
-                        <div class="card-icon">${createIcon('wallet')}</div>
-                        <span class="card-title">Arus Kas per Periode</span>
-                        <div class="card-actions">
-                            <button class="btn btn-light btn-sm icon-only" id="btn-cf-weekly" data-tooltip="7D">${createIcon('calendar',16)}<span class="btn-label">7D</span></button>
-                            <button class="btn btn-light btn-sm icon-only" id="btn-cf-monthly" data-tooltip="30D">${createIcon('calendar',16)}<span class="btn-label">30D</span></button>
-                            <button class="btn btn-secondary btn-sm icon-only" id="btn-cf-csv" data-tooltip="Unduh CSV">${createIcon('download',16)}</button>
-                            <button class="btn btn-light btn-sm icon-only" data-action="open-report-detail" data-target="cashflow-period-table" data-tooltip="Lihat Detail">${createIcon('file',16)}<span class="btn-label">Detail</span></button>
+                <section class="panel panel-pad insight-card" data-sticker="line">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Arus Kas</p>
+                            <h3 class="card-title">Arus Kas per Periode</h3>
+                            <p class="insight-subtext">Gunakan chip untuk beralih mingguan/bulanan.</p>
                         </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="card-body card-body-chart" style="min-height:220px"><canvas id="cashflow-period-chart"></canvas></div>
-                        <div id="cashflow-period-table" class="table-like" style="margin-top:.75rem;"></div>
+                        <div class="insight-actions">
+                            <div class="chip-toggle" role="group" aria-label="Mode arus kas">
+                                <button class="chip-button" id="btn-cf-weekly" type="button">7H</button>
+                                <button class="chip-button" id="btn-cf-monthly" type="button">30H</button>
+                            </div>
+                            <button class="icon-button" id="btn-cf-csv" data-tooltip="Unduh CSV" type="button">${createIcon('download',16)}</button>
+                            <button class="icon-button" data-action="open-report-detail" data-target="cashflow-period-table" data-tooltip="Lihat detail" type="button">${createIcon('file',16)}</button>
+                        </div>
+                    </header>
+                    <div class="insight-body">
+                        <div class="report-card-chart full"><canvas id="cashflow-period-chart"></canvas></div>
+                        <div id="cashflow-period-table" class="table-like"></div>
                     </div>
                 </section>
 
-                <section class="panel panel-full-width" data-sticker="pie">
-                    <div class="card-header">
-                        <div class="card-icon">${createIcon('pie')}</div>
-                        <span class="card-title">Analisis Beban</span>
-                        <div class="card-actions">
-                            <button class="btn btn-light btn-sm icon-only" data-action="open-report-detail" data-target="expense-analysis-accounting" data-tooltip="Lihat Detail">${createIcon('file',16)}<span class="btn-label">Detail</span></button>
+                <section class="panel panel-pad insight-card" data-sticker="pie">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Analisis</p>
+                            <h3 class="card-title">Analisis Beban</h3>
+                            <p class="insight-subtext">Filter kategori untuk mengontrol pengeluaran.</p>
                         </div>
-                    </div>
-                    <div class="card-body">
+                        <div class="insight-actions">
+                            <button class="icon-button" data-action="open-report-detail" data-target="expense-analysis-accounting" data-tooltip="Lihat detail" type="button">${createIcon('file',16)}</button>
+                        </div>
+                    </header>
+                    <div class="insight-body">
                         <div id="expense-analysis-accounting" class="table-like"></div>
                     </div>
                 </section>
 
-                <section class="panel panel-full-width" data-sticker="scale">
-                    <div class="card-header">
-                        <div class="card-icon balance">${createIcon('landmark')}</div>
-                        <span class="card-title">Neraca (Ringkas)</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="list" style="display:grid; grid-template-columns: 1fr auto; gap:.5rem;">
-                            <div class="text-dim">Aset</div><div></div>
-                            <div>Kas (Perubahan Bersih Periode)</div><div id="bs-cash" style="text-align:right; font-weight:600;">-</div>
-                            <div class="text-dim" style="margin-top:.5rem;">Kewajiban</div><div></div>
-                            <div>Utang Usaha (Tagihan Belum Lunas)</div><div id="bs-ap" style="text-align:right;">-</div>
-                            <div>Pinjaman Belum Lunas</div><div id="bs-loans" style="text-align:right;">-</div>
+                <section class="panel panel-pad insight-card" data-sticker="scale">
+                    <header class="insight-header">
+                        <div>
+                            <p class="insight-eyebrow">Posisi</p>
+                            <h3 class="card-title">Neraca (Ringkas)</h3>
+                            <p class="insight-subtext">Tampilkan aset vs kewajiban secara manis.</p>
+                        </div>
+                    </header>
+                    <div class="insight-body">
+                        <div class="insight-table">
+                            <div class="insight-row section-label"><span class="label">Aset</span></div>
+                            <div class="insight-row"><span class="label">Kas (Perubahan Bersih Periode)</span><span class="value" id="bs-cash">-</span></div>
+                            <div class="insight-row section-label"><span class="label">Kewajiban</span></div>
+                            <div class="insight-row"><span class="label">Utang Usaha (Tagihan Belum Lunas)</span><span class="value" id="bs-ap">-</span></div>
+                            <div class="insight-row"><span class="label">Pinjaman Belum Lunas</span><span class="value" id="bs-loans">-</span></div>
                         </div>
                     </div>
                 </section>
@@ -322,6 +390,8 @@ async function renderLaporanContent() {
 
         const finalHTML = filterHTML + summaryHeaderHTML + (isAccounting ? accountingHTML : contentHTML);
         container.innerHTML = finalHTML;
+        setupProjectDropdown();
+        updateReportFilterNote();
 
         // Compact behaviors: Apply button and detail handlers
         $('#btn-apply-report-filter')?.addEventListener('click', () => applyReportFilters());
@@ -333,21 +403,35 @@ async function renderLaporanContent() {
                 const card = btn.closest('.panel');
                 const title = card?.querySelector('.card-title')?.textContent || 'Detail';
 
-                        if (isMobile) {
+                const wrapBottomSheetContent = (tableEl, extra = '') => {
+                    if (!tableEl) return '';
+                    const clone = tableEl.cloneNode(true);
+                    clone.removeAttribute('id');
+                    clone.classList.add('table-like--drawer');
+                    return `
+                        <div class="report-bottom-sheet scrollable-content has-padding">
+                            ${extra}
+                            ${clone.outerHTML}
+                        </div>`;
+                };
+
+                if (isMobile) {
                     // Build bottom sheet content
-                    let content = '';
                     if (target === 'cashflow-period-table') {
                         const mode = appState.reportCashflowMode || 'weekly';
                         const start = $('#laporan-start-date')?.value || '';
                         const end = $('#laporan-end-date')?.value || '';
                         const projectId = $('#laporan-project-id')?.value || 'all';
                         const { labels, inflows, outflows } = aggregateCashflowByPeriod({ start, end, projectId }, mode);
-                        content = `
-                            <div class="card-body card-body-chart" style="min-height:220px;">
+                        const tableEl = document.getElementById(target);
+                        if (!tableEl) return;
+                        const chartBlock = `
+                            <div class="report-bottom-sheet__chart">
                                 <canvas id="cf-detail-chart"></canvas>
-                            </div>
-                            <div class="table-like" style="margin-top:.75rem;">${document.getElementById(target)?.innerHTML || ''}</div>`;
-                        const modal = createModal('actionsPopup', { title, content, layoutClass: 'is-bottom-sheet' });
+                            </div>`;
+                        const mergedContent = wrapBottomSheetContent(tableEl, chartBlock);
+                        if (!mergedContent) return;
+                        const modal = createModal('actionsPopup', { title, content: mergedContent, layoutClass: 'is-bottom-sheet' });
                         // Defer chart render
                         setTimeout(() => {
                             try { _renderCashflowPeriodChart({ canvasId: 'cf-detail-chart', labels, inflows, outflows }); } catch(_) {}
@@ -355,8 +439,9 @@ async function renderLaporanContent() {
                     } else {
                         const table = target ? document.getElementById(target) : null;
                         if (!table) return;
-                        content = `<div class="table-like">${table.innerHTML}</div>`;
-                        createModal('actionsPopup', { title, content, layoutClass: 'is-bottom-sheet' });
+                        const mergedContent = wrapBottomSheetContent(table);
+                        if (!mergedContent) return;
+                        createModal('actionsPopup', { title, content: mergedContent, layoutClass: 'is-bottom-sheet' });
                     }
                 } else {
                     // Desktop: show detail pane (if used), otherwise no-op since content already visible
@@ -399,6 +484,7 @@ async function renderLaporanContent() {
 function createIcon(name, size = 18, classes = '') {
     const icons = {
         check: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check ${classes}"><path d="M20 6 9 17l-5-5"/></svg>`,
+        'chevron-down': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down ${classes}"><path d="m6 9 6 6 6-6"/></svg>`,
         rotate_ccw: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rotate-ccw ${classes}"><path d="M3 2v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L3 8"/></svg>`,
         scale: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-scale ${classes}"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2"/><path d="M19 7h2"/></svg>`,
         wallet: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wallet ${classes}"><path d="M21 12V7H5a2 2 0 0 1 0-4h14a2 2 0 0 1 2 2v4Z"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2Z"/></svg>`,
@@ -469,6 +555,9 @@ function aggregateReportData({ start, end, projectId }) {
     });
 
     const funding = (appState.fundingSources || []).filter(f => !f.isDeleted && inRange(f.createdAt || f.date, start, end));
+    const totalLoanInterest = funding
+        .filter(f => f.interestType === 'interest')
+        .reduce((s, f) => s + Math.max(0, (f.totalRepaymentAmount || 0) - (f.totalAmount || 0)), 0);
 
     const totalIncome = incomes.reduce((s, i) => s + (i.amount || 0), 0);
     const totalExpense = expenses.reduce((s, e) => s + (e.amount || 0), 0);
@@ -551,6 +640,7 @@ function aggregateReportData({ start, end, projectId }) {
             totalWagesPaid,
             totalWagesUnpaid,
             totalWorkerDays,
+            totalLoanInterest,
         },
         categoryTotals,
         agingBuckets: buckets,
@@ -568,6 +658,8 @@ function renderSummaryAndCharts(data) {
     if (kpiIncomeEl) kpiIncomeEl.textContent = fmtIDR(data.totals.totalIncome);
     const kpiExpenseEl = $('#kpi-expense');
     if (kpiExpenseEl) kpiExpenseEl.textContent = fmtIDR(totalOutflow);
+    const kpiInterestEl = $('#kpi-interest');
+    if (kpiInterestEl) kpiInterestEl.textContent = fmtIDR(data.totals.totalLoanInterest || 0);
     const kpiNetEl = $('#kpi-net');
     if (kpiNetEl) kpiNetEl.textContent = fmtIDR(netProfit);
 
@@ -577,6 +669,8 @@ function renderSummaryAndCharts(data) {
     if (sumExpenseEl) sumExpenseEl.textContent = fmtIDR(totalOutflow);
     const sumFundingEl = $('#sum-funding');
     if (sumFundingEl) sumFundingEl.textContent = fmtIDR(data.totals.totalFunding);
+    const sumInterestEl = $('#sum-loan-interest');
+    if (sumInterestEl) sumInterestEl.textContent = fmtIDR(data.totals.totalLoanInterest || 0);
     const sumNetEl = $('#sum-net');
     if (sumNetEl) sumNetEl.textContent = fmtIDR(netProfit);
     const sumUnpaidCountEl = $('#sum-unpaid-bills-count');
@@ -593,6 +687,7 @@ function renderSummaryAndCharts(data) {
             totalIncome: data.totals.totalIncome,
             totalExpense: totalOutflow,
             totalFunding: data.totals.totalFunding,
+            loanInterest: data.totals.totalLoanInterest || 0,
         }
     };
     const originalDashboardData = appState.dashboardData;
@@ -868,6 +963,7 @@ function applyReportFilters() {
     const end = $('#laporan-end-date')?.value || '';
     const projectId = $('#laporan-project-id')?.value || 'all';
     appState.reportFilter = { start, end, projectId };
+    updateReportFilterNote();
 
     const data = aggregateReportData({ start, end, projectId });
 
@@ -911,6 +1007,92 @@ function applyReportFilters() {
             }
         } catch (_) { console.error("Error computing/rendering accounting statements"); }
     }
+}
+
+function setupProjectDropdown() {
+    if (typeof teardownProjectDropdown === 'function') {
+        teardownProjectDropdown();
+        teardownProjectDropdown = null;
+    }
+    const trigger = $('#laporan-project-trigger');
+    const list = $('#laporan-project-options');
+    const hiddenInput = $('#laporan-project-id');
+    const labelEl = $('#laporan-project-label');
+    const root = trigger?.closest('.custom-select');
+    if (!trigger || !list || !hiddenInput || !labelEl || !root) return;
+
+    const toggle = (state) => {
+        const shouldOpen = typeof state === 'boolean' ? state : !root.classList.contains('open');
+        root.classList.toggle('open', shouldOpen);
+        trigger.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    };
+
+    const onTriggerClick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggle();
+    };
+
+    const onOptionClick = (event) => {
+        const option = event.target.closest('[data-value]');
+        if (!option) return;
+        const value = option.getAttribute('data-value') || 'all';
+        hiddenInput.value = value;
+        labelEl.textContent = option.textContent.trim();
+        list.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+        option.classList.add('selected');
+        toggle(false);
+        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const onOutsideClick = (event) => {
+        if (!root.contains(event.target)) {
+            toggle(false);
+        }
+    };
+
+    trigger.addEventListener('click', onTriggerClick);
+    list.addEventListener('click', onOptionClick);
+    document.addEventListener('click', onOutsideClick);
+
+    teardownProjectDropdown = () => {
+        trigger.removeEventListener('click', onTriggerClick);
+        list.removeEventListener('click', onOptionClick);
+        document.removeEventListener('click', onOutsideClick);
+    };
+}
+
+function getProjectLabel(projectId) {
+    if (!projectId || projectId === 'all') return 'Semua Proyek';
+    const project = (appState.projects || []).find(p => p.id === projectId);
+    return project?.projectName || 'Proyek Terpilih';
+}
+
+function formatFilterDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatFilterRangeNote(start, end, projectId) {
+    const startLabel = formatFilterDate(start);
+    const endLabel = formatFilterDate(end);
+    const hasRange = startLabel && endLabel;
+    const projectLabel = getProjectLabel(projectId);
+    if (hasRange) {
+        return `Menampilkan data ${startLabel} – ${endLabel} untuk ${projectLabel}.`;
+    }
+    return `Menampilkan semua data untuk ${projectLabel}.`;
+}
+
+function updateReportFilterNote() {
+    const noteEl = $('#report-filter-note');
+    if (!noteEl) return;
+    const start = $('#laporan-start-date')?.value || '';
+    const end = $('#laporan-end-date')?.value || '';
+    const projectId = $('#laporan-project-id')?.value || 'all';
+    noteEl.textContent = formatFilterRangeNote(start, end, projectId);
 }
 
 // Mengelompokkan arus kas per periode (mingguan/bulanan)
@@ -1105,25 +1287,13 @@ async function initLaporanPage() {
     const pageToolbarHTML = createPageToolbarHTML({ title: toolbarTitle, actions });
 
     // Reports hero moved into panel-header for a unified page header
-    const isAccounting = !!appState.reportAccountingMode;
-    const hideReportsHero = (function(){ try { return localStorage.getItem('ui.hideHero.reports') === '1'; } catch(_) { return false; } })();
-    const panelHeroHTML = hideReportsHero ? '' : `
-        <div class="dashboard-hero" style="margin-bottom: .5rem; position: relative;">
-            <button class="hero-close-btn" data-action="close-hero" data-hero-id="reports" title="Tutup"></button>
-            <div class="hero-content">
-                <h1>${isAccounting ? 'Laporan Akuntansi' : 'Ringkasan & Analisis'}</h1>
-                <p>${isAccounting ? 'Tampilan profesional akuntansi proyek (P&L, Arus Kas, Neraca).' : 'Analisis komprehensif dari semua data yang diinput.'}</p>
-            </div>
-        </div>`;
-
     // Wrap content with content-panel structure to blend backgrounds consistently
     container.innerHTML = `
         <div class="content-panel">
             <div class="panel-header">
                 ${pageToolbarHTML}
-                ${panelHeroHTML}
             </div>
-            <div id="sub-page-content" class="panel-body scrollable-content">
+            <div id="sub-page-content" class="panel-body scrollable-content has-padding">
                 ${_getSkeletonLoaderHTML('laporan')}
             </div>
         </div>

@@ -154,11 +154,8 @@ export function initServiceUIBridge() {
           handlePaymentModal(data.id, 'pinjaman');
       } else if (data.type === 'bill') {
           const { openBillPaymentModal } = await import('../modals/tagihan/itemActionsModal.js');
-          openBillPaymentModal(data.id);
+          openBillPaymentModal(data.id, { billIds: data.billIds, workerId: data.workerId });
       }
-  });
-  on('ui.modal.openPaymentHistory', async (data = {}) => {
-    try { const { handleOpenPaymentHistoryModal } = await import('../modals/tagihan/paymentHistoryModal.js'); handleOpenPaymentHistoryModal(data); } catch(_) {}
   });
   on('ui.modal.openLoanPaymentHistory', async (data = {}) => {
     try { const { handleOpenLoanPaymentHistoryModal } = await import('../modals/pemasukan/loanPaymentHistoryModal.js'); handleOpenLoanPaymentHistoryModal(data); } catch(_) {}

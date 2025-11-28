@@ -18,6 +18,8 @@ import { handleSaveAllPendingAttendance, setManualAttendanceProject } from '../.
 import { openAttendanceGuidanceModal } from '../../services/modals/absensi/guidanceModal.js';
 import { liveQueryMulti } from '../../state/liveQuery.js';
 import { projectsCol, workersCol, professionsCol, attendanceRecordsCol } from '../../config/firebase.js';
+import { getPendingQuotaMaps } from '../../services/pendingQuotaService.js';
+import { buildPendingQuotaBanner } from '../components/pendingQuotaBanner.js';
 
 let pageDataController = null;
 let pageEventListenerController = null;
@@ -324,6 +326,8 @@ async function renderAttendanceList(signal) {
             
         if (signal?.aborted) throw new DOMException('Dexie query aborted (daily attendance)', 'AbortError');
         const attendanceMap = new Map(attendanceRecords.map(rec => [rec.workerId, rec]));
+        const pendingQuotaMaps = await getPendingQuotaMaps(['attendance_records']);
+        const pendingQuotaMap = pendingQuotaMaps.get('attendance_records') || new Map();
 
         let activeWorkers = (appState.workers || []).filter(w => w.status === 'active' && !w.isDeleted);
         if (resolvedProjectFilter && resolvedProjectFilter !== 'all') {
@@ -361,7 +365,7 @@ async function renderAttendanceList(signal) {
             return comparison;
         });
 
-        _renderAttendanceListUI(activeWorkers, attendanceMap, selectedDateStr, signal);
+        _renderAttendanceListUI(activeWorkers, attendanceMap, selectedDateStr, pendingQuotaMap, signal);
 
     } catch (error) {
          if (error.name === 'AbortError') {
@@ -373,7 +377,7 @@ async function renderAttendanceList(signal) {
     }
 }
 
-function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateStr, signal) {
+function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateStr, pendingQuotaMap = new Map(), signal) {
     const container = $('#sub-page-content');
     if (!container) return;
 
@@ -533,8 +537,10 @@ function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateSt
         const timelineHTML = buildTimelineHTML(attendance);
         const priorityNoteHTML = buildPriorityNoteHTML(attendance, worker, project);
         const actionButtonsHTML = buildActionButtonsHTML(attendance, worker, false);
+        const pendingWarning = recordId ? pendingQuotaMap.get(recordId) : null;
+        const warningHTML = pendingWarning ? buildPendingQuotaBanner(pendingWarning) : '';
 
-        return createUnifiedCard({
+        return `${warningHTML}${createUnifiedCard({
             id: `att-${itemId}`,
             title: worker.workerName,
             headerMeta: headerMetaText,
@@ -560,7 +566,7 @@ function _renderAttendanceListUI(workersToDisplay, attendanceMap, selectedDateSt
                 ${priorityNoteHTML}
                 ${actionButtonsHTML}
             `
-        });
+        })}`;
     }).join('');
 
     container.innerHTML = `<div class="wa-card-list-wrapper">${cardsHTML}</div>`;

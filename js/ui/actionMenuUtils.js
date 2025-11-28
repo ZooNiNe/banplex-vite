@@ -114,7 +114,41 @@ export function getItemActions(context) {
         page = 'master';
     }
 
-     if (page === 'tagihan') {
+    if (page === 'tagihan') {
+        if (type === 'worker-payroll') {
+            const billIds = (context['bill-ids'] || context.billIds || '').toString().split(',').filter(Boolean);
+            const firstBillId = billIds[0] || null;
+            const totalUnpaid = Number(context.totalUnpaid || 0);
+            
+            // REVISI: Ganti aksi utama menjadi open-bill-detail agar membuka sidebar detail yang berisi LIST REKAP
+            baseActions.push({
+                label: 'Lihat Rincian Tagihan',
+                action: 'open-bill-detail', // Ini akan memicu _createSalaryBillDetailContentHTML di cards.js
+                icon: 'visibility',
+                workerId: context.workerId,
+                billIds: billIds.join(','),
+                type: 'worker-payroll'
+            });
+
+            // Tetap sediakan opsi riwayat pembayaran terpisah
+            baseActions.push({
+                label: 'Riwayat Pembayaran',
+                action: 'open-salary-payment-history',
+                icon: 'history',
+                workerId: context.workerId,
+                billIds,
+                billId: firstBillId
+            });
+
+            if (totalUnpaid > 0 && !isViewer()) {
+                baseActions.push({ label: 'Kelola Pembayaran', action: 'open-salary-payment-panel', icon: 'coins', workerId: context.workerId, billId: firstBillId, billIds: billIds.join(',') });
+            }
+            if (!isViewer() && firstBillId) {
+                // Hapus rekap global (opsional, karena di detail juga ada hapus per item)
+                baseActions.push({ label: 'Hapus Semua Rekap', action: 'delete-salary-bill', icon: 'delete', isDanger: true, workerId: context.workerId, id: firstBillId });
+            }
+            return baseActions;
+        }
         const isExpense = type === 'expense';
         const isBill = type === 'bill';
         const item = isBill

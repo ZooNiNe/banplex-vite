@@ -3,7 +3,7 @@ import { $ } from '../../utils/dom.js';
 import { createPageToolbarHTML } from '../components/toolbar.js';
 import { createTabsHTML } from '../components/tabs.js';
 import { emit, on, off } from '../../state/eventBus.js';
-import { _getBillsListHTML } from '../components/cards.js';
+import { _getBillsListHTML, createUnifiedCard, aggregateSalaryBillWorkers } from '../components/cards.js';
 import { getEmptyStateHTML, getEndOfListPlaceholderHTML } from '../components/emptyState.js';
 import { getJSDate } from '../../utils/helpers.js';
 import { parseFormattedNumber, formatDate, fmtIDR } from '../../utils/formatters.js';
@@ -84,9 +84,10 @@ function groupItemsByDate(items, dateField = 'dueDate') {
     return Array.from(groups.values()).sort((a, b) => b.sortDate - a.sortDate);
 }
 
-function renderGroupedList(groupedData, pendingOptions = {}) {
+function renderGroupedList(groupedData, pendingOptions = {}, renderOptions = {}) {
     const html = groupedData.map(group => {
-        const bodyHTML = _getBillsListHTML(group.items, pendingOptions);
+        const bodyHTML = _getBillsListHTML(group.items, { ...pendingOptions, ...renderOptions });
+        if (!bodyHTML) return ''; // Skip empty groups
         return `
             <section class="date-group" data-group-key="${group.key}">
                 <div class="date-group-header">${group.label}</div>
@@ -97,11 +98,13 @@ function renderGroupedList(groupedData, pendingOptions = {}) {
     return `<div class="wa-card-list-wrapper grouped" id="bills-grouped-wrapper">${html}</div>`;
 }
 
-function appendGroupedSections(wrapper, groups, pendingOptions = {}) {
+function appendGroupedSections(wrapper, groups, pendingOptions = {}, renderOptions = {}) {
     const insertedNodes = [];
     groups.forEach(group => {
         const existingSection = wrapper.querySelector(`.date-group[data-group-key="${group.key}"]`);
-        const bodyHTML = _getBillsListHTML(group.items, pendingOptions);
+        const bodyHTML = _getBillsListHTML(group.items, { ...pendingOptions, ...renderOptions });
+        if (!bodyHTML) return;
+
         if (existingSection) {
             const body = existingSection.querySelector('.date-group-body');
             if (!body) return;
@@ -121,6 +124,101 @@ function appendGroupedSections(wrapper, groups, pendingOptions = {}) {
         }
     });
     return insertedNodes;
+}
+
+// ... buildWorkerPayrollSummary, renderWorkerPayrollSummaryList helpers ...
+// (Helper ini tidak digunakan di renderTagihanContent tapi tetap dipertahankan)
+function buildWorkerPayrollSummary(items, sortBy = 'dueDate', sortDirection = 'desc') {
+    const aggregates = aggregateSalaryBillWorkers(items);
+    const direction = (sortDirection === 'asc' ? 1 : -1);
+    const normalized = aggregates.map(summary => {
+        const totalAmount = Number(summary.amount || 0);
+        const totalPaid = Number(summary.paidAmount || 0);
+        return {
+            workerId: summary.workerId,
+            workerName: summary.workerName,
+            totalAmount,
+            totalPaid,
+            remaining: Math.max(0, totalAmount - totalPaid),
+            billCount: summary.summaryCount || (summary.billIds ? summary.billIds.length : 0),
+            billIds: summary.billIds || [],
+            projectCount: (summary.projectNames || []).length,
+            projectNames: summary.projectNames || [],
+            summaries: summary.summaries || []
+        };
+    });
+
+    normalized.sort((a, b) => {
+        if (sortBy === 'amount') {
+            return (a.remaining - b.remaining) * direction;
+        }
+        return a.workerName.localeCompare(b.workerName) * direction;
+    });
+
+    return normalized;
+}
+
+function renderWorkerPayrollSummaryList(summaries) {
+    if (!Array.isArray(summaries) || summaries.length === 0) return '';
+    // ... logic sama seperti file asli ...
+    const listHTML = summaries.map(summary => {
+        const amountValue = summary.remaining > 0 ? summary.remaining : summary.totalAmount;
+        const amountLabel = summary.remaining > 0 ? 'Sisa Gaji' : 'Total Gaji';
+        const amountColor = summary.remaining > 0 ? 'warn' : 'positive';
+        const projectsDisplay = summary.projectNames.length ? summary.projectNames.join(', ') : 'Tanpa Proyek';
+        const paidPercent = summary.totalAmount > 0 ? Math.min(100, Math.round((summary.totalPaid / summary.totalAmount) * 100)) : 0;
+        const miniProgress = `
+            <div class="payroll-progress" style="margin: 6px 0 4px; background: var(--line, #ececec); height: 6px; border-radius: 999px;">
+                <div style="width:${paidPercent}%; height:100%; background: var(--primary, #0b6bcb); border-radius: 999px; transition: width 0.3s ease;"></div>
+            </div>
+        `;
+        const allRanges = (summary.summaries || [])
+            .map(s => s.rangeLabel || formatDate(getJSDate(s.startDate || s.endDate), { day: 'numeric', month: 'short' }))
+            .filter(Boolean);
+        const rangeChips = allRanges.length
+            ? allRanges.map(r => `<span class="payroll-chip" style="display:inline-block; padding:2px 8px; border-radius:999px; background:var(--surface-muted, #f5f5f5); font-size:0.8rem; color:var(--text-dim, #555); margin:2px 4px;">${r}</span>`).join('')
+            : `<span class="wa-card-v2__description sub">Belum ada rentang absensi</span>`;
+        const mainContentHTML = `
+            <div class="payroll-simple" style="display:flex; flex-direction:column; gap:6px;">
+                <div class="wa-card-v2__description" style="margin:0;">${projectsDisplay}</div>
+                <div class="payroll-simple__row" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+                    <span class="payroll-chip" style="display:inline-block; padding:2px 8px; border-radius:999px; background:var(--surface-muted, #f5f5f5); font-size:0.8rem; color:var(--text-dim, #555);">
+                        ${summary.billCount} rekap
+                    </span>
+                    ${paidPercent ? `
+                    <span class="payroll-chip" style="display:inline-block; padding:2px 8px; border-radius:999px; background:var(--surface-muted, #f5f5f5); font-size:0.8rem; color:var(--text-dim, #555);">
+                        ${paidPercent}% terbayar
+                    </span>` : ''}
+                </div>
+                ${miniProgress}
+                <div class="payroll-chip-row" style="margin-top:2px; display:flex; flex-wrap:wrap; justify-content:flex-start;">${rangeChips}</div>
+            </div>
+        `;
+        return createUnifiedCard({
+            id: `worker-payroll-${summary.workerId}`,
+            title: summary.workerName,
+            headerMeta: '',
+            metaBadges: [],
+            mainContentHTML,
+            amount: fmtIDR(amountValue),
+            amountLabel,
+            amountColorClass: amountColor,
+            dataset: { 
+                'item-id': `worker-${summary.workerId}`,
+                itemId: `worker-${summary.workerId}`,
+                type: 'worker-payroll',
+                workerId: summary.workerId,
+                'bill-ids': (summary.billIds || []).join(','),
+                totalUnpaid: summary.remaining,
+                totalAmount: summary.totalAmount,
+                billCount: summary.billCount,
+                pageContext: 'tagihan'
+            },
+            moreAction: true,
+            customClasses: 'payroll-summary-card'
+        });
+    }).join('');
+    return `<div class="wa-card-list-wrapper payroll-summary-list">${listHTML}</div>`;
 }
 
 
@@ -152,10 +250,14 @@ async function renderTagihanContent(append = false) {
             }
         } else {
         }
+        
+        // Safety initialization
+        if (!appState.activeSubPage) appState.activeSubPage = new Map();
+        if (!appState.tagihan) appState.tagihan = {};
 
         const activeTab = appState.activeSubPage.get('tagihan') || 'tagihan';
         const dateField = (activeTab === 'surat_jalan') ? 'date' : 'dueDate';
-        const { searchTerm, category, status, supplierId, projectId, dateStart, dateEnd, sortBy, sortDirection } = appState.billsFilter || {};
+        const { searchTerm, category, status, supplierId, projectId, workerId, dateStart, dateEnd, sortBy, sortDirection } = appState.billsFilter || {};
         const lowerSearchTerm = (searchTerm || '').toLowerCase();
 
         const categoryNav = document.getElementById('category-sub-nav-container');
@@ -169,9 +271,9 @@ async function renderTagihanContent(append = false) {
         const allSuppliers = appState.suppliers || [];
 
         if (activeTab === 'tagihan') {
-            items = allBills.filter(b => b.status === 'unpaid' && !b.isDeleted);
+            items = allBills.filter(b => !b.isDeleted && ((b.status || 'unpaid') === 'unpaid'));
         } else if (activeTab === 'lunas') {
-            items = allBills.filter(b => b.status === 'paid' && !b.isDeleted);
+            items = allBills.filter(b => !b.isDeleted && ((b.status || 'unpaid') === 'paid'));
         } else {
             items = allExpenses.filter(e => e.status === 'delivery_order' && !e.isDeleted);
         }
@@ -185,7 +287,7 @@ async function renderTagihanContent(append = false) {
         }
 
         if ((activeTab === 'tagihan' || activeTab === 'lunas') && status && status !== 'all') {
-            items = items.filter(item => item.status === status);
+            items = items.filter(item => (item.status || 'unpaid') === status);
         }
 
          if (supplierId && supplierId !== 'all') {
@@ -200,6 +302,17 @@ async function renderTagihanContent(append = false) {
                 const expense = activeTab === 'surat_jalan' ? item : allExpenses.find(e => e.id === item.expenseId);
                 const sourceProjectId = expense?.projectId || item.projectId;
                 return sourceProjectId === projectId;
+            });
+        }
+
+        if (workerId && workerId !== 'all') {
+            items = items.filter(item => {
+                if (item.type !== 'gaji') return true;
+                if (item.workerId === workerId) return true;
+                if (Array.isArray(item.workerDetails)) {
+                    return item.workerDetails.some(detail => detail.id === workerId || detail.workerId === workerId);
+                }
+                return false;
             });
         }
 
@@ -234,6 +347,21 @@ async function renderTagihanContent(append = false) {
             });
         }
 
+        // --- PRE-AGGREGATION STEP (NEW) ---
+        // Jika kita berada di tab "tagihan" atau "lunas", kita ingin menyatukan semua tagihan gaji
+        // satu pekerja menjadi satu item, agar tidak terpecah berdasarkan tanggal saat grouping.
+        if (activeTab === 'tagihan' || activeTab === 'lunas') {
+            const salaryItems = items.filter(i => i.type === 'gaji');
+            const nonSalaryItems = items.filter(i => i.type !== 'gaji');
+            
+            // Agregasi semua item gaji menjadi satu item per pekerja
+            const aggregatedSalaryItems = aggregateSalaryBillWorkers(salaryItems);
+            
+            // Gabungkan kembali
+            items = [...aggregatedSalaryItems, ...nonSalaryItems];
+        }
+        // ----------------------------------
+
         items.sort((a, b) => {
             const safeDate = (value) => {
                 const date = getJSDate(value);
@@ -261,20 +389,26 @@ async function renderTagihanContent(append = false) {
             return comparison * direction;
         });
 
-        appState.tagihan.currentList = items;
+        // FIX: Ensure appState.tagihan exists before assignment
+        if (appState.tagihan) {
+            appState.tagihan.currentList = items;
+        }
 
         const pendingMaps = await getPendingQuotaMaps(['bills', 'expenses']);
         const pendingOptions = {
             pendingBills: pendingMaps.get('bills') || new Map(),
             pendingExpenses: pendingMaps.get('expenses') || new Map()
         };
+        
+        // Pass aggregateSalary: false because we already aggregated them above!
+        const renderOptions = { aggregateSalary: false };
 
         const paginationKey = `bills_${activeTab}`;
         if (!appState.pagination[paginationKey]) {
            appState.pagination[paginationKey] = { isLoading: false, hasMore: true, page: -1 };
         }
         const paginationState = appState.pagination[paginationKey];
-
+        
         let itemsToDisplay = [];
         let nextPage = 0;
 
@@ -330,7 +464,7 @@ async function renderTagihanContent(append = false) {
         let billsGroupedWrapper = container.querySelector('#bills-grouped-wrapper');
 
         if (!append || !billsGroupedWrapper) {
-            container.innerHTML = renderGroupedList(groupedData, pendingOptions);
+            container.innerHTML = renderGroupedList(groupedData, pendingOptions, renderOptions);
             billsGroupedWrapper = container.querySelector('#bills-grouped-wrapper');
             if (!append) {
                 container.scrollTop = 0;
@@ -339,7 +473,7 @@ async function renderTagihanContent(append = false) {
                 newlyAddedElements = Array.from(billsGroupedWrapper.querySelectorAll('.wa-card-v2-wrapper'));
             }
         } else {
-            newlyAddedElements = appendGroupedSections(billsGroupedWrapper, groupedData, pendingOptions);
+            newlyAddedElements = appendGroupedSections(billsGroupedWrapper, groupedData, pendingOptions, renderOptions);
         }
 
         newlyAddedElements.forEach((el, idx) => {
@@ -395,20 +529,23 @@ async function renderTagihanContent(append = false) {
         }
 
     } catch (e) {
-        if (e.name === 'AbortError') {
-        } else {
-            container.innerHTML = getEmptyStateHTML({ icon: 'error', title: 'Gagal Memuat', desc: 'Terjadi kesalahan saat memuat data tagihan.' });
-        }
+        // FIX: Ignore AbortError silently
+        if (e.name === 'AbortError' || e.message?.includes('aborted')) return;
+        
+        console.error("Error rendering Tagihan:", e);
+        container.innerHTML = getEmptyStateHTML({
+            icon: 'error',
+            title: 'Gagal Memuat',
+            desc: 'Terjadi kesalahan saat memuat data tagihan.'
+        });
         container.querySelector('#infinite-scroll-sentinel')?.remove();
     } finally {
         if (!append && signal === pageAbortController?.signal) {
-             pageAbortController = null;
+            pageAbortController = null;
         }
-        const activeTab = appState.activeSubPage.get('tagihan') || 'tagihan';
+        const activeTab = appState.activeSubPage?.get('tagihan') || 'tagihan'; // Safe access
         const paginationKey = `bills_${activeTab}`;
-        if (appState.pagination[paginationKey] && typeof e === 'undefined') {
-            appState.pagination[paginationKey].isLoading = false;
-        } else if (appState.pagination[paginationKey] && e?.name !== 'AbortError') {
+        if (appState.pagination[paginationKey]) {
             appState.pagination[paginationKey].isLoading = false;
         }
     }
@@ -418,7 +555,10 @@ async function renderTagihanContent(append = false) {
 function loadMoreTagihan() {
     if (appState.activePage !== 'tagihan') return;
 
+    // Safe Check
+    if (!appState.activeSubPage) appState.activeSubPage = new Map();
     const activeTab = appState.activeSubPage.get('tagihan') || 'tagihan';
+    
     const paginationKey = `bills_${activeTab}`;
     let paginationState = appState.pagination[paginationKey];
     if (!paginationState) {
@@ -451,11 +591,16 @@ function initTagihanPage() {
     const container = $('.page-container');
     container.classList.add('page-container--has-panel');
 
+    // FIX: Initialize appState.tagihan explicitly
+    if (!appState.tagihan) appState.tagihan = {};
+    if (!appState.activeSubPage) appState.activeSubPage = new Map();
+
     if (!appState.billsFilter) {
-        appState.billsFilter = { searchTerm: '', projectId: 'all', supplierId: 'all', sortBy: 'dueDate', sortDirection: 'desc', category: 'all', status: 'all', dateStart: '', dateEnd: '' };
+        appState.billsFilter = { searchTerm: '', projectId: 'all', supplierId: 'all', workerId: 'all', sortBy: 'dueDate', sortDirection: 'desc', category: 'all', status: 'all', dateStart: '', dateEnd: '' };
     } else {
         appState.billsFilter.sortBy = appState.billsFilter.sortBy || 'dueDate';
         appState.billsFilter.sortDirection = appState.billsFilter.sortDirection || 'desc';
+        appState.billsFilter.workerId = appState.billsFilter.workerId || 'all';
     }
 
     appState.pagination.bills_tagihan = { isLoading: false, hasMore: true, page: -1 };

@@ -39,6 +39,7 @@
 @import "components/_tooltip.css";
 @import 'components/_pull-to-refresh.css';
 @import './components/_info-modal.css';
+@import "components/_salary-detail.css"; /* Added */
 
 /* 4. PAGE-SPECIFIC STYLES */
 @import "pages/_chat.css";

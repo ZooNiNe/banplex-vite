@@ -565,66 +565,138 @@ export async function handleCetakKwitansiIndividu(dataset) {
 
 export async function handleCetakKwitansiKolektif(dataset) {
     const { billId } = dataset;
+    const rawBillIds = dataset.billIds || dataset['bill-ids'];
+    const aggregateBillIds = Array.isArray(rawBillIds)
+        ? rawBillIds
+        : (typeof rawBillIds === 'string' ? rawBillIds.split(',').filter(Boolean) : []);
+    const targetBillIds = aggregateBillIds.length ? aggregateBillIds : (billId ? [billId] : []);
+    if (!targetBillIds.length) {
+        toast('error', 'Tagihan gaji tidak ditemukan.');
+        return;
+    }
+
     const loader = startGlobalLoading('Mengumpulkan data pembayaran...');
     try {
-        const bill = appState.bills.find(b => b.id === billId);
-        if (!bill || !bill.workerDetails) {
+        const bills = [];
+        for (const id of targetBillIds) {
+            let bill = appState.bills.find(b => b.id === id);
+            if (!bill) {
+                bill = await localDB.bills.get(id);
+            }
+            if (bill && bill.workerDetails) {
+                bills.push(bill);
+            }
+        }
+        if (!bills.length) {
             toast('error', 'Data tagihan gabungan tidak ditemukan.');
             return;
         }
 
-    let allPaymentsForBill = [];
-    try {
-        if (navigator.onLine) {
-            // PERBAIKAN: Pastikan 'db' dan 'TEAM_ID' diimpor dan query benar
-            const billRef = doc(db, 'teams', TEAM_ID, 'bills', billId);
-            const paymentsSnap = await getDocs(query(collection(billRef, 'payments'), orderBy('date', 'asc')));
-            allPaymentsForBill.push(...paymentsSnap.docs.map(d => d.data()));
+        const referenceBill = bills[0];
+        const workerFilterId = dataset.workerId || '';
+        const fallbackWorkerName = dataset.workerName || '';
+        const allPayments = [];
+
+        for (const bill of bills) {
+            if (navigator.onLine) {
+                try {
+                    const billRef = doc(db, 'teams', TEAM_ID, 'bills', bill.id);
+                    const snap = await getDocs(query(collection(billRef, 'payments'), orderBy('date', 'asc')));
+                    snap.docs.forEach(d => {
+                        allPayments.push({ billId: bill.id, ...d.data() });
+                    });
+                } catch (e) {
+                    console.warn('Gagal mengambil pembayaran server untuk bill', bill.id, e);
+                }
+            }
+            try {
+                const pending = await localDB.pending_payments.where({ billId: bill.id }).toArray();
+                pending.forEach(p => {
+                    allPayments.push({ billId: bill.id, ...p });
+                });
+            } catch (e) {
+                console.warn('Gagal mengambil pembayaran lokal untuk bill', bill.id, e);
+            }
         }
-        const queuedPayments = await localDB.pending_payments.where({ billId }).toArray();
-        allPaymentsForBill.push(...queuedPayments);
-    } catch (e) {
-        toast('error', 'Gagal mengambil riwayat pembayaran.');
-        console.error("Gagal fetch payments:", e);
-        return;
-    }
 
-    if (allPaymentsForBill.length === 0) {
-        toast('info', 'Belum ada pembayaran yang tercatat untuk tagihan ini.');
-        return;
-    }
-
-    const paymentsByWorker = allPaymentsForBill.reduce((acc, payment) => {
-        if (payment.workerId) {
-            acc[payment.workerId] = (acc[payment.workerId] || 0) + payment.amount;
+        if (!allPayments.length) {
+            toast('info', 'Belum ada pembayaran yang tercatat untuk tagihan ini.');
+            return;
         }
-        return acc;
-    }, {});
 
-    const allKwitansiData = Object.keys(paymentsByWorker).map(workerId => {
-        const workerDetail = bill.workerDetails.find(w => (w.id === workerId || w.workerId === workerId));
-        if (!workerDetail) return null;
+        const filteredPayments = allPayments
+            .map(payment => ({
+                ...payment,
+                workerId: payment.workerId || (workerFilterId || '')
+            }))
+            .filter(payment => payment.workerId);
 
-        const totalGajiPeriodeIni = workerDetail.amount;
-        const totalSudahDibayar = paymentsByWorker[workerId];
-        const sisaTagihan = totalGajiPeriodeIni - totalSudahDibayar;
+        const scopedPayments = workerFilterId
+            ? filteredPayments.filter(p => p.workerId === workerFilterId)
+            : filteredPayments;
 
-        return {
-            nomor: `KW-G-${bill.id.substring(0, 4)}-${workerId.substring(0, 4)}`.toUpperCase(),
-            tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
-            namaPenerima: workerDetail.name,
-            jumlah: totalSudahDibayar,
-            deskripsi: `Pembayaran Gaji (Periode: ${new Date(bill.description.split(' ').pop()).toLocaleDateString('id-ID')})`,
-            isLunas: sisaTagihan <= 0
-        };
-    }).filter(Boolean);
+        if (!scopedPayments.length) {
+            toast('info', 'Pembayaran untuk pekerja ini belum tersedia.');
+            return;
+        }
 
-    if (allKwitansiData.length === 0) {
-        toast('info', 'Tidak ada pembayaran yang cocok untuk dicetak.');
-        return;
-    }
+        const paymentsByWorker = scopedPayments.reduce((acc, payment) => {
+            const workerId = payment.workerId;
+            const amount = Number(payment.amount || 0);
+            if (!acc[workerId]) {
+                acc[workerId] = { amount: 0 };
+            }
+            acc[workerId].amount += amount;
+            return acc;
+        }, {});
 
-        emit('ui.pdf.downloadKolektif', { allKwitansiData, bill });
+        const workerDetailsById = new Map();
+        bills.forEach(bill => {
+            (bill.workerDetails || []).forEach(detail => {
+                const workerId = detail.id || detail.workerId;
+                if (!workerId) return;
+                const info = workerDetailsById.get(workerId) || {
+                    name: detail.name || fallbackWorkerName || 'Pekerja',
+                    totalAmount: 0,
+                    descriptions: new Set()
+                };
+                info.totalAmount += Number(detail.amount || 0);
+                if (bill.description) info.descriptions.add(bill.description);
+                workerDetailsById.set(workerId, info);
+            });
+        });
+
+        const targetWorkerIds = workerFilterId
+            ? [workerFilterId]
+            : Object.keys(paymentsByWorker);
+
+        const allKwitansiData = targetWorkerIds.map(workerId => {
+            const paymentSummary = paymentsByWorker[workerId];
+            if (!paymentSummary) return null;
+            const workerInfo = workerDetailsById.get(workerId);
+            const workerName = workerInfo?.name || fallbackWorkerName || 'Pekerja';
+            const totalNominal = workerInfo?.totalAmount || paymentSummary.amount;
+            const sisaTagihan = Math.max(0, totalNominal - paymentSummary.amount);
+            const descriptionSource = workerInfo?.descriptions
+                ? Array.from(workerInfo.descriptions).join(', ')
+                : (referenceBill?.description || 'Tagihan Gaji');
+
+            return {
+                nomor: `KW-G-${(workerId || 'WORK').substring(0, 4)}-${Date.now().toString().slice(-4)}`.toUpperCase(),
+                tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+                namaPenerima: workerName,
+                jumlah: paymentSummary.amount,
+                deskripsi: `Pembayaran Gaji (${descriptionSource})`,
+                isLunas: sisaTagihan <= 0
+            };
+        }).filter(Boolean);
+
+        if (!allKwitansiData.length) {
+            toast('info', 'Tidak ada pembayaran yang cocok untuk dicetak.');
+            return;
+        }
+
+        emit('ui.pdf.downloadKolektif', { allKwitansiData, bill: referenceBill });
     } finally {
         loader.close();
     }

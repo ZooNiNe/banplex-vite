@@ -4,6 +4,7 @@ import { fmtIDR, parseFormattedNumber } from "../../../utils/formatters.js";
 import { emit, on, off } from "../../../state/eventBus.js";
 import { getFormPengeluaranHTML, getFormFakturMaterialHTML, attachPengeluaranFormListeners, _createAttachmentManagerHTML, _attachSingleFileUploadListener } from "../../components/forms/index.js";
 import { animateNumber } from "../../../utils/dom.js";
+import { aggregateSalaryBillWorkers, getSalarySummaryStats } from "../../components/cards.js";
 
 function createIcon(iconName, size = 18, classes = '') {
     const icons = {
@@ -21,10 +22,46 @@ function createIcon(iconName, size = 18, classes = '') {
     return icons[iconName] || '';
 }
 
-function _openPaymentBillModal(bill) {
-  const remaining = Math.max(0, (bill.amount || 0) - (bill.paidAmount || 0));
+function _openPaymentBillModal(bill, options = {}) {
+  const parseIdList = (value) => {
+      if (!value) return [];
+      if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean);
+      if (typeof value === 'string') return value.split(',').map(part => part.trim()).filter(Boolean);
+      return [];
+  };
+  const isSalaryBill = bill?.type === 'gaji';
+  const rawBillIds = parseIdList(options.billIds || options['bill-ids']);
+  const targetBillIds = isSalaryBill && rawBillIds.length ? rawBillIds : (bill?.id ? [bill.id] : []);
+  const workerIdHint = options.workerId
+      || options['worker-id']
+      || bill?.workerId
+      || bill?.workerDetails?.[0]?.workerId
+      || bill?.workerDetails?.[0]?.id
+      || '';
+
+  let workerSummary = null;
+  if (isSalaryBill) {
+      const sourceBills = targetBillIds
+          .map(id => (bill && bill.id === id ? bill : (appState.bills?.find(b => b.id === id) || null)))
+          .filter(Boolean);
+      if (sourceBills.length) {
+          const aggregates = aggregateSalaryBillWorkers(sourceBills);
+          if (workerIdHint) {
+              workerSummary = aggregates.find(entry => entry.workerId === workerIdHint) || null;
+          }
+          if (!workerSummary && aggregates.length === 1) {
+              workerSummary = aggregates[0];
+          }
+      }
+  }
+  const summaryStats = workerSummary ? getSalarySummaryStats(workerSummary.summaries || []) : { totalAmount: 0 };
+  const totalAmount = workerSummary ? (summaryStats.totalAmount || Number(workerSummary.amount || 0)) : Number(bill.amount || 0);
+  const paidAmount = workerSummary ? Number(workerSummary.paidAmount || 0) : Number(bill.paidAmount || 0);
+  const remaining = Math.max(0, totalAmount - paidAmount);
   const amountFormatted = new Intl.NumberFormat('id-ID').format(remaining);
   const todayString = new Date().toISOString().slice(0, 10);
+  const workerName = workerSummary?.workerName || (bill?.workerDetails?.length === 1 ? bill.workerDetails[0].name : bill?.description) || 'Pekerja';
+  const summaryCount = workerSummary?.summaryCount || workerSummary?.summaries?.length || 0;
 
   const attachmentHTML = _createAttachmentManagerHTML({}, {
       singleOptional: true,
@@ -32,27 +69,33 @@ function _openPaymentBillModal(bill) {
       containerId: 'new-payment-attachment-container'
   });
 
+  const remainingLabelText = isSalaryBill ? 'Sisa Gaji' : 'Sisa Tagihan';
+
   const content = `
-    <div class="card card-pad">
-        <div class="success-hero success-hero--payment" style="margin-bottom:.75rem;">
-            <svg class="success-hero-art" width="120" height="88" viewBox="0 0 120 88" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <defs>
-                    <linearGradient id="pb1" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.18" />
-                        <stop offset="100%" stop-color="var(--primary)" stop-opacity="0.05" />
-                    </linearGradient>
-                </defs>
-                <rect x="8" y="12" width="84" height="52" rx="10" fill="url(#pb1)" stroke="var(--line)"/>
-                <rect x="20" y="26" width="40" height="8" rx="4" fill="var(--primary)" opacity="0.25" />
-                <rect x="20" y="40" width="30" height="8" rx="4" fill="var(--primary)" opacity="0.15" />
-            </svg>
-            <div class="success-preview-icon">${createIcon('payment', 28)}</div>
+    <div class="payment-panel card card-pad">
+        <div class="payment-panel__header">
+            ${isSalaryBill ? `
+            <div class="payment-panel__worker">
+                <span class="label">Pekerja</span>
+                <strong>${workerName}</strong>
+                ${summaryCount ? `<span class="chip">${summaryCount} rangkuman</span>` : ''}
+            </div>` : ''}
+            <div class="payment-panel__remaining">
+                <span class="label" id="payment-remaining-label">${remainingLabelText}</span>
+                <strong id="payment-remaining-amount" data-raw-amount="${remaining}">${fmtIDR(remaining)}</strong>
+            </div>
         </div>
-        <div class="payment-modal-header">
-            <span class="label" id="payment-remaining-label">Sisa Tagihan</span>
-            <strong class="payment-main-amount" id="payment-remaining-amount" data-raw-amount="${remaining}">${fmtIDR(remaining)}</strong>
+        <div class="payment-panel__totals">
+            <div>
+                <span class="label">Total</span>
+                <strong>${fmtIDR(totalAmount)}</strong>
+            </div>
+            <div>
+                <span class="label">Terbayar</span>
+                <strong>${fmtIDR(paidAmount)}</strong>
+            </div>
         </div>
-        <div class="quick-pay-actions">
+        <div class="payment-panel__quick">
             <button type="button" class="btn btn-secondary" data-action="set-payment-full">Bayar Lunas</button>
             <button type="button" class="btn btn-secondary" data-action="set-payment-half">Bayar Setengah</button>
         </div>
@@ -105,13 +148,13 @@ function _openPaymentBillModal(bill) {
      emit('ui.forms.init', detailPane);
 }
 
-export function openBillPaymentModal(billId) {
+export function openBillPaymentModal(billId, options = {}) {
   const bill = (appState.bills || []).find(b => b.id === billId);
   if (!bill) {
     emit('ui.toast', { args: ['error', 'Tagihan tidak ditemukan'] });
     return;
   }
-  _openPaymentBillModal(bill);
+  _openPaymentBillModal(bill, options);
 }
 
 export function handleOpenItemActionsModal({ id, type, expenseId }, targetRect = null) {

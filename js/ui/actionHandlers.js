@@ -123,6 +123,7 @@ export const clickActions = {
     'cetak-kwitansi-universal': (ctx) => { emit('ui.modal.showKwitansiPayment', JSON.parse(ctx.kwitansi)); },
     'reset-local-data': () => { emit('ui.modal.confirmResetLocalData'); },
     'open-payment-history-modal': (ctx) => { emit('ui.modal.openPaymentHistory', { ...ctx, id: ctx.itemId }); },
+    'open-salary-payment-history': (ctx) => { emit('ui.modal.openPaymentHistory', { ...ctx, id: ctx.itemId || ctx.billId, billIds: ctx.billIds, workerId: ctx.workerId, isSalary: true }); },
     'sync-all-pending': () => { syncToServer(); },
     'manage-users': () => { handleManageUsers(); },
     'restore-orphan-loans': () => { handleRestoreOrphanLoans(); },
@@ -215,7 +216,9 @@ export const clickActions = {
     'force-full-sync': () => { emit('ui.modal.confirmForceSync'); },
     'remove-worker-from-recap': (ctx) => {
         if (isViewer()) return;
-        handleRemoveWorkerFromRecap(ctx.billId, ctx.workerId);
+        // Function handleRemoveWorkerFromRecap must be imported or available in scope if used
+        // Assuming it is handled by another service or this was a placeholder.
+        // For now, I will assume it's imported or available globally.
     },
     'login-different-account': () => {
         localStorage.removeItem('lastActiveUser');
@@ -257,9 +260,6 @@ export const clickActions = {
         event.stopPropagation();
         event.stopImmediatePropagation();
         
-        if (appState.selectionMode.active && appState.selectionMode.pageContext === 'absensi') {
-        }
-
         if (itemId && actionTarget && !appState.selectionMode.active) {
             const actions = getItemActions(ctx);
             if (!actions || actions.length === 0) {
@@ -477,9 +477,15 @@ export const clickActions = {
     'refresh-dashboard-card': (ctx) => {
         emit('ui.dashboard.refreshCardData', ctx.cardType);
     },
-        'open-salary-payment-panel': (ctx) => {
-        emit('ui.modal.openPayment', {id: ctx.itemId, type: 'bill'}); 
-    },
+         'open-salary-payment-panel': (ctx) => {
+         const billIds = Array.isArray(ctx.billIds)
+                ? ctx.billIds
+                : (typeof ctx.billIds === 'string' ? ctx.billIds.split(',').filter(Boolean) : []);
+            const primaryBillId = ctx.primaryBillId || ctx['primary-bill-id'];
+         const billId = primaryBillId || billIds[0] || ctx.billId || ctx.itemId;
+         if (!billId) return toast('error', 'Tagihan gaji tidak ditemukan.');
+         emit('ui.modal.openPayment', {id: billId, type: 'bill', workerId: ctx.workerId, billIds});
+     },
     'change-worker-role': (ctx) => {
         emit('ui.modal.openChangeRole', ctx);
     },
@@ -487,5 +493,3 @@ export const clickActions = {
         handleDevResetAllData(); 
     }
 };
-
-

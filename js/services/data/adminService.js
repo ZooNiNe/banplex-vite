@@ -4,7 +4,7 @@ import { db, expensesCol, billsCol, incomesCol, fundingSourcesCol, attendanceRec
 import { doc, runTransaction, writeBatch, getDocs, getDoc, setDoc, updateDoc, deleteDoc, addDoc, query, where, orderBy, serverTimestamp, increment, collection, Timestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { toast } from "../../ui/components/toast.js";
 // --- PERUBAHAN: Menambahkan 'requestSync' ---
-import { _isQuotaExceeded, _setQuotaExceededFlag, syncFromServer, requestSync } from "../syncService.js";
+import { _isQuotaExceeded, _setQuotaExceededFlag, syncFromServer, requestSync, checkAndPushQueuedData } from "../syncService.js";
 import { localDB, loadAllLocalDataToState } from "../localDbService.js";
 import { fetchAndCacheData } from "./fetch.js";
 import { showDetailPane, startGlobalLoading } from "../../ui/components/modal.js";
@@ -102,14 +102,22 @@ export function openToolsGrid() {
 
         const pushSyncButton = pane.querySelector('[data-action="manual-push-sync"]');
         if (pushSyncButton && !pushSyncButton._listenerAttached) {
-            pushSyncButton.addEventListener('click', () => {
-                toast('info', 'Memulai sinkronisasi manual ke server...');
-                // Memanggil requestSync (non-silent) untuk memicu syncToServer
-                requestSync({ silent: false })
-                    .catch(err => {
-                        console.error('Sinkronisasi manual gagal:', err);
-                        toast('error', 'Gagal memulai sinkronisasi manual.');
+            pushSyncButton.addEventListener('click', async () => {
+                toast('info', 'Memeriksa dan mengirim antrian data...');
+                try {
+                    const result = await checkAndPushQueuedData({
+                        silent: false,
+                        notifyWhenEmpty: true,
+                        showModalOnBlock: true,
+                        forceQuotaRetry: true
                     });
+                    if (result?.triggered) {
+                        toast('info', 'Sinkronisasi antrian dimulai.');
+                    }
+                } catch (err) {
+                    console.error('Sinkronisasi manual gagal:', err);
+                    toast('error', 'Gagal memulai sinkronisasi manual.');
+                }
             });
             pushSyncButton._listenerAttached = true; // Tandai agar listener tidak ganda
         }
