@@ -400,7 +400,7 @@ export function _createSalaryBillDetailContentHTML(bill, payments = [], options 
         : [];
 
     const aggregates = (bill?.type === 'gaji' && candidateBills.length)
-        ? aggregateSalaryBillWorkers(candidateBills)
+        ? aggregateSalaryBillWorkers(candidateBills, { allSalaryBills: candidateBills, sourceItems: candidateBills })
         : [];
 
     let workerSummary = null;
@@ -468,12 +468,20 @@ export function _createSalaryBillDetailContentHTML(bill, payments = [], options 
     })();
 
     const summaryStats = getSalarySummaryStats(summaryLines);
+    const summaryLineTotal = summaryLines.reduce((sum, line) => {
+        const amount = Number(line.uniqueAmount ?? line.amount ?? 0);
+        return sum + (Number.isFinite(amount) ? amount : 0);
+    }, 0);
+    const candidateBillTotal = candidateBills.reduce((sum, candidate) => sum + (Number(candidate.amount) || 0), 0);
+    const candidateBillPaid = candidateBills.reduce((sum, candidate) => sum + (Number(candidate.paidAmount) || 0), 0);
     
+    const fallbackTotalBase = Math.max(summaryLineTotal, candidateBillTotal, Number(bill?.amount) || 0);
     const total = workerSummary 
-        ? workerSummary.totalAmount 
-        : (summaryLines.length ? summaryStats.totalAmount : (Number(bill?.amount) || 0));
+        ? Number(workerSummary.totalAmount || fallbackTotalBase)
+        : fallbackTotalBase;
 
-    const fallbackPaid = workerSummary ? Number(workerSummary.paidAmount || 0) : Number(bill?.paidAmount || 0);
+    const paidFallbackBase = Math.max(paidFromPayments, candidateBillPaid, Number(bill?.paidAmount) || 0);
+    const fallbackPaid = workerSummary ? Number(workerSummary.paidAmount || paidFallbackBase) : paidFallbackBase;
     const paid = paidFromPayments > 0 ? paidFromPayments : fallbackPaid;
     const remaining = Math.max(0, total - paid);
 
@@ -537,22 +545,25 @@ export function _createSalaryBillDetailContentHTML(bill, payments = [], options 
             }).join('')
         : `<div class="salary-summary-list__empty">Belum ada rangkuman gaji.</div>`;
 
-    // === AGGREGATE HEADER ===
-    const summaryAggregateHTML = `
-        <div class="salary-aggregate-summary">
-            <div class="summary-row main">
-                <span class="summary-label">Total Tagihan (${summaryLines.length} Rekap)</span>
-                <strong class="summary-value big">${fmtIDR(total)}</strong>
-            </div>
-            <div class="summary-row">
-                <span class="summary-label">Sudah Dibayar</span>
-                <strong class="summary-value text-positive">${fmtIDR(paid)}</strong>
-            </div>
-            <div class="summary-row">
-                <span class="summary-label">Sisa Pembayaran</span>
-                <strong class="summary-value ${remaining > 0 ? 'text-warn' : 'text-positive'}">${fmtIDR(remaining)}</strong>
-            </div>
+    const summaryCards = [
+        { label: `Total Tagihan (${summaryLines.length} Rekap)`, value: fmtIDR(total), detail: 'Rekap gabungan per pekerja' },
+        { label: 'Sudah Dibayar', value: fmtIDR(paid), detail: 'Pembayaran yang sudah tercatat' },
+        { label: 'Sisa Pembayaran', value: fmtIDR(remaining), detail: remaining > 0 ? 'Masih perlu diselesaikan' : 'Semua sudah lunas' }
+    ];
+    const summaryCardsHTML = summaryCards.map(card => `
+        <div class="salary-summary-card">
+            <span class="label">${card.label}</span>
+            <strong>${card.value}</strong>
+            <span class="subtext">${card.detail}</span>
         </div>
+    `).join('');
+
+    const summaryAggregateHTML = `
+        <section id="tagihan-summary-section" class="salary-summary-overview">
+            <div class="salary-summary-card-grid">
+                ${summaryCardsHTML}
+            </div>
+        </section>
     `;
 
     const metaDetailsHTML = `
@@ -657,15 +668,55 @@ export function getSalarySummaryStats(summaries = []) {
     return { totalAmount, overwrittenCount, useUniqueAmount };
 }
 
-export function aggregateSalaryBillWorkers(items = []) {
+export function aggregateSalaryBillWorkers(items = [], options = {}) {
     const attendanceRecords = appState.attendanceRecords || [];
     const attendanceMap = new Map(attendanceRecords.map(rec => [rec.id, rec]));
     const projectMap = new Map((appState.projects || []).map(project => [project.id, project.projectName]));
     const workerLookup = new Map((appState.workers || []).map(worker => [worker.id, worker.workerName]));
     const grouped = new Map();
-
     const UNKNOWN_WORKER_KEY = '__unknown-worker__';
     const UNKNOWN_WORKER_LABEL = 'Unknown Worker';
+
+    const allSalaryBillsSource = Array.isArray(options.allSalaryBills)
+        ? options.allSalaryBills
+        : (Array.isArray(appState.bills) ? appState.bills : []);
+    const allSalaryBills = (Array.isArray(allSalaryBillsSource) ? allSalaryBillsSource : [])
+        .filter(bill => bill && bill.type === 'gaji' && !bill.isDeleted);
+
+    const isMeaningfulWorkerName = (value) => {
+        if (!value) return false;
+        const normalized = String(value).trim();
+        if (!normalized) return false;
+        const lowered = normalized.toLowerCase();
+        if (lowered === 'pekerja') return false;
+        if (lowered === UNKNOWN_WORKER_LABEL.toLowerCase()) return false;
+        return true;
+    };
+
+    const matchesBillToWorker = (summary, bill) => {
+        if (!bill) return false;
+        if (summary.matchingIds.size > 0) {
+            if (bill.workerId && summary.matchingIds.has(bill.workerId)) return true;
+            if (Array.isArray(bill.workerDetails)) {
+                if (bill.workerDetails.some(detail => detail && (summary.matchingIds.has(detail.workerId) || summary.matchingIds.has(detail.id)))) {
+                    return true;
+                }
+            }
+        }
+        if (summary.matchingNames.size > 0) {
+            const billName = (bill.workerName || '').trim();
+            if (billName && summary.matchingNames.has(billName)) return true;
+            if (Array.isArray(bill.workerDetails)) {
+                if (bill.workerDetails.some(detail => {
+                    const detailName = (detail?.name || '').trim();
+                    return detailName && summary.matchingNames.has(detailName);
+                })) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
 
     const normalizeDateValue = (value) => {
         if (value === undefined || value === null) return null;
@@ -713,7 +764,10 @@ export function aggregateSalaryBillWorkers(items = []) {
         return parsed ? parsed.getTime() : 0;
     };
 
-    const salaryItems = (Array.isArray(items) ? items : [])
+    const sourceSalaryItems = Array.isArray(options.sourceItems) && options.sourceItems.length
+        ? options.sourceItems
+        : (Array.isArray(items) ? items : []);
+    const salaryItems = sourceSalaryItems
         .filter(item => item && item.type === 'gaji')
         .sort((a, b) => resolveComparableTime(b) - resolveComparableTime(a));
 
@@ -754,11 +808,16 @@ export function aggregateSalaryBillWorkers(items = []) {
                     dueDate: null,
                     summaries: [],
                     seenRecords: new Set(),
+                    matchingIds: new Set(),
+                    matchingNames: new Set(),
                     overallRangeStart: null,
                     overallRangeEnd: null
                 });
             }
             const summary = grouped.get(workerKey);
+            const meaningfulName = isMeaningfulWorkerName(detailDisplayName) ? detailDisplayName.trim() : null;
+            if (resolvedWorkerId) summary.matchingIds.add(resolvedWorkerId);
+            if (meaningfulName) summary.matchingNames.add(meaningfulName);
             const recordIds = Array.isArray(detail.recordIds) && detail.recordIds.length > 0
                 ? detail.recordIds
                 : (item.recordIds || []);
@@ -826,12 +885,16 @@ export function aggregateSalaryBillWorkers(items = []) {
     });
 
     return Array.from(grouped.values()).map(summary => {
-        const status = (summary.totalAmount > 0 && summary.totalPaid >= summary.totalAmount)
-            ? 'paid'
-            : 'unpaid';
         const overallStart = summary.overallRangeStart;
         const overallEnd = summary.overallRangeEnd;
         const summaryRangeLabel = formatRangeLabel(overallStart, overallEnd);
+        const matchedBills = (summary.matchingIds.size > 0 || summary.matchingNames.size > 0)
+            ? allSalaryBills.filter(bill => matchesBillToWorker(summary, bill))
+            : [];
+        const hasMatchingBills = matchedBills.length > 0;
+        const workerHasUnpaid = matchedBills.some(bill => (bill.status || 'unpaid') !== 'paid');
+        const statusFromTotals = (summary.totalAmount > 0 && summary.totalPaid >= summary.totalAmount) ? 'paid' : 'unpaid';
+        const status = hasMatchingBills ? (workerHasUnpaid ? 'unpaid' : 'paid') : statusFromTotals;
         return {
             id: `worker-${summary.workerId}`,
             type: 'gaji',
@@ -840,18 +903,19 @@ export function aggregateSalaryBillWorkers(items = []) {
             amount: summary.totalAmount,
             paidAmount: summary.totalPaid,
             status,
+            hasOutstandingBills: hasMatchingBills && workerHasUnpaid,
             dueDate: summary.dueDate,
             startDate: overallStart,
             endDate: overallEnd,
             summaryRangeLabel,
             primaryBillId: Array.from(summary.billIds)[0] || null,
             workerDetails: [{
-            workerId: summary.workerId,
-            id: summary.workerId,
-            name: summary.workerName,
-            amount: summary.totalAmount,
-            recordIds: Array.from(summary.recordIds)
-        }],
+                workerId: summary.workerId,
+                id: summary.workerId,
+                name: summary.workerName,
+                amount: summary.totalAmount,
+                recordIds: Array.from(summary.recordIds)
+            }],
             projectNames: Array.from(summary.projectNames),
             billIds: Array.from(summary.billIds),
             summaries: summary.summaries,

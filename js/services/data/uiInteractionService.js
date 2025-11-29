@@ -24,6 +24,7 @@ import {
     updateCustomSelectOptions
 } from '../../ui/components/forms/index.js';
 import { attachPemasukanFormListeners } from "../../ui/pages/pemasukan_form_listeners.js";
+import { renderMobileBreadcrumbTitle } from "../../ui/components/mobileHeaderUtils.js";
 
 function createIcon(iconName, size = 18, classes = '') {
     const icons = {
@@ -162,6 +163,8 @@ export async function handleOpenBillDetail(context) {
         }
 
         let content, title;
+        let mobileHeaderTitle = '';
+        let detailSubtitleText = null;
         if (bill && bill.type === 'gaji') {
             let payments = [];
             const targetPaymentIds = searchBillIds.length ? searchBillIds : [bill.id];
@@ -181,23 +184,35 @@ export async function handleOpenBillDetail(context) {
             };
             content = _createSalaryBillDetailContentHTML(bill, payments, detailOptions);
             
+            let workerName = 'Pekerja';
             try {
-                const workerName = bill.workerDetails && bill.workerDetails.length === 1
+                workerName = bill.workerDetails && bill.workerDetails.length === 1
                     ? bill.workerDetails[0].name
                     : (bill.workerDetails ? `${bill.workerDetails.length} Pekerja` : 'Pekerja');
                 title = `Rekap Gaji: ${workerName}`;
             } catch (e) {
                 title = `Rekap Tagihan Gaji`; // Fallback akhir
             }
+            mobileHeaderTitle = 'Rekap Gaji';
+            detailSubtitleText = workerName;
 
         } else {
             content = await _createBillDetailContentHTML(bill, expenseData);
-            title = `Detail: ${expenseData?.description || bill?.description || 'Item'}`;
+            const detailLabel = expenseData?.description || bill?.description;
+            const titleFallback = detailLabel || 'Item';
+            title = `Detail: ${titleFallback}`;
+            mobileHeaderTitle = 'Detail Tagihan';
+            detailSubtitleText = detailLabel || null;
         }
 
+        const breadcrumbNav = targetEl.querySelector('.breadcrumb-nav');
         const titleEl = targetEl.querySelector('.modal-header h4, h4, .breadcrumb-nav strong');
         const bodyEl = targetEl.querySelector('.modal-body, .detail-pane-body, .mobile-detail-content');
-        if (titleEl) titleEl.innerHTML = title;
+        if (breadcrumbNav) {
+            renderMobileBreadcrumbTitle(breadcrumbNav, mobileHeaderTitle || title, detailSubtitleText);
+        } else if (titleEl) {
+            titleEl.innerHTML = title;
+        }
         if (bodyEl) bodyEl.innerHTML = content;
 
     } catch (error) {
@@ -262,10 +277,17 @@ export async function handleOpenPemasukanDetail(context) {
         const content = _createDetailContentHTML(item, type);
         let title = (type === 'termin') ? 'Detail Termin Proyek' : 'Detail Pinjaman';
         if(item.description) title = item.description;
+        const mobileHeaderTitle = (type === 'termin') ? 'Termin Proyek' : 'Pinjaman';
+        const detailSubtitleText = item.description || item.projectName || item.creditorName || null;
 
+        const breadcrumbNav = targetEl.querySelector('.breadcrumb-nav');
         const titleEl = targetEl.querySelector('.modal-header h4, h4, .breadcrumb-nav strong');
         const bodyContainer = targetEl.querySelector('.modal-body, .detail-pane-body, .mobile-detail-content');
-        if(titleEl) titleEl.textContent = title;
+        if (breadcrumbNav) {
+            renderMobileBreadcrumbTitle(breadcrumbNav, mobileHeaderTitle || title, detailSubtitleText);
+        } else if (titleEl) {
+            titleEl.textContent = title;
+        }
         if(bodyContainer) bodyContainer.innerHTML = content;
 
 

@@ -81,6 +81,10 @@ export async function handleOpenPaymentHistoryModal(dataset = {}) {
   }
   
   if (!bill) return;
+  const toKeyString = (value) => {
+    if (value === undefined || value === null) return '';
+    return String(value).trim();
+  };
   if (!billId || (bill && billId === dataset.id)) billId = bill.id;
 
   const isSalaryBill = bill.type === 'gaji';
@@ -91,16 +95,43 @@ export async function handleOpenPaymentHistoryModal(dataset = {}) {
       defaultRecipientName = supplier?.supplierName || 'Penerima';
   }
   
-  // FIX: Definisi Variabel Scope Atas
-  const targetBillIds = billIds.length > 0 ? billIds : [billId];
+  const datasetWorkerId = toKeyString(dataset.workerId || dataset['worker-id']);
+  const matchesWorkerRecord = (candidate, workerId) => {
+    if (!candidate || !workerId) return false;
+    if (candidate.workerId === workerId) return true;
+    if (Array.isArray(candidate.workerDetails)) {
+      return candidate.workerDetails.some(detail => detail && (detail.workerId === workerId || detail.id === workerId));
+    }
+    return false;
+  };
+
+  const candidateBillIds = [];
+  const appendUniqueBillId = (value) => {
+    const normalized = toKeyString(value);
+    if (normalized && !candidateBillIds.includes(normalized)) {
+      candidateBillIds.push(normalized);
+    }
+  };
+
+  const workerBillIds = isSalaryBill && datasetWorkerId
+    ? (appState.bills || [])
+        .filter(billItem => billItem && billItem.type === 'gaji' && !billItem.isDeleted && matchesWorkerRecord(billItem, datasetWorkerId))
+        .map(billItem => billItem.id)
+    : [];
+
+  billIds.filter(Boolean).forEach(appendUniqueBillId);
+  workerBillIds.forEach(appendUniqueBillId);
+  appendUniqueBillId(billId);
+
+  const targetBillIds = candidateBillIds.length > 0 ? candidateBillIds : (billId ? [billId] : []);
   const aggregatedBillIdsAttr = targetBillIds.join(',');
 
   let allPayments = [];
   const paymentResults = await Promise.all(targetBillIds.map(id => getPaymentHistory(id).catch(() => [])));
   allPayments = paymentResults.flat().sort((a, b) => getJSDate(a.date) - getJSDate(b.date));
 
-  if (isSalaryBill && dataset.workerId) {
-    allPayments = allPayments.filter(p => !p.workerId || p.workerId === dataset.workerId);
+  if (isSalaryBill && datasetWorkerId) {
+    allPayments = allPayments.filter(p => !p.workerId || p.workerId === datasetWorkerId);
   }
 
   const realTotalPaid = allPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
@@ -125,54 +156,30 @@ export async function handleOpenPaymentHistoryModal(dataset = {}) {
   let workerChipLabel = recipientName;
   let workerTotalAmount = 0;
   const normalizedPaidAmount = Number(realTotalPaid) || 0;
-  
+  let outstandingAmount = 0;
+  let computedStatusClass = 'status-badge--positive';
+  let computedStatusLabel = 'Lunas';
+  let heroTotalAmount = 0;
+  let heroOutstandingTotal = 0;
+  let summaryCount = 0;
+
   if (isSalaryBill) {
     const allSalaryBills = targetBillIds
       .map(id => appState.bills.find(b => b.id === id))
       .filter(b => b && b.type === 'gaji' && !b.isDeleted);
 
-    const aggregates = aggregateSalaryBillWorkers(allSalaryBills);
-
-    const workerId = dataset.workerId || bill.workerId || bill.workerDetails?.[0]?.workerId || bill.workerDetails?.[0]?.id;
-    const workerSummary = aggregates.find(s => s.workerId === workerId);
+    const aggregates = aggregateSalaryBillWorkers(allSalaryBills, { allSalaryBills, sourceItems: allSalaryBills });
+    const workerId = datasetWorkerId || bill.workerId || bill.workerDetails?.[0]?.workerId || bill.workerDetails?.[0]?.id;
+    const workerSummary = workerId ? aggregates.find(s => s.workerId === workerId) : null;
 
     const aggregatedBillAmount = allSalaryBills.reduce((sum, salaryBill) => sum + (Number(salaryBill?.amount) || 0), 0);
-    const candidateTotalAmount = workerSummary?.totalAmount ?? Math.max(aggregatedBillAmount, bill.amount || 0);
+    const candidateTotalAmount = workerSummary?.totalAmount ?? Math.max(aggregatedBillAmount, Number(bill.amount || 0));
     workerTotalAmount = Number.isFinite(candidateTotalAmount) ? candidateTotalAmount : 0;
 
     if (workerSummary) {
       workerChipLabel = workerSummary.workerName || recipientName;
     }
 
-    const outstanding = Math.max(0, workerTotalAmount - normalizedPaidAmount);
-    const statusColor = outstanding > 0 ? 'var(--danger, #ef4444)' : 'var(--success, #22c55e)';
-
-    workerOverviewHTML = `
-      <div style="background:var(--surface-sunken); border-radius:12px; padding:16px; margin-bottom:20px;">
-        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:24px; align-items:flex-start;">
-           <div>
-              <div style="font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:4px;">Pekerja</div>
-              <div style="font-weight:600; font-size:1.1rem; color:var(--text-main);">${workerChipLabel}</div>
-           </div>
-           <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end;">
-              <div style="text-align:right;">
-                 <div style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase;">Total Tagihan</div>
-                 <div style="font-weight:700; font-size:1rem;">${fmtIDR(workerTotalAmount)}</div>
-              </div>
-              <div style="text-align:right;">
-                 <div style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase;">Sudah Dibayar</div>
-                 <div style="font-weight:700; font-size:1rem; color:var(--success);">${fmtIDR(normalizedPaidAmount)}</div>
-              </div>
-              <div style="text-align:right;">
-                 <div style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase;">Sisa Pembayaran</div>
-                 <div style="font-weight:700; font-size:1rem; color:${statusColor};">${fmtIDR(outstanding)}</div>
-              </div>
-           </div>
-        </div>
-      </div>
-    `;
-
-    const summaryCandidates = Array.isArray(workerSummary?.summaries) ? [...workerSummary.summaries] : [];
     const fallbackSummaries = allSalaryBills.map((salaryBill) => {
       const startDate = salaryBill.startDate || salaryBill.date;
       const endDate = salaryBill.endDate || salaryBill.date;
@@ -188,70 +195,117 @@ export async function handleOpenPaymentHistoryModal(dataset = {}) {
         attendanceSummary: {}
       };
     });
-    const summaryEntries = summaryCandidates.length ? summaryCandidates : fallbackSummaries;
-    const sortedSummaries = summaryEntries.slice();
+
+    const summaryCandidates = Array.isArray(workerSummary?.summaries) ? [...workerSummary.summaries] : [];
+    const recapSummaries = summaryCandidates.length ? summaryCandidates : fallbackSummaries;
+    summaryCount = recapSummaries.length;
+    outstandingAmount = Math.max(0, workerTotalAmount - normalizedPaidAmount);
+    computedStatusClass = outstandingAmount > 0 ? 'status-badge--warn' : 'status-badge--positive';
+    computedStatusLabel = outstandingAmount > 0 ? 'Belum lunas' : 'Lunas';
+
+    const sortedSummaries = recapSummaries.slice();
     sortedSummaries.sort((a, b) => getJSDate(b.startDate || b.endDate) - getJSDate(a.startDate || a.endDate));
-
-    const summaryListHTML = sortedSummaries.length
-      ? sortedSummaries.map((summary, index) => {
-          const rawAmount = Number(summary.uniqueAmount ?? summary.amount ?? 0);
-          const amountValue = Number.isFinite(rawAmount) ? rawAmount : 0;
-          const attendanceSummary = summary.attendanceSummary || {};
-          const attendanceParts = [];
-          if (attendanceSummary.full) attendanceParts.push(`${attendanceSummary.full} Hadir`);
-          if (attendanceSummary.half) attendanceParts.push(`${attendanceSummary.half} 1/2 Hari`);
-          if (attendanceSummary.absent) attendanceParts.push(`${attendanceSummary.absent} Absen`);
-          if (summary.recordCount) attendanceParts.push(`${summary.recordCount} Absensi`);
-          const attendanceText = attendanceParts.length ? attendanceParts.join(' · ') : 'Tanpa data absensi';
-          const rangeLabel = summary.rangeLabel || formatRangeLabelForModal(summary.startDate, summary.endDate);
-          const isPaidSummary = summary.status === 'paid';
-          return `
-            <div style="padding:10px 0; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:6px;">
-              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
-                <div style="flex:1;">
-                  <div style="font-weight:600; font-size:0.95rem;">Rekap ${index + 1}${summary.billId ? ` • ${summary.billId}` : ''}</div>
-                  <div style="font-size:0.8rem; color:var(--text-dim);">${rangeLabel}</div>
-                </div>
-                <span style="font-size:0.75rem; padding:2px 10px; border-radius:999px; border:1px solid ${isPaidSummary ? 'var(--success)' : 'var(--danger)'}; color:${isPaidSummary ? 'var(--success)' : 'var(--danger)'};">
-                  ${isPaidSummary ? 'Lunas' : 'Belum Lunas'}
-                </span>
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <strong style="font-size:1rem; color:var(--text-main);">${fmtIDR(amountValue)}</strong>
-                <span style="font-size:0.75rem; color:var(--text-dim);">${attendanceText}</span>
-              </div>
-            </div>
-          `;
-        }).join('')
-      : `<div style="padding:10px 0; color:var(--text-dim); font-style:italic;">Belum ada rangkuman tagihan.</div>`;
-
-    recapListHTML = `
-      <div class="payment-history-summary-section" style="margin-bottom:20px;">
-        <h4 style="margin:0 0 12px 0; font-size:1rem; border-bottom:2px solid var(--surface-sunken); padding-bottom:6px;">Rincian Rekap ${workerChipLabel}</h4>
-        <div class="payment-history-summary-list">
-          ${summaryListHTML}
-        </div>
-      </div>
-    `;
-
-  } else {
-      workerTotalAmount = Number(bill.amount || 0);
-      const outstanding = Math.max(0, workerTotalAmount - normalizedPaidAmount);
-      const statusColor = outstanding > 0 ? 'var(--danger)' : 'var(--success)';
-       workerOverviewHTML = `
-        <div style="background:var(--surface-sunken); border-radius:12px; padding:16px; margin-bottom:20px;">
-           <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span style="color:var(--text-dim);">Total Tagihan</span>
-                <strong style="font-size:1.1rem;">${fmtIDR(workerTotalAmount)}</strong>
-           </div>
-           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                <span style="color:var(--text-dim);">Sisa</span>
-                <strong style="font-size:1.1rem; color:${statusColor}">${fmtIDR(outstanding)}</strong>
-           </div>
-        </div>
+    const recapCardsHTML = sortedSummaries.map((summary, index) => {
+      const rangeLabel = summary.rangeLabel || formatRangeLabelForModal(summary.startDate, summary.endDate);
+      const rawAmount = Number(summary.uniqueAmount ?? summary.amount ?? 0);
+      const amountValue = Number.isFinite(rawAmount) ? rawAmount : 0;
+      const statusLabel = summary.status === 'paid' ? 'Lunas' : 'Belum lunas';
+      return `
+        <article class="payment-history-recap-card">
+          <div class="payment-history-recap-card__top">
+            <strong>${index + 1}. ${rangeLabel}</strong>
+            <span class="status-badge ${summary.status === 'paid' ? 'status-badge--positive' : 'status-badge--warn'}">${statusLabel}</span>
+          </div>
+          <div class="payment-history-recap-card__body">
+            <span class="payment-history-recap-card__amount">${fmtIDR(amountValue)}</span>
+            <span class="payment-history-recap-card__meta">${summary.recordCount || 0} absensi</span>
+          </div>
+        </article>
       `;
+    }).join('');
+
+    recapListHTML = summaryCount
+      ? `
+        <section class="payment-history-recap-section">
+          <h4>Rincian Rekap</h4>
+          <div class="payment-history-recap-grid">
+            ${recapCardsHTML}
+          </div>
+        </section>
+      `
+      : `<section class="payment-history-recap-section"><p class="subtext">Belum ada rekapan gaji untuk ditampilkan.</p></section>`;
+
+    const recapTotalAmount = recapSummaries.reduce((sum, summary) => sum + (Number(summary.uniqueAmount ?? summary.amount) || 0), 0);
+    heroTotalAmount = recapTotalAmount || workerTotalAmount;
+    heroOutstandingTotal = Math.max(0, heroTotalAmount - normalizedPaidAmount);
+
+    workerOverviewHTML = `
+      <section class="payment-history-overview-card payment-history-overview-card--salary">
+        <div class="payment-history-overview-card__meta">
+          <div>
+            <span class="payment-history-overview-card__label">Pekerja</span>
+            <strong>${workerChipLabel}</strong>
+          </div>
+          <div>
+            <span class="payment-history-overview-card__label">Status</span>
+            <span class="status-badge ${computedStatusClass}">${computedStatusLabel}</span>
+          </div>
+        </div>
+        <div class="payment-history-overview-card__stats">
+          <div>
+            <span class="payment-history-overview-card__label">Total Tagihan</span>
+            <strong>${fmtIDR(workerTotalAmount)}</strong>
+          </div>
+          <div>
+            <span class="payment-history-overview-card__label">Terbayar</span>
+            <strong>${fmtIDR(normalizedPaidAmount)}</strong>
+          </div>
+          <div>
+            <span class="payment-history-overview-card__label">Sisa</span>
+            <strong class="payment-history-overview-card__status-amount ${outstandingAmount > 0 ? 'payment-history-overview-card__status-amount--warn' : 'payment-history-overview-card__status-amount--positive'}">${fmtIDR(outstandingAmount)}</strong>
+          </div>
+        </div>
+        <p class="payment-history-overview-card__subtext">
+          ${summaryCount ? `${summaryCount} rekapan tersedia` : 'Belum ada rekapan tambahan'}
+        </p>
+      </section>
+    `;
+  } else {
+    workerTotalAmount = Number(bill.amount || 0);
+    outstandingAmount = Math.max(0, workerTotalAmount - normalizedPaidAmount);
+    computedStatusClass = outstandingAmount > 0 ? 'status-badge--warn' : 'status-badge--positive';
+    computedStatusLabel = outstandingAmount > 0 ? 'Belum lunas' : 'Lunas';
+    heroTotalAmount = workerTotalAmount;
+    heroOutstandingTotal = outstandingAmount;
+    summaryCount = 0;
+
+    workerOverviewHTML = `
+      <section class="payment-history-overview-card">
+        <div class="payment-history-overview-card__meta payment-history-overview-card__meta--space-between">
+          <div>
+            <span class="payment-history-overview-card__label">Penerima</span>
+            <strong>${recipientName}</strong>
+          </div>
+          <div>
+            <span class="payment-history-overview-card__label">Status</span>
+            <span class="status-badge ${computedStatusClass}">${computedStatusLabel}</span>
+          </div>
+        </div>
+        <div class="payment-history-overview-card__stats">
+          <div>
+            <span class="payment-history-overview-card__label">Total Tagihan</span>
+            <strong>${fmtIDR(workerTotalAmount)}</strong>
+          </div>
+          <div>
+            <span class="payment-history-overview-card__label">Sisa</span>
+            <strong class="payment-history-overview-card__status-amount ${outstandingAmount > 0 ? 'payment-history-overview-card__status-amount--warn' : 'payment-history-overview-card__status-amount--positive'}">${fmtIDR(outstandingAmount)}</strong>
+          </div>
+        </div>
+      </section>
+    `;
   }
 
+  const billLookup = new Map((appState.bills || []).map(b => [b.id, b]));
   const historyEntries = [...allPayments].sort((a, b) => getJSDate(b.date) - getJSDate(a.date));
 
   if (bill.status === 'paid' && realTotalPaid > 0 && historyEntries.length === 0) {
@@ -271,64 +325,119 @@ export async function handleOpenPaymentHistoryModal(dataset = {}) {
     return `${dd} ${mmm}, ${hh}:${mm}`;
   }
 
-  const listHTML = historyEntries.map(p => {
-    const dateObj = getJSDate(p.date || new Date());
-    const timeStr = formatTime(dateObj);
-    let statusLabel = 'Server';
-    if (p._source === 'pending') statusLabel = 'Menunggu';
-    
-    // FIX: Gunakan ID Bill Asli untuk Delete agar tidak error
-    const parentBillId = p.billId || bill.id;
+    const listHTML = historyEntries.map(p => {
+        const dateObj = getJSDate(p.date || new Date());
+        const timeStr = formatTime(dateObj);
+        const parentBillId = p.billId || bill.id;
+        const parentBill = billLookup.get(parentBillId);
+        const rekapLabel = parentBill ? (parentBill.description || parentBill.workerName || parentBill.id) : (parentBillId || 'Rekap');
+        const safeParentLabel = String(rekapLabel || 'Rekap').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        const attachmentButton = (p.attachmentUrl || p.localAttachmentId) ? `
+            <button class="btn-icon small" data-action="view-payment-attachment" data-url="${p.attachmentUrl||''}" data-local-id="${p.localAttachmentId||''}">
+                ${createIcon('attachment', 16)}
+            </button>` : '';
+        const sourceDescription = p._source === 'pending' ? 'Menunggu sinkronisasi' : 'Tersimpan di server';
+        const workerIdForPrint = toKeyString(p.workerId || datasetWorkerId || bill.workerId);
+        const canPrintIndividual = Boolean(isSalaryBill && workerIdForPrint && parentBill?.type === 'gaji');
+        const workerIdAttr = workerIdForPrint ? `data-worker-id="${workerIdForPrint}"` : '';
+        const printButtonHTML = canPrintIndividual
+            ? `<button class="btn-icon small" data-action="cetak-kwitansi-individu" data-bill-id="${parentBillId}" ${workerIdAttr} title="Cetak Kwitansi">${createIcon('print', 16)}</button>`
+            : `<button class="btn-icon small" data-action="cetak-kwitansi" data-bill-id="${parentBillId}" title="Cetak Kwitansi">${createIcon('print', 16)}</button>`;
+        const deleteButtonHTML = `
+            <button class="btn-icon small danger" data-action="delete-payment" data-bill-id="${parentBillId}" ${p._source === 'pending' ? `data-pending-id="${p.id}" data-source="pending"` : `data-payment-id="${p.id}" data-source="server"`} data-amount="${p.amount || 0}" title="Hapus Pembayaran">
+                ${createIcon('delete', 16)}
+            </button>`;
+        const actionsHTML = `
+            <div class="payment-history-entry__actions payment-history-entry__actions--top">
+                ${printButtonHTML}
+                ${deleteButtonHTML}
+            </div>
+        `;
+        const attachmentsSection = attachmentButton ? `<div class="payment-history-entry__attachments">${attachmentButton}</div>` : '';
 
-    return `
-      <div class="history-item" style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--line); gap:10px;">
-          <div style="display:flex; flex-direction:column; min-width:120px;">
-              <span style="font-weight:600; font-size:0.95rem; color:var(--text-main);">${timeStr}</span>
-              <span style="font-size:0.75rem; color:var(--text-dim);">${statusLabel}</span>
-          </div>
-
-          <div style="display:flex; align-items:center; gap:12px; margin-left:auto;">
-              <strong style="color:var(--success); font-size:1rem;">+ ${fmtIDR(p.amount || 0)}</strong>
-              
-              <div style="display:flex; gap:4px;">
-                ${(p.attachmentUrl || p.localAttachmentId) ? `
-                    <button class="btn-icon small" data-action="view-payment-attachment" data-url="${p.attachmentUrl||''}" data-local-id="${p.localAttachmentId||''}">
-                        ${createIcon('attachment', 16)}
-                    </button>` : ''}
-                
-                <button class="btn-icon small danger" data-action="delete-payment" data-bill-id="${parentBillId}" ${p._source === 'pending' ? `data-pending-id="${p.id}" data-source="pending"` : `data-payment-id="${p.id}" data-source="server"`} data-amount="${p.amount || 0}">
-                    ${createIcon('delete', 16)}
-                </button>
-              </div>
-          </div>
-      </div>
-    `;
-  }).join('');
+        return `
+            <article class="payment-history-entry">
+                <div class="payment-history-entry__header">
+                    <div>
+                        <strong>${timeStr}</strong>
+                        <span class="payment-history-entry__description">${sourceDescription}</span>
+                    </div>
+                </div>
+                ${actionsHTML}
+                <div class="payment-history-entry__meta">
+                    <span>${fmtIDR(p.amount || 0)}</span>
+                    <span class="payment-history-entry__tag">Rekap: ${safeParentLabel}</span>
+                </div>
+                ${attachmentsSection}
+            </article>
+        `;
+    }).join('');
 
   const emptyState = historyEntries.length === 0 
     ? `<div style="text-align:center; padding:20px; color:var(--text-dim); font-style:italic;">Belum ada riwayat pembayaran.</div>` 
     : '';
 
   const footerHTML = historyEntries.length > 0 ? `
-    <div class="modal-footer">
         <button class="btn btn-secondary w-full" data-action="cetak-kwitansi-kolektif" data-bill-id="${bill.id}" data-bill-ids="${aggregatedBillIdsAttr}" data-worker-id="${dataset.workerId || ''}" data-worker-name="${(workerChipLabel || recipientName || '').replace(/"/g, '&quot;')}">
             ${createIcon('print', 18)} Cetak Semua Kwitansi
         </button>
     </div>
   ` : '';
 
+  const heroSummaryLabel = summaryCount ? `${summaryCount} rekapan aktif` : 'Tanpa rekapan tambahan';
+  const heroHTML = `
+    <div class="payment-history-panel__hero">
+      <div class="payment-history-panel__hero-info">
+        <p class="payment-history-panel__hero-label">Total Outstanding Rekap</p>
+        <strong class="payment-history-panel__hero-value">${fmtIDR(heroOutstandingTotal)}</strong>
+        <span class="payment-history-panel__hero-meta">${heroSummaryLabel}</span>
+      </div>
+      <div class="payment-history-panel__hero-info">
+        <p class="payment-history-panel__hero-label">Total Rekap</p>
+        <strong class="payment-history-panel__hero-value">${fmtIDR(heroTotalAmount)}</strong>
+        <span class="payment-history-panel__hero-meta">Termasuk ${fmtIDR(normalizedPaidAmount)} terbayar</span>
+      </div>
+    </div>
+  `;
+
   const paneTitle = isSalaryBill ? `Riwayat: ${workerChipLabel}` : 'Riwayat Pembayaran';
 
   const content = `
-      <div class="payment-history-wrapper">
+    <div class="payment-history-wrapper">
+      <div class="payment-history-panel">
+        <aside class="payment-history-panel__sidebar">
           ${workerOverviewHTML}
           ${recapListHTML}
-          <h4 style="margin:0 0 10px 0; font-size:1rem; border-bottom:2px solid var(--surface-sunken); padding-bottom:8px;">Riwayat Pembayaran</h4>
+        </aside>
+        <section class="payment-history-panel__main">
+          ${heroHTML}
+          <header class="payment-history-panel__main-header">
+            <div>
+              <p class="payment-history-panel__main-subtitle">Riwayat Pembayaran</p>
+              <h4 class="payment-history-panel__main-title">${paneTitle}</h4>
+            </div>
+            <div class="payment-history-panel__main-stats">
+              <div>
+                <span class="payment-history-panel__label">Total Dibayarkan</span>
+                <strong>${fmtIDR(normalizedPaidAmount)}</strong>
+              </div>
+              <div>
+                <span class="payment-history-panel__label">Sisa</span>
+                <strong class="payment-history-panel__status-amount ${outstandingAmount > 0 ? 'payment-history-panel__status-amount--warn' : 'payment-history-panel__status-amount--positive'}">${fmtIDR(outstandingAmount)}</strong>
+              </div>
+              <div>
+                <span class="payment-history-panel__label">Transaksi</span>
+                <strong>${historyEntries.length}</strong>
+              </div>
+            </div>
+          </header>
           <div class="history-list">
-              ${listHTML}
-              ${emptyState}
+            ${listHTML}
+            ${emptyState}
           </div>
+        </section>
       </div>
+    </div>
   `;
 
   showDetailPane({

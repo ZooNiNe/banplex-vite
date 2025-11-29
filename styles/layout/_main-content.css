@@ -114,53 +114,79 @@ body.detail-view-active .detail-pane {
 .mobile-detail-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--line);
-  background-color: var(--panel-alt);
+  gap: clamp(0.75rem, 1.5vw, 1.25rem);
+  padding: clamp(0.85rem, 2vw, 1.35rem) clamp(1.1rem, 3vw, 1.5rem);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 45%, transparent 55%);
+  background: color-mix(in srgb, var(--panel-alt) 40%, transparent 60%);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  border-radius: 0 0 28px 28px;
+  box-shadow: 0 22px 40px rgba(15, 23, 42, 0.25);
   flex-shrink: 0;
   position: relative;
+  z-index: 3;
+  overflow: hidden;
 }
 .mobile-detail-header .breadcrumb-nav {
-  flex-grow: 1;
-  font-size: 0.9rem;
-  color: var(--text-dim);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.mobile-detail-header .breadcrumb-nav strong,
+.mobile-detail-header .breadcrumb-nav .chat-title,
+.mobile-detail-header .breadcrumb-nav .detail-title {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.mobile-detail-header .breadcrumb-nav .title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: flex-start;
+}
+.mobile-detail-header .breadcrumb-nav .detail-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* PERBAIKAN: Tambahkan min-width: 0 agar flex item bisa menyusut */
-  min-width: 0;
 }
-.mobile-detail-header .breadcrumb-nav strong {
-  color: var(--text);
+.mobile-detail-header .breadcrumb-nav .detail-subtitle {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--text-dim) 85%, transparent 15%);
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .mobile-detail-header .header-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
-
-/* PERBAIKAN: Tambahkan style untuk title-wrap di dalam mobile-detail-header */
-.mobile-detail-header .breadcrumb-nav .title-wrap {
-    display: grid;
-    gap: 2px;
-    align-items: center;
+.mobile-detail-header .btn-icon {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--line) 50%, transparent 40%);
+  background: color-mix(in srgb, var(--surface-muted) 65%, transparent 35%);
+  color: var(--text);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.22);
+  transition: transform 0.2s ease, background 0.2s ease;
 }
-.mobile-detail-header .breadcrumb-nav .chat-title {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: block;
-    font-size: 1rem;
-    color: var(--text);
-    font-weight: 600;
+.mobile-detail-header .btn-icon:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--surface) 85%, transparent 15%);
 }
-.mobile-detail-header .breadcrumb-nav .chat-subtitle {
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    font-size: 0.8rem;
-    color: var(--text-dim);
-}
-/* AKHIR PERBAIKAN */
 
 
 .mobile-detail-content {

@@ -353,12 +353,16 @@ async function renderTagihanContent(append = false) {
         if (activeTab === 'tagihan' || activeTab === 'lunas') {
             const salaryItems = items.filter(i => i.type === 'gaji');
             const nonSalaryItems = items.filter(i => i.type !== 'gaji');
-            
-            // Agregasi semua item gaji menjadi satu item per pekerja
-            const aggregatedSalaryItems = aggregateSalaryBillWorkers(salaryItems);
-            
-            // Gabungkan kembali
-            items = [...aggregatedSalaryItems, ...nonSalaryItems];
+            const allSalaryBills = allBills.filter(b => b && b.type === 'gaji' && !b.isDeleted);
+            const aggregatedSalaryItems = aggregateSalaryBillWorkers(allSalaryBills, { allSalaryBills, sourceItems: allSalaryBills });
+            const salaryAggregatesForTab = aggregatedSalaryItems.filter(entry => {
+                if (activeTab === 'lunas') {
+                    return entry.status === 'paid';
+                }
+                return entry.status !== 'paid';
+            });
+
+            items = [...salaryAggregatesForTab, ...nonSalaryItems];
         }
         // ----------------------------------
 
@@ -831,3 +835,4 @@ function initBillsHeroCarousel() {
     wrap.addEventListener('touchmove', e => { if(!drag) return; curX=e.touches[0].clientX; }, { passive: true });
     wrap.addEventListener('touchend', ()=>{ if(!drag) return; const dx=curX-startX; drag=false; if(Math.abs(dx)>40){ setIndex(index+(dx<0?1:-1)); if (wrap._timer) { clearInterval(wrap._timer); wrap._timer = setInterval(()=>setIndex(index+1), 7000);} } });
 }
+

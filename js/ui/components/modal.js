@@ -6,6 +6,7 @@ import { restorePageFab } from "../pages/pageManager.js";
 import { initCustomSelects, formatNumberInput } from "./forms/index.js";
 import { setCommentsScope } from "../../services/syncService.js";
 import { getEmptyStateHTML } from "./emptyState.js";
+import { renderMobileBreadcrumbTitle } from "./mobileHeaderUtils.js";
 import { emit } from "../../state/eventBus.js";
 
 function createIcon(iconName, size = 20, classes = '') {
@@ -393,7 +394,7 @@ export function closeDetailPane() {
     });
 }
 
-export function showMobileDetailPage({ title, subtitle, content, footer, headerActions, fabHTML, isMasterDataGrid = false, paneType = '', isSuccessPanel = false }, isGoingBack = false) {
+export function showMobileDetailPage({ title, subtitle, content, footer, headerActions, fabHTML, isMasterDataGrid = false, paneType = '', isSuccessPanel = false, iconHTML: iconProp = '' }, isGoingBack = false) {
     const detailPane = $('.detail-pane');
     if (!detailPane) return null;
 
@@ -425,9 +426,11 @@ export function showMobileDetailPage({ title, subtitle, content, footer, headerA
 
         if (document.body.classList.contains('detail-view-active') && !isMasterDataGrid && !isSuccessPanel) {
             const currentFabHTML = detailPane.querySelector('.fab')?.outerHTML || '';
+            const breadcrumbNav = detailPane.querySelector('.breadcrumb-nav');
             const previousState = {
-                title: detailPane.querySelector('.breadcrumb-nav')?.innerHTML || '',
-                subtitle: detailPane.querySelector('.chat-subtitle')?.textContent || null,
+                title: breadcrumbNav?.querySelector('.detail-title, .chat-title, strong')?.textContent || '',
+                subtitle: breadcrumbNav?.querySelector('.detail-subtitle, .chat-subtitle')?.textContent || null,
+                iconHTML: detailPane.querySelector('.mobile-detail-header > .avatar-badge.is-icon')?.outerHTML || '',
                 content: detailPane.querySelector('.mobile-detail-content')?.innerHTML || '',
                 footer: detailPane.querySelector('.modal-footer')?.innerHTML || '',
                 headerActions: detailPane.querySelector('.header-actions')?.innerHTML || '',
@@ -440,27 +443,23 @@ export function showMobileDetailPage({ title, subtitle, content, footer, headerA
         }
     }
 
-    let titleHTML = `<strong>${title}</strong>`;
-    let iconHTML = ''; // Variabel baru untuk ikon
+    let titleHTML = `<strong class="detail-title">${title}</strong>`;
+    let iconHTML = iconProp || ''; // Variabel baru untuk ikon
+    let subtitleClass = 'detail-subtitle';
+    let titleClass = 'detail-title';
+    let computedTitleText = title;
 
     // Cek jika judul adalah HTML (untuk Chat)
     if (paneType === 'comments') {
         const titleText = title.replace(/<span.*?>.*?<\/span>/, '').trim();
         const iconMatch = title.match(/(<span class="avatar-badge is-icon">.*?<\/span>)/);
-        iconHTML = iconMatch ? iconMatch[1] : ''; // Ekstrak HTML ikon
-        titleHTML = `<strong class="chat-title">${titleText}</strong>`; // Judul sekarang hanya teks
-    } else {
-        titleHTML = `<strong class="chat-title">${title}</strong>`;
+        iconHTML = iconMatch ? iconMatch[1] : iconHTML; // Ekstrak HTML ikon
+        computedTitleText = titleText;
+        titleClass = 'chat-title';
+        subtitleClass = 'chat-subtitle';
+        titleHTML = `<strong class="${titleClass}">${titleText}</strong>`;
     }
 
-    if (subtitle) {
-        titleHTML = `
-            <div class="title-wrap">
-                ${titleHTML}
-                <span class="chat-subtitle">${subtitle}</span>
-            </div>
-        `;
-    }
 
     const hasHistory = appState.detailPaneHistory.length > 0;
     const backOrCloseButtonHTML = hasHistory
@@ -484,6 +483,8 @@ export function showMobileDetailPage({ title, subtitle, content, footer, headerA
     const baseFooterHTML = footer ? `<div class="${footerClass}">${footer}</div>` : ``;
 
     detailPane.innerHTML = headerHTML + contentHTML + baseFooterHTML;
+    const breadcrumbNav = detailPane.querySelector('.breadcrumb-nav');
+    renderMobileBreadcrumbTitle(breadcrumbNav, computedTitleText, subtitle, { title: titleClass, subtitle: subtitleClass });
 
     if (fabHTML && typeof fabHTML === 'string') {
         detailPane.insertAdjacentHTML('beforeend', fabHTML);

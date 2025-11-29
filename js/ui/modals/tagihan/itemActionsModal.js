@@ -45,7 +45,7 @@ function _openPaymentBillModal(bill, options = {}) {
           .map(id => (bill && bill.id === id ? bill : (appState.bills?.find(b => b.id === id) || null)))
           .filter(Boolean);
       if (sourceBills.length) {
-          const aggregates = aggregateSalaryBillWorkers(sourceBills);
+           const aggregates = aggregateSalaryBillWorkers(sourceBills, { allSalaryBills: sourceBills, sourceItems: sourceBills });
           if (workerIdHint) {
               workerSummary = aggregates.find(entry => entry.workerId === workerIdHint) || null;
           }
@@ -100,7 +100,7 @@ function _openPaymentBillModal(bill, options = {}) {
             <button type="button" class="btn btn-secondary" data-action="set-payment-half">Bayar Setengah</button>
         </div>
         <form id="payment-form" data-id="${bill.id}" data-type="bill">
-            <div class="payment-form-body">
+            <div class="payment-panel__form">
                 <div class="form-group">
                     <label>Jumlah Pembayaran</label>
                     <input type="text" name="amount" id="payment-input-amount" inputmode="numeric" required value="${amountFormatted}">

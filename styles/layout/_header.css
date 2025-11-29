@@ -35,7 +35,7 @@
 .page-label .page-name {
   display: inline-block;
   font-size: .9rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text);
   margin: 0;
   line-height: 1;
@@ -43,6 +43,8 @@
   border: none; /* Remove chip/badge look */
   background: transparent; /* Subtle, text-only */
   box-shadow: none;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .dark-theme .page-label .page-name {
