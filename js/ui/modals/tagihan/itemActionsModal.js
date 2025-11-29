@@ -23,130 +23,139 @@ function createIcon(iconName, size = 18, classes = '') {
 }
 
 function _openPaymentBillModal(bill, options = {}) {
-  const parseIdList = (value) => {
-      if (!value) return [];
-      if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean);
-      if (typeof value === 'string') return value.split(',').map(part => part.trim()).filter(Boolean);
-      return [];
-  };
-  const isSalaryBill = bill?.type === 'gaji';
-  const rawBillIds = parseIdList(options.billIds || options['bill-ids']);
-  const targetBillIds = isSalaryBill && rawBillIds.length ? rawBillIds : (bill?.id ? [bill.id] : []);
-  const workerIdHint = options.workerId
-      || options['worker-id']
-      || bill?.workerId
-      || bill?.workerDetails?.[0]?.workerId
-      || bill?.workerDetails?.[0]?.id
-      || '';
-
-  let workerSummary = null;
-  if (isSalaryBill) {
-      const sourceBills = targetBillIds
-          .map(id => (bill && bill.id === id ? bill : (appState.bills?.find(b => b.id === id) || null)))
-          .filter(Boolean);
-      if (sourceBills.length) {
-           const aggregates = aggregateSalaryBillWorkers(sourceBills, { allSalaryBills: sourceBills, sourceItems: sourceBills });
-          if (workerIdHint) {
-              workerSummary = aggregates.find(entry => entry.workerId === workerIdHint) || null;
-          }
-          if (!workerSummary && aggregates.length === 1) {
-              workerSummary = aggregates[0];
-          }
-      }
-  }
-  const summaryStats = workerSummary ? getSalarySummaryStats(workerSummary.summaries || []) : { totalAmount: 0 };
-  const totalAmount = workerSummary ? (summaryStats.totalAmount || Number(workerSummary.amount || 0)) : Number(bill.amount || 0);
-  const paidAmount = workerSummary ? Number(workerSummary.paidAmount || 0) : Number(bill.paidAmount || 0);
-  const remaining = Math.max(0, totalAmount - paidAmount);
-  const amountFormatted = new Intl.NumberFormat('id-ID').format(remaining);
-  const todayString = new Date().toISOString().slice(0, 10);
-  const workerName = workerSummary?.workerName || (bill?.workerDetails?.length === 1 ? bill.workerDetails[0].name : bill?.description) || 'Pekerja';
-  const summaryCount = workerSummary?.summaryCount || workerSummary?.summaries?.length || 0;
-
-  const attachmentHTML = _createAttachmentManagerHTML({}, {
-      singleOptional: true,
-      inputName: 'paymentAttachment',
-      containerId: 'new-payment-attachment-container'
-  });
-
-  const remainingLabelText = isSalaryBill ? 'Sisa Gaji' : 'Sisa Tagihan';
-
-  const content = `
-    <div class="payment-panel card card-pad">
-        <div class="payment-panel__header">
-            ${isSalaryBill ? `
-            <div class="payment-panel__worker">
-                <span class="label">Pekerja</span>
-                <strong>${workerName}</strong>
-                ${summaryCount ? `<span class="chip">${summaryCount} rangkuman</span>` : ''}
-            </div>` : ''}
-            <div class="payment-panel__remaining">
-                <span class="label" id="payment-remaining-label">${remainingLabelText}</span>
-                <strong id="payment-remaining-amount" data-raw-amount="${remaining}">${fmtIDR(remaining)}</strong>
-            </div>
-        </div>
-        <div class="payment-panel__totals">
-            <div>
-                <span class="label">Total</span>
-                <strong>${fmtIDR(totalAmount)}</strong>
-            </div>
-            <div>
-                <span class="label">Terbayar</span>
-                <strong>${fmtIDR(paidAmount)}</strong>
-            </div>
-        </div>
-        <div class="payment-panel__quick">
-            <button type="button" class="btn btn-secondary" data-action="set-payment-full">Bayar Lunas</button>
-            <button type="button" class="btn btn-secondary" data-action="set-payment-half">Bayar Setengah</button>
-        </div>
-        <form id="payment-form" data-id="${bill.id}" data-type="bill">
-            <div class="payment-panel__form">
-                <div class="form-group">
-                    <label>Jumlah Pembayaran</label>
-                    <input type="text" name="amount" id="payment-input-amount" inputmode="numeric" required value="${amountFormatted}">
-                </div>
-                <div class="form-group">
-                    <label>Tanggal Pembayaran</label>
-                    <input type="date" name="date" value="${todayString}" required>
-                </div>
-                <h5 class="invoice-section-title full-width">Lampiran (Opsional)</h5>
-                <div class="form-group full-width">
-                    ${attachmentHTML}
-                    <input type="file" name="paymentAttachment" accept="image/*" class="hidden-file-input" style="display:none;">
-                </div>
-            </div>
-        </form>
-    </div>`;
-
-    const footer = `
-        <div class="form-footer-actions">
-            <button type="submit" class="btn btn-primary" form="payment-form">
-                ${createIcon('payment')} Konfirmasi Pembayaran
-            </button>
-        </div>`;
-
-    const detailPane = showDetailPane({ title: 'Pembayaran Tagihan', content, footer });
-    if (!detailPane) return;
-
-    emit('ui.detailPane.formReady', { context: detailPane });
-
-    _attachSingleFileUploadListener(detailPane, 'paymentAttachment', '#new-payment-attachment-container');
-
-    const amountInput = detailPane.querySelector('#payment-input-amount');
-    const remainingAmountEl = detailPane.querySelector('#payment-remaining-amount');
-    const remainingLabelEl = detailPane.querySelector('#payment-remaining-label');
-    const originalRemaining = parseFloat(remainingAmountEl.dataset.rawAmount);
-
-    if (amountInput && remainingAmountEl && remainingLabelEl) {
-        amountInput.addEventListener('input', () => {
-            const amountToPay = parseFormattedNumber(amountInput.value);
-            const newRemaining = originalRemaining - amountToPay;
-            animateNumber(remainingAmountEl, newRemaining);
-            remainingLabelEl.textContent = "Sisa Setelah Bayar";
-        });
+    const parseIdList = (value) => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean);
+        if (typeof value === 'string') return value.split(',').map(part => part.trim()).filter(Boolean);
+        return [];
+    };
+    
+    const isSalaryBill = bill?.type === 'gaji';
+    const rawBillIds = parseIdList(options.billIds || options['bill-ids']);
+    const targetBillIds = isSalaryBill && rawBillIds.length ? rawBillIds : (bill?.id ? [bill.id] : []);
+    const workerIdHint = options.workerId
+        || options['worker-id']
+        || bill?.workerId
+        || bill?.workerDetails?.[0]?.workerId
+        || bill?.workerDetails?.[0]?.id
+        || '';
+  
+    const sourceBills = targetBillIds
+        .map(id => (bill && bill.id === id ? bill : (appState.bills?.find(b => b.id === id) || null)))
+        .filter(Boolean);
+  
+    let workerSummary = null;
+    if (isSalaryBill && typeof aggregateSalaryBillWorkers === 'function' && sourceBills.length) {
+        const aggregates = aggregateSalaryBillWorkers(sourceBills, { allSalaryBills: sourceBills, sourceItems: sourceBills });
+        if (workerIdHint) {
+            workerSummary = aggregates.find(entry => entry.workerId === workerIdHint);
+        }
+        if (!workerSummary && aggregates.length === 1) {
+            workerSummary = aggregates[0];
+        }
     }
-     emit('ui.forms.init', detailPane);
-}
+  
+    let totalAmount = 0;
+    let paidAmount = 0;
+  
+    if (sourceBills.length > 0) {
+        totalAmount = sourceBills.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+        paidAmount = sourceBills.reduce((sum, b) => sum + (Number(b.paidAmount) || 0), 0);
+    } else {
+        totalAmount = Number(bill.amount || 0);
+        paidAmount = Number(bill.paidAmount || 0);
+    }
+  
+    const remaining = Math.max(0, totalAmount - paidAmount);
+    const amountFormatted = new Intl.NumberFormat('id-ID').format(remaining);
+    const todayString = new Date().toISOString().slice(0, 10);
+    
+    const workerName = workerSummary?.workerName || (bill?.workerDetails?.length === 1 ? bill.workerDetails[0].name : bill?.description) || 'Pekerja';
+    const summaryCount = sourceBills.length; 
+    
+    const attachmentHTML = _createAttachmentManagerHTML({}, {
+        singleOptional: true,
+        inputName: 'paymentAttachment',
+        containerId: 'new-payment-attachment-container'
+    });
+  
+    const remainingLabelText = isSalaryBill ? 'Sisa Gaji' : 'Sisa Tagihan';
+  
+    const content = `
+      <div class="payment-panel card card-pad">
+          
+          <div class="payment-panel__hero payment-panel__hero--salary" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+              ${isSalaryBill ? `
+              <div class="payment-panel__hero-card">
+                  <span class="payment-panel__hero-label">Pekerja</span>
+                  <strong>${workerName}</strong>
+                  <span class="payment-panel__hero-note">${summaryCount > 1 ? `${summaryCount} rekapan` : '1 rekapan'}</span>
+              </div>` : ''}
+  
+              <div class="payment-panel__hero-card payment-panel__hero-card--accent">
+                  <span class="payment-panel__hero-label" id="payment-remaining-label">${remainingLabelText}</span>
+                  <strong class="payment-panel__hero-primary-amount" id="payment-remaining-amount" data-raw-amount="${remaining}">${fmtIDR(remaining)}</strong>
+              </div>
+  
+              <div class="payment-panel__hero-card">
+                  <span class="payment-panel__hero-label">Sudah Terbayar</span>
+                  <strong>${fmtIDR(paidAmount)}</strong>
+              </div>
+          </div>
+  
+          <div class="payment-panel__quick">
+              <button type="button" class="btn btn-secondary" data-action="set-payment-full">Bayar Lunas</button>
+              <button type="button" class="btn btn-secondary" data-action="set-payment-half">Bayar Setengah</button>
+          </div>
+  
+          <form id="payment-form" data-id="${bill.id}" data-type="bill">
+              <div class="payment-panel__form">
+                  <div class="form-group">
+                      <label>Jumlah Pembayaran</label>
+                      <input type="text" name="amount" id="payment-input-amount" inputmode="numeric" required value="${amountFormatted}">
+                  </div>
+                  <div class="form-group">
+                      <label>Tanggal Pembayaran</label>
+                      <input type="date" name="date" value="${todayString}" required>
+                  </div>
+                  <h5 class="invoice-section-title full-width">Lampiran (Opsional)</h5>
+                  <div class="form-group full-width">
+                      ${attachmentHTML}
+                      <input type="file" name="paymentAttachment" accept="image/*" class="hidden-file-input" style="display:none;">
+                  </div>
+              </div>
+          </form>
+      </div>`;
+  
+      const footer = `
+          <div class="form-footer-actions">
+              <button type="submit" class="btn btn-primary" form="payment-form">
+                  ${createIcon('payment')} Konfirmasi Pembayaran
+              </button>
+          </div>`;
+  
+      const detailPane = showDetailPane({ title: 'Pembayaran Tagihan', content, footer });
+      if (!detailPane) return;
+  
+      emit('ui.detailPane.formReady', { context: detailPane });
+  
+      _attachSingleFileUploadListener(detailPane, 'paymentAttachment', '#new-payment-attachment-container');
+  
+      const amountInput = detailPane.querySelector('#payment-input-amount');
+      const remainingAmountEl = detailPane.querySelector('#payment-remaining-amount');
+      const remainingLabelEl = detailPane.querySelector('#payment-remaining-label');
+      const originalRemaining = parseFloat(remainingAmountEl.dataset.rawAmount);
+  
+      if (amountInput && remainingAmountEl && remainingLabelEl) {
+          amountInput.addEventListener('input', () => {
+              const amountToPay = parseFormattedNumber(amountInput.value);
+              const newRemaining = originalRemaining - amountToPay;
+              animateNumber(remainingAmountEl, newRemaining);
+              remainingLabelEl.textContent = "Sisa Setelah Bayar";
+          });
+      }
+       emit('ui.forms.init', detailPane);
+  }
 
 export function openBillPaymentModal(billId, options = {}) {
   const bill = (appState.bills || []).find(b => b.id === billId);

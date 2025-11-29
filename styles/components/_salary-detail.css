@@ -19,7 +19,7 @@
 
 .salary-summary-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); /* Adjusted min-width for mobile */
     gap: 10px;
 }
 
@@ -31,7 +31,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    min-height: 110px;
+    min-height: 100px; /* Reduced min-height */
     box-shadow: 0 10px 18px rgba(15, 23, 42, 0.05);
 }
 
@@ -43,13 +43,14 @@
 }
 
 .salary-summary-card strong {
-    font-size: 1.2rem;
+    font-size: 1.1rem; /* Slightly smaller font */
     font-weight: 700;
     color: var(--text-main);
+    word-break: break-all; /* Prevent overflow on long numbers */
 }
 
 .salary-summary-card .subtext {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-dim);
 }
 
@@ -68,21 +69,17 @@
 
 .payment-history-recap-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 12px;
 }
 
+/* Wrapper Adjustment */
 .payment-history-wrapper {
     width: 100%;
-    min-width: 360px;
+    /* Removed min-width: 360px to prevent horizontal scroll on small devices */
+    box-sizing: border-box; 
 }
 
-.payment-history-panel {
-    display: grid;
-    grid-template-columns: minmax(240px, 1fr) minmax(320px, 1.5fr);
-    gap: clamp(16px, 2vw, 26px);
-    align-items: flex-start;
-}
 
 .payment-history-panel__sidebar {
     display: flex;
@@ -94,11 +91,12 @@
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 18px;
-    padding: clamp(16px, 2vw, 24px);
+    padding: clamp(12px, 2vw, 24px); /* Reduced padding for mobile */
     box-shadow: 0 20px 32px rgba(15, 23, 42, 0.08);
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-width: 0; /* Critical for grid children to shrink */
 }
 
 .payment-history-panel__main-header {
@@ -114,7 +112,7 @@
 .payment-history-panel__hero {
     background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 15%, transparent) 0%, color-mix(in srgb, var(--surface) 90%, transparent) 100%);
     border: 1px solid var(--line);
-    border-radius: 20px;
+    border-radius: 16px;
     padding: 16px;
     display: flex;
     gap: 16px;
@@ -124,30 +122,30 @@
 }
 
 .payment-history-panel__hero-info {
-    flex: 1;
-    min-width: 140px;
+    flex: 1 1 140px; /* Allow shrinking/growing */
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
 .payment-history-panel__hero-label {
-    font-size: 0.68rem;
-    letter-spacing: 0.4em;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--text-dim);
 }
 
 .payment-history-panel__hero-value {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     font-weight: 700;
     color: var(--text-main);
+    line-height: 1.2;
 }
 
 .payment-history-panel__hero-meta {
     font-size: 0.7rem;
     color: var(--text-muted);
-    letter-spacing: 0.1em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
 }
 
@@ -163,8 +161,10 @@
     margin: 0;
     font-size: 1rem;
     line-height: 1.3;
+    word-break: break-word; /* Prevent long titles from breaking layout */
 }
 
+/* Stats Section */
 .payment-history-panel__main-stats {
     display: flex;
     gap: 18px;
@@ -209,14 +209,15 @@
     gap: 12px;
 }
 
+/* Overview Card */
 .payment-history-overview-card {
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 18px;
+    border-radius: 16px;
     padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
 }
 
@@ -225,6 +226,7 @@
     justify-content: space-between;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap; /* Allow wrapping */
 }
 
 .payment-history-overview-card__meta--space-between {
@@ -241,13 +243,14 @@
 
 .payment-history-overview-card__stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); /* Smaller min-width */
     gap: 10px;
 }
 
 .payment-history-overview-card__stats strong {
     font-size: 1rem;
     font-weight: 600;
+    word-break: break-all;
 }
 
 .payment-history-overview-card__status-amount {
@@ -265,38 +268,92 @@
     color: var(--text-dim);
 }
 
-@media (max-width: 960px) {
-    .payment-history-panel {
-        grid-template-columns: 1fr;
-    }
-    .payment-history-panel__main {
-        order: 2;
-    }
-    .payment-history-panel__sidebar {
-        order: 1;
-    }
-}
 
-@media (max-width: 640px) {
+    .payment-history-panel {
+        gap: 16px;
+        display: flex; /* Switch to flex for better control */
+        flex-direction: column;
+    }
+    
+    .payment-history-panel__main {
+        padding: 16px 12px; /* Thinner padding */
+        border-radius: 12px;
+    }
+
     .payment-history-panel__main-header {
         flex-direction: column;
         align-items: flex-start;
+        gap: 12px;
     }
+
+    /* Transform the stats row into a list-like view on mobile to prevent overlap */
     .payment-history-panel__main-stats {
         width: 100%;
-    }
-    .payment-history-panel__hero {
         flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+        background: var(--surface-sunken);
+        padding: 10px;
+        border-radius: 8px;
     }
-}
 
-@media (max-width: 480px) {
-    .payment-history-panel__hero {
-        padding: 12px;
-        gap: 10px;
+    .payment-history-panel__main-stats > div {
+        flex-direction: row;
+        justify-content: space-between;
+        width: 100%;
+        border-bottom: 1px dashed var(--line);
+        padding-bottom: 4px;
     }
+
+    .payment-history-panel__main-stats > div:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .payment-history-panel__hero {
+        flex-direction: column; /* Stack hero items */
+        padding: 12px;
+    }
+    
     .payment-history-panel__hero-info {
-        min-width: 100%;
+        width: 100%;
+        border-bottom: 1px dashed rgba(0,0,0,0.1);
+        padding-bottom: 8px;
+    }
+    
+    .payment-history-panel__hero-info:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    /* Overview Card mobile tweaks */
+    .payment-history-overview-card__stats {
+        grid-template-columns: 1fr; /* Stack stats vertically on very small screens */
+        gap: 8px;
+    }
+    
+    .payment-history-overview-card__stats > div {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--surface-hover);
+        padding-bottom: 4px;
+    }
+
+    .payment-history-recap-grid {
+        grid-template-columns: 1fr; /* Single column recap cards */
+    }
+
+/* Tiny Screens (Prevent breaking on < 360px) */
+@media (max-width: 360px) {
+    .salary-summary-value.big {
+        font-size: 1.15rem;
+    }
+    .payment-history-entry {
+        font-size: 0.9em; /* Scale down text slightly */
+    }
+    .btn {
+        width: 100%; /* Full width buttons */
     }
 }
 

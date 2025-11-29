@@ -384,6 +384,45 @@
     flex-wrap: wrap;
     align-items: stretch;
 }
+.payment-panel__hero {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--line);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 18%, transparent) 0%, color-mix(in srgb, var(--surface) 90%, transparent) 100%);
+    padding: 0.75rem;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
+}
+.payment-panel__hero-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.85rem;
+    border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+    background: var(--surface);
+    min-height: 90px;
+}
+.payment-panel__hero-card--accent {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--success) 28%, transparent) 0%, color-mix(in srgb, var(--surface) 92%, transparent) 100%);
+    border-color: color-mix(in srgb, var(--success) 40%, transparent);
+}
+.payment-panel__hero-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+.payment-panel__hero-note {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.payment-panel__hero-primary-amount {
+    font-size: 1.5rem;
+    color: var(--primary);
+    line-height: 1.2;
+}
 .payment-panel__worker {
     display: grid;
     grid-column: 1fr 1fr;
@@ -604,6 +643,12 @@
   }
   .salary-summary-aggregate {
     grid-template-columns: 1fr;
+  }
+  .payment-panel__hero {
+    padding: 0.5rem;
+  }
+  .payment-panel__hero-card {
+    min-height: auto;
   }
 }
 
