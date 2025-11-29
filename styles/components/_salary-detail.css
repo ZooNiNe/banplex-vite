@@ -4,7 +4,7 @@
 
 /* --- Aggregate Summary Card (Header Detail) --- */
 .salary-aggregate-summary {
-    background: var(--surface-sunken);
+    background: var(--panel);
     padding: 16px;
     border-radius: 12px;
     margin-bottom: 20px;
@@ -114,8 +114,8 @@
     border: 1px solid var(--line);
     border-radius: 16px;
     padding: 16px;
+    gap: 8px;
     display: flex;
-    gap: 16px;
     justify-content: space-between;
     flex-wrap: wrap;
     box-shadow: 0 16px 35px rgba(15, 23, 42, 0.18);
@@ -292,7 +292,7 @@
         flex-direction: column;
         gap: 8px;
         align-items: stretch;
-        background: var(--surface-sunken);
+        background: var(--panel);
         padding: 10px;
         border-radius: 8px;
     }
@@ -308,11 +308,6 @@
     .payment-history-panel__main-stats > div:last-child {
         border-bottom: none;
         padding-bottom: 0;
-    }
-
-    .payment-history-panel__hero {
-        flex-direction: column; /* Stack hero items */
-        padding: 12px;
     }
     
     .payment-history-panel__hero-info {
@@ -351,9 +346,6 @@
     }
     .payment-history-entry {
         font-size: 0.9em; /* Scale down text slightly */
-    }
-    .btn {
-        width: 100%; /* Full width buttons */
     }
 }
 
@@ -413,6 +405,8 @@
     font-size: 0.85rem;
     color: var(--text-dim);
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .summary-value {
@@ -491,7 +485,7 @@
     gap: 6px;
     font-size: 0.8rem;
     color: var(--text-dim);
-    background: var(--surface-sunken);
+    background: var(--panel);
     padding: 4px 8px;
     border-radius: 6px;
 }
@@ -516,15 +510,30 @@
 .recap-actions-bar .btn-icon {
     width: 32px;
     height: 32px;
-    background: var(--surface-sunken);
+    background: var(--panel);
     border-radius: 6px;
+}
+
+.recap-actions-bar .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    min-height: 34px;
+}
+
+.recap-actions-bar .btn .lucide {
+    width: 16px;
+    height: 16px;
 }
 
 /* --- Payment History Minimalist --- */
 .payment-history-section {
     margin-top: 24px;
     padding-top: 20px;
-    border-top: 4px solid var(--surface-sunken);
+    border-top: 4px solid var(--panel);
 }
 
 .payment-history-entry.minimalist {
@@ -612,7 +621,7 @@
     font-size: 0.75rem;
     padding: 2px 8px;
     border-radius: 99px;
-    background: var(--surface-sunken);
+    background: var(--panel);
     color: var(--text-dim);
     font-weight: 500;
 }

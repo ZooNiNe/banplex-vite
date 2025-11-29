@@ -221,7 +221,6 @@ function renderWorkerPayrollSummaryList(summaries) {
     return `<div class="wa-card-list-wrapper payroll-summary-list">${listHTML}</div>`;
 }
 
-
 async function renderTagihanContent(append = false) {
     if (!append && pageAbortController) {
         pageAbortController.abort();
@@ -248,10 +247,8 @@ async function renderTagihanContent(append = false) {
                 await loadDataForPage('tagihan');
                 if (signal?.aborted) throw new DOMException('Operation aborted after page data load', 'AbortError');
             }
-        } else {
         }
         
-        // Safety initialization
         if (!appState.activeSubPage) appState.activeSubPage = new Map();
         if (!appState.tagihan) appState.tagihan = {};
 
@@ -265,19 +262,76 @@ async function renderTagihanContent(append = false) {
             categoryNav.style.display = activeTab === 'surat_jalan' ? 'none' : 'flex';
         }
 
-        let items = [];
         const allBills = appState.bills || [];
         const allExpenses = appState.expenses || [];
         const allSuppliers = appState.suppliers || [];
 
-        if (activeTab === 'tagihan') {
-            items = allBills.filter(b => !b.isDeleted && ((b.status || 'unpaid') === 'unpaid'));
-        } else if (activeTab === 'lunas') {
-            items = allBills.filter(b => !b.isDeleted && ((b.status || 'unpaid') === 'paid'));
+        // --- 1. PISAHKAN LOGIKA SALARY VS NON-SALARY ---
+        let items = [];
+        let nonSalaryItems = [];
+        let salaryItems = [];
+
+        // A. Ambil Item Non-Gaji (Sesuai Tab)
+        if (activeTab === 'surat_jalan') {
+            nonSalaryItems = allExpenses.filter(e => e.status === 'delivery_order' && !e.isDeleted);
         } else {
-            items = allExpenses.filter(e => e.status === 'delivery_order' && !e.isDeleted);
+            const targetStatus = activeTab === 'tagihan' ? 'unpaid' : 'paid';
+            nonSalaryItems = allBills.filter(b => !b.isDeleted && b.type !== 'gaji' && (b.status || 'unpaid') === targetStatus);
         }
 
+        // B. Ambil Item Gaji (Logika Agregasi Worker)
+        if (activeTab === 'tagihan' || activeTab === 'lunas') {
+            // Ambil SEMUA bill gaji aktif untuk dicek status global pekerjanya
+            const allSalaryBills = allBills.filter(b => !b.isDeleted && b.type === 'gaji');
+            
+            if (allSalaryBills.length > 0) {
+                // Agregasi per pekerja
+                const workerSummaries = aggregateSalaryBillWorkers(allSalaryBills);
+                
+                // Filter masuk ke tab mana
+                if (activeTab === 'tagihan') {
+                    // Masuk 'Belum Lunas' jika masih ada sisa (remaining > 0)
+                    salaryItems = workerSummaries.filter(w => {
+                        const remaining = (Number(w.amount) || 0) - (Number(w.paidAmount) || 0);
+                        return remaining > 100; // Toleransi floating point
+                    });
+                } else {
+                    // Masuk 'Lunas' HANYA jika sisa <= 0 (Lunas Total)
+                    salaryItems = workerSummaries.filter(w => {
+                        const remaining = (Number(w.amount) || 0) - (Number(w.paidAmount) || 0);
+                        return remaining <= 100;
+                    });
+                }
+
+                // Tambahkan properti pelengkap agar bisa difilter & di-sort dengan benar
+                salaryItems = salaryItems.map(w => {
+                    // Cari tanggal paling relevan (misal: terbaru) dari sub-items
+                    const repBill = (w.summaries || []).reduce((prev, curr) => {
+                        const dPrev = getJSDate(prev.dueDate || prev.date);
+                        const dCurr = getJSDate(curr.dueDate || curr.date);
+                        return dCurr > dPrev ? curr : prev;
+                    }, w.summaries[0] || {});
+
+                    return {
+                        ...w,
+                        type: 'gaji',
+                        date: repBill.date,
+                        dueDate: repBill.dueDate, 
+                        createdAt: repBill.createdAt,
+                        projectId: repBill.projectId, // Default project ID for quick filter
+                        // Status virtual agar lolos filter status di bawah (jika ada)
+                        status: activeTab === 'tagihan' ? 'unpaid' : 'paid' 
+                    };
+                });
+            }
+        }
+
+        // Gabungkan kembali
+        items = [...salaryItems, ...nonSalaryItems];
+
+        // --- 2. FILTERING UMUM ---
+
+        // Filter Kategori
         if (category && category !== 'all') {
             items = items.filter(item => {
                 const expense = activeTab === 'surat_jalan' ? item : allExpenses.find(e => e.id === item.expenseId);
@@ -286,25 +340,40 @@ async function renderTagihanContent(append = false) {
             });
         }
 
+        // Filter Status (Untuk non-gaji, gaji sudah difilter di atas)
         if ((activeTab === 'tagihan' || activeTab === 'lunas') && status && status !== 'all') {
-            items = items.filter(item => (item.status || 'unpaid') === status);
+            items = items.filter(item => {
+                if (item.type === 'gaji') return true; // Gaji sudah difilter by tab logic
+                return (item.status || 'unpaid') === status;
+            });
         }
 
-         if (supplierId && supplierId !== 'all') {
+        // Filter Supplier
+        if (supplierId && supplierId !== 'all') {
             items = items.filter(item => {
                 const expense = activeTab === 'surat_jalan' ? item : allExpenses.find(e => e.id === item.expenseId);
                 return expense && expense.supplierId === supplierId;
             });
         }
 
+        // Filter Proyek
         if (projectId && projectId !== 'all') {
             items = items.filter(item => {
+                // Cek item biasa
                 const expense = activeTab === 'surat_jalan' ? item : allExpenses.find(e => e.id === item.expenseId);
                 const sourceProjectId = expense?.projectId || item.projectId;
-                return sourceProjectId === projectId;
+                if (sourceProjectId === projectId) return true;
+
+                // Cek item gaji (summary) yang mungkin punya banyak project
+                if (item.type === 'gaji' && Array.isArray(item.summaries)) {
+                    return item.summaries.some(s => s.projectId === projectId);
+                }
+                
+                return false;
             });
         }
 
+        // Filter Pekerja
         if (workerId && workerId !== 'all') {
             items = items.filter(item => {
                 if (item.type !== 'gaji') return true;
@@ -316,6 +385,7 @@ async function renderTagihanContent(append = false) {
             });
         }
 
+        // Filter Tanggal
         if (dateStart) {
             const startDate = new Date(dateStart + 'T00:00:00');
             items = items.filter(item => getJSDate(item[dateField] || item.date) >= startDate);
@@ -325,6 +395,7 @@ async function renderTagihanContent(append = false) {
             items = items.filter(item => getJSDate(item[dateField] || item.date) <= endDate);
         }
 
+        // Filter Pencarian
         if (lowerSearchTerm) {
             items = items.filter(item => {
                 const descriptionMatch = item.description && item.description.toLowerCase().includes(lowerSearchTerm);
@@ -335,8 +406,12 @@ async function renderTagihanContent(append = false) {
                     supplierNameMatch = supplier?.supplierName.toLowerCase().includes(lowerSearchTerm);
                 }
                 let workerNameMatch = false;
-                if (item.type === 'gaji' && Array.isArray(item.workerDetails)) {
-                    workerNameMatch = item.workerDetails.some(w => w.name && w.name.toLowerCase().includes(lowerSearchTerm));
+                if (item.type === 'gaji') {
+                    // Cek nama worker di level summary atau detail
+                    if (item.workerName && item.workerName.toLowerCase().includes(lowerSearchTerm)) workerNameMatch = true;
+                    else if (Array.isArray(item.workerDetails)) {
+                        workerNameMatch = item.workerDetails.some(w => w.name && w.name.toLowerCase().includes(lowerSearchTerm));
+                    }
                 }
                 let materialMatch = false;
                 if (expense && Array.isArray(expense.items)) {
@@ -347,25 +422,7 @@ async function renderTagihanContent(append = false) {
             });
         }
 
-        // --- PRE-AGGREGATION STEP (NEW) ---
-        // Jika kita berada di tab "tagihan" atau "lunas", kita ingin menyatukan semua tagihan gaji
-        // satu pekerja menjadi satu item, agar tidak terpecah berdasarkan tanggal saat grouping.
-        if (activeTab === 'tagihan' || activeTab === 'lunas') {
-            const salaryItems = items.filter(i => i.type === 'gaji');
-            const nonSalaryItems = items.filter(i => i.type !== 'gaji');
-            const allSalaryBills = allBills.filter(b => b && b.type === 'gaji' && !b.isDeleted);
-            const aggregatedSalaryItems = aggregateSalaryBillWorkers(allSalaryBills, { allSalaryBills, sourceItems: allSalaryBills });
-            const salaryAggregatesForTab = aggregatedSalaryItems.filter(entry => {
-                if (activeTab === 'lunas') {
-                    return entry.status === 'paid';
-                }
-                return entry.status !== 'paid';
-            });
-
-            items = [...salaryAggregatesForTab, ...nonSalaryItems];
-        }
-        // ----------------------------------
-
+        // --- SORTING ---
         items.sort((a, b) => {
             const safeDate = (value) => {
                 const date = getJSDate(value);
@@ -393,7 +450,6 @@ async function renderTagihanContent(append = false) {
             return comparison * direction;
         });
 
-        // FIX: Ensure appState.tagihan exists before assignment
         if (appState.tagihan) {
             appState.tagihan.currentList = items;
         }
@@ -404,8 +460,8 @@ async function renderTagihanContent(append = false) {
             pendingExpenses: pendingMaps.get('expenses') || new Map()
         };
         
-        // Pass aggregateSalary: false because we already aggregated them above!
-        const renderOptions = { aggregateSalary: false };
+        // aggregateSalary: false karena kita sudah melakukan agregasi manual di atas
+        const renderOptions = { aggregateSalary: false, hidePayrollMetaBadges: true };
 
         const paginationKey = `bills_${activeTab}`;
         if (!appState.pagination[paginationKey]) {
@@ -442,6 +498,7 @@ async function renderTagihanContent(append = false) {
 
         paginationState.isLoading = false;
 
+        // ... (Sisa kode rendering DOM untuk skeleton, sentinel, groupedData tetap sama) ...
         const existingSkeleton = container.querySelector('#list-skeleton');
         if (existingSkeleton) existingSkeleton.remove();
         const existingSentinel = container.querySelector('#infinite-scroll-sentinel');
@@ -533,7 +590,6 @@ async function renderTagihanContent(append = false) {
         }
 
     } catch (e) {
-        // FIX: Ignore AbortError silently
         if (e.name === 'AbortError' || e.message?.includes('aborted')) return;
         
         console.error("Error rendering Tagihan:", e);
@@ -547,14 +603,13 @@ async function renderTagihanContent(append = false) {
         if (!append && signal === pageAbortController?.signal) {
             pageAbortController = null;
         }
-        const activeTab = appState.activeSubPage?.get('tagihan') || 'tagihan'; // Safe access
+        const activeTab = appState.activeSubPage?.get('tagihan') || 'tagihan';
         const paginationKey = `bills_${activeTab}`;
         if (appState.pagination[paginationKey]) {
             appState.pagination[paginationKey].isLoading = false;
         }
     }
 }
-
 
 function loadMoreTagihan() {
     if (appState.activePage !== 'tagihan') return;
@@ -835,4 +890,3 @@ function initBillsHeroCarousel() {
     wrap.addEventListener('touchmove', e => { if(!drag) return; curX=e.touches[0].clientX; }, { passive: true });
     wrap.addEventListener('touchend', ()=>{ if(!drag) return; const dx=curX-startX; drag=false; if(Math.abs(dx)>40){ setIndex(index+(dx<0?1:-1)); if (wrap._timer) { clearInterval(wrap._timer); wrap._timer = setInterval(()=>setIndex(index+1), 7000);} } });
 }
-

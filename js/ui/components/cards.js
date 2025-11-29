@@ -4,6 +4,7 @@ import { getJSDate, getUnreadCommentCount } from "../../utils/helpers.js";
 import { on } from "../../state/eventBus.js";
 import { buildPendingQuotaBanner } from "./pendingQuotaBanner.js";
 import { encodePayloadForDataset } from "../../services/pendingQuotaService.js";
+import { isViewer } from "../../utils/helpers.js";
 
 function createIcon(iconName, size = 16, classes = '') {
     const icons = {
@@ -400,7 +401,7 @@ export function _createSalaryBillDetailContentHTML(bill, payments = [], options 
         : [];
 
     const aggregates = (bill?.type === 'gaji' && candidateBills.length)
-        ? aggregateSalaryBillWorkers(candidateBills, { allSalaryBills: candidateBills, sourceItems: candidateBills })
+        ? aggregateSalaryBillWorkers(candidateBills)
         : [];
 
     let workerSummary = null;
@@ -468,22 +469,18 @@ export function _createSalaryBillDetailContentHTML(bill, payments = [], options 
     })();
 
     const summaryStats = getSalarySummaryStats(summaryLines);
-    const summaryLineTotal = summaryLines.reduce((sum, line) => {
-        const amount = Number(line.uniqueAmount ?? line.amount ?? 0);
-        return sum + (Number.isFinite(amount) ? amount : 0);
-    }, 0);
-    const candidateBillTotal = candidateBills.reduce((sum, candidate) => sum + (Number(candidate.amount) || 0), 0);
-    const candidateBillPaid = candidateBills.reduce((sum, candidate) => sum + (Number(candidate.paidAmount) || 0), 0);
-    
-    const fallbackTotalBase = Math.max(summaryLineTotal, candidateBillTotal, Number(bill?.amount) || 0);
-    const total = workerSummary 
-        ? Number(workerSummary.totalAmount || fallbackTotalBase)
-        : fallbackTotalBase;
+    const summaryBillIds = Array.from(collectedIds).filter(Boolean);
+    const summaryLineTotal = summaryLines.length ? summaryStats.totalAmount : null;
+    const fallbackBillAmount = Number(bill?.amount) || 0;
+    const total = summaryLineTotal !== null ? summaryLineTotal : fallbackBillAmount;
 
-    const paidFallbackBase = Math.max(paidFromPayments, candidateBillPaid, Number(bill?.paidAmount) || 0);
-    const fallbackPaid = workerSummary ? Number(workerSummary.paidAmount || paidFallbackBase) : paidFallbackBase;
+    const fallbackPaid = workerSummary ? Number(workerSummary.paidAmount || 0) : Number(bill?.paidAmount || 0);
     const paid = paidFromPayments > 0 ? paidFromPayments : fallbackPaid;
     const remaining = Math.max(0, total - paid);
+    const primaryBillIdForPayment = summaryBillIds[0] || bill?.id || '';
+    const workerIdForPayment = workerSummary?.workerId || bill?.workerId || '';
+    const safeBillIdsAttr = summaryBillIds.join(',').replace(/"/g, '&quot;');
+    const showPaymentAction = !isViewer() && remaining > 0 && summaryBillIds.length > 0 && primaryBillIdForPayment;
 
     const summaryListHTML = summaryLines.length
         ? summaryLines
@@ -503,20 +500,31 @@ export function _createSalaryBillDetailContentHTML(bill, payments = [], options 
                 
                 // === ACTION BUTTONS PER ITEM ===
                 const isPaid = badgeState === 'positive';
-                const actionsHTML = isPaid 
-                    ? `
-                        <button class="btn-icon" title="Cetak Kwitansi" data-action="print-bill" data-id="${sum.billId}">
-                            ${createIcon('printer', 16)}
-                        </button>
-                      ` 
-                    : `
-                        <button class="btn-icon" title="Bayar Tagihan Ini" data-action="open-salary-payment-panel" data-item-id="${sum.billId}" data-bill-id="${sum.billId}" data-worker-id="${workerSummary?.workerId}">
-                            ${createIcon('coins', 16)}
-                        </button>
-                        <button class="btn-icon danger" title="Hapus Rekap Ini" data-action="delete-salary-bill" data-id="${sum.billId}" data-worker-id="${workerSummary?.workerId}">
-                            ${createIcon('trash-2', 16)}
-                        </button>
-                      `;
+                
+                const printButtonHTML = `
+                    <button class="btn btn-sm btn-ghost recap-print-btn" style="gap:4px; padding: 4px 10px;" title="Cetak Kwitansi" data-action="print-bill" data-id="${sum.billId}" data-bill-id="${sum.billId}">
+                        ${createIcon('printer', 14)} <span>Cetak</span>
+                    </button>
+                `;
+
+                const deletePaidSummaryButtonHTML = `
+                    <button class="btn btn-sm btn-danger recap-delete-btn" style="gap:4px; padding: 4px 10px;" title="Hapus Rekap Ini" data-action="delete-salary-summary" data-id="${sum.billId}" data-bill-id="${sum.billId}" data-worker-id="${workerSummary?.workerId}">
+                        ${createIcon('trash-2', 14)} <span>Hapus</span>
+                    </button>
+                `;
+
+                const unpaidActionsHTML = `
+                    <button class="btn btn-sm btn-primary" style="gap:4px; padding: 4px 8px;" title="Bayar Tagihan Ini" data-action="open-salary-payment-panel" data-item-id="${sum.billId}" data-bill-id="${sum.billId}" data-worker-id="${workerSummary?.workerId}">
+                        ${createIcon('coins', 14)} <span>Bayar</span>
+                    </button>
+                    <button class="btn-icon danger" title="Hapus Rekap Ini" data-action="delete-salary-bill" data-id="${sum.billId}" data-worker-id="${workerSummary?.workerId}">
+                        ${createIcon('trash-2', 16)}
+                    </button>
+                `;
+
+                const actionsHTML = isPaid
+                    ? `${printButtonHTML}${deletePaidSummaryButtonHTML}`
+                    : unpaidActionsHTML;
 
                 return `
                     <div class="sub-recap-item">
@@ -545,25 +553,22 @@ export function _createSalaryBillDetailContentHTML(bill, payments = [], options 
             }).join('')
         : `<div class="salary-summary-list__empty">Belum ada rangkuman gaji.</div>`;
 
-    const summaryCards = [
-        { label: `Total Tagihan (${summaryLines.length} Rekap)`, value: fmtIDR(total), detail: 'Rekap gabungan per pekerja' },
-        { label: 'Sudah Dibayar', value: fmtIDR(paid), detail: 'Pembayaran yang sudah tercatat' },
-        { label: 'Sisa Pembayaran', value: fmtIDR(remaining), detail: remaining > 0 ? 'Masih perlu diselesaikan' : 'Semua sudah lunas' }
-    ];
-    const summaryCardsHTML = summaryCards.map(card => `
-        <div class="salary-summary-card">
-            <span class="label">${card.label}</span>
-            <strong>${card.value}</strong>
-            <span class="subtext">${card.detail}</span>
-        </div>
-    `).join('');
-
+    // === AGGREGATE HEADER ===
     const summaryAggregateHTML = `
-        <section id="tagihan-summary-section" class="salary-summary-overview">
-            <div class="salary-summary-card-grid">
-                ${summaryCardsHTML}
+        <div class="salary-aggregate-summary">
+            <div class="summary-row main">
+                <span class="summary-label">Total Tagihan (${summaryLines.length} Rekap)</span>
+                <strong class="summary-value big">${fmtIDR(total)}</strong>
             </div>
-        </section>
+            <div class="summary-row">
+                <span class="summary-label">Sudah Dibayar</span>
+                <strong class="summary-value text-positive">${fmtIDR(paid)}</strong>
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Sisa Pembayaran</span>
+                <strong class="summary-value ${remaining > 0 ? 'text-warn' : 'text-positive'}">${fmtIDR(remaining)}</strong>
+            </div>
+        </div>
     `;
 
     const metaDetailsHTML = `
@@ -668,106 +673,20 @@ export function getSalarySummaryStats(summaries = []) {
     return { totalAmount, overwrittenCount, useUniqueAmount };
 }
 
-export function aggregateSalaryBillWorkers(items = [], options = {}) {
+export function aggregateSalaryBillWorkers(items = []) {
     const attendanceRecords = appState.attendanceRecords || [];
     const attendanceMap = new Map(attendanceRecords.map(rec => [rec.id, rec]));
     const projectMap = new Map((appState.projects || []).map(project => [project.id, project.projectName]));
     const workerLookup = new Map((appState.workers || []).map(worker => [worker.id, worker.workerName]));
     const grouped = new Map();
-    const UNKNOWN_WORKER_KEY = '__unknown-worker__';
-    const UNKNOWN_WORKER_LABEL = 'Unknown Worker';
-
-    const allSalaryBillsSource = Array.isArray(options.allSalaryBills)
-        ? options.allSalaryBills
-        : (Array.isArray(appState.bills) ? appState.bills : []);
-    const allSalaryBills = (Array.isArray(allSalaryBillsSource) ? allSalaryBillsSource : [])
-        .filter(bill => bill && bill.type === 'gaji' && !bill.isDeleted);
-
-    const isMeaningfulWorkerName = (value) => {
-        if (!value) return false;
-        const normalized = String(value).trim();
-        if (!normalized) return false;
-        const lowered = normalized.toLowerCase();
-        if (lowered === 'pekerja') return false;
-        if (lowered === UNKNOWN_WORKER_LABEL.toLowerCase()) return false;
-        return true;
-    };
-
-    const matchesBillToWorker = (summary, bill) => {
-        if (!bill) return false;
-        if (summary.matchingIds.size > 0) {
-            if (bill.workerId && summary.matchingIds.has(bill.workerId)) return true;
-            if (Array.isArray(bill.workerDetails)) {
-                if (bill.workerDetails.some(detail => detail && (summary.matchingIds.has(detail.workerId) || summary.matchingIds.has(detail.id)))) {
-                    return true;
-                }
-            }
-        }
-        if (summary.matchingNames.size > 0) {
-            const billName = (bill.workerName || '').trim();
-            if (billName && summary.matchingNames.has(billName)) return true;
-            if (Array.isArray(bill.workerDetails)) {
-                if (bill.workerDetails.some(detail => {
-                    const detailName = (detail?.name || '').trim();
-                    return detailName && summary.matchingNames.has(detailName);
-                })) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    };
-
-    const normalizeDateValue = (value) => {
-        if (value === undefined || value === null) return null;
-        if (value instanceof Date) {
-            return Number.isNaN(value.getTime()) ? null : value;
-        }
-        if (typeof value === 'object') {
-            if (typeof value.toDate === 'function') {
-                const converted = value.toDate();
-                if (converted instanceof Date && !Number.isNaN(converted.getTime())) return converted;
-            }
-            const seconds = value.seconds ?? value._seconds;
-            if (typeof seconds === 'number') {
-                const nanoseconds = value.nanoseconds ?? value._nanoseconds ?? 0;
-                const parsed = new Date(seconds * 1000 + nanoseconds / 1000000);
-                if (!Number.isNaN(parsed.getTime())) return parsed;
-            }
-        }
-        if (typeof value === 'number' && Number.isFinite(value)) {
-            const parsed = new Date(value);
-            if (!Number.isNaN(parsed.getTime())) return parsed;
-            return null;
-        }
-        if (typeof value === 'string') {
-            const trimmed = value.trim();
-            if (!trimmed) return null;
-            const direct = new Date(trimmed);
-            if (!Number.isNaN(direct.getTime())) return direct;
-            const normalized = trimmed.replace(/[.]/g, '-');
-            const altDirect = new Date(normalized);
-            if (!Number.isNaN(altDirect.getTime())) return altDirect;
-            const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-            if (slashMatch) {
-                const [, day, month, year] = slashMatch;
-                const parsed = new Date(Number(year), Number(month) - 1, Number(day));
-                if (!Number.isNaN(parsed.getTime())) return parsed;
-            }
-        }
-        return null;
-    };
 
     const resolveComparableTime = (bill = {}) => {
         const sourceDate = bill.updatedAt || bill.createdAt || bill.endDate || bill.dueDate || bill.date;
-        const parsed = normalizeDateValue(sourceDate);
-        return parsed ? parsed.getTime() : 0;
+        const parsed = getJSDate(sourceDate);
+        return (parsed instanceof Date && !Number.isNaN(parsed.getTime())) ? parsed.getTime() : 0;
     };
 
-    const sourceSalaryItems = Array.isArray(options.sourceItems) && options.sourceItems.length
-        ? options.sourceItems
-        : (Array.isArray(items) ? items : []);
-    const salaryItems = sourceSalaryItems
+    const salaryItems = (Array.isArray(items) ? items : [])
         .filter(item => item && item.type === 'gaji')
         .sort((a, b) => resolveComparableTime(b) - resolveComparableTime(a));
 
@@ -775,30 +694,21 @@ export function aggregateSalaryBillWorkers(items = [], options = {}) {
         const billTotal = Number(item.amount) || 0;
         const billPaid = Number(item.paidAmount) || 0;
         const paidRatio = billTotal > 0 ? Math.min(1, Math.max(0, billPaid / billTotal)) : 0;
-        const fallbackWorkerName = item.workerDetails?.[0]?.name || item.workerName || item.description || UNKNOWN_WORKER_LABEL;
         const detailWorkers = Array.isArray(item.workerDetails) && item.workerDetails.length > 0
             ? item.workerDetails
-            : [{
-                workerId: item.workerId,
-                id: item.workerId,
-                name: fallbackWorkerName,
-                amount: item.amount,
-                recordIds: item.recordIds || []
-            }];
+            : (item.workerId ? [{ workerId: item.workerId, name: workerLookup.get(item.workerId) || 'Pekerja', amount: item.amount, recordIds: item.recordIds || [] }] : []);
         const fallbackAmount = Number(item.amount) || 0;
-        const billStart = normalizeDateValue(item.startDate);
-        const billEnd = normalizeDateValue(item.endDate);
+        const billStart = item.startDate ? getJSDate(item.startDate) : null;
+        const billEnd = item.endDate ? getJSDate(item.endDate) : null;
 
         detailWorkers.forEach(detail => {
-            const detailDisplayName = detail.name || detail.workerName;
-            const resolvedWorkerId = detail.workerId || detail.id;
-            const workerKey = resolvedWorkerId || detailDisplayName || UNKNOWN_WORKER_KEY;
-            const workerName = detailDisplayName || (resolvedWorkerId ? workerLookup.get(resolvedWorkerId) : null) || (workerKey === UNKNOWN_WORKER_KEY ? UNKNOWN_WORKER_LABEL : 'Pekerja');
+            const workerId = detail.workerId || detail.id || detail.name;
+            if (!workerId) return;
             const detailAmount = Number(detail.amount ?? fallbackAmount) || (fallbackAmount > 0 ? fallbackAmount / detailWorkers.length : 0);
-            if (!grouped.has(workerKey)) {
-                grouped.set(workerKey, {
-                    workerId: workerKey,
-                    workerName,
+            if (!grouped.has(workerId)) {
+                grouped.set(workerId, {
+                    workerId,
+                    workerName: detail.name || workerLookup.get(workerId) || 'Pekerja',
                     totalAmount: 0,
                     totalPaid: 0,
                     statusSet: new Set(),
@@ -808,16 +718,11 @@ export function aggregateSalaryBillWorkers(items = [], options = {}) {
                     dueDate: null,
                     summaries: [],
                     seenRecords: new Set(),
-                    matchingIds: new Set(),
-                    matchingNames: new Set(),
                     overallRangeStart: null,
                     overallRangeEnd: null
                 });
             }
-            const summary = grouped.get(workerKey);
-            const meaningfulName = isMeaningfulWorkerName(detailDisplayName) ? detailDisplayName.trim() : null;
-            if (resolvedWorkerId) summary.matchingIds.add(resolvedWorkerId);
-            if (meaningfulName) summary.matchingNames.add(meaningfulName);
+            const summary = grouped.get(workerId);
             const recordIds = Array.isArray(detail.recordIds) && detail.recordIds.length > 0
                 ? detail.recordIds
                 : (item.recordIds || []);
@@ -830,10 +735,13 @@ export function aggregateSalaryBillWorkers(items = [], options = {}) {
             summary.totalPaid += appliedAmount * paidRatio;
             summary.statusSet.add(item.status || 'unpaid');
             if (item.id) summary.billIds.add(item.id);
-            const candidateDate = normalizeDateValue(item.dueDate || item.date);
+            const candidateDate = item.dueDate || item.date;
             if (candidateDate) {
-                if (!summary.dueDate || candidateDate < summary.dueDate) {
-                    summary.dueDate = candidateDate;
+                const parsed = getJSDate(candidateDate);
+                if (parsed instanceof Date && !Number.isNaN(parsed.getTime())) {
+                    if (!summary.dueDate || parsed < summary.dueDate) {
+                        summary.dueDate = parsed;
+                    }
                 }
             }
             const attendanceSummary = { full: 0, half: 0, absent: 0 };
@@ -846,8 +754,8 @@ export function aggregateSalaryBillWorkers(items = [], options = {}) {
                     const projName = projectMap.get(record.projectId) || record.projectId;
                     summary.projectNames.add(projName);
                 }
-                const recordDate = record ? normalizeDateValue(record.date) : null;
-                if (recordDate) {
+                const recordDate = record ? getJSDate(record.date) : null;
+                if (recordDate && !Number.isNaN(recordDate.getTime())) {
                     if (!rangeStart || recordDate < rangeStart) rangeStart = recordDate;
                     if (!rangeEnd || recordDate > rangeEnd) rangeEnd = recordDate;
                 }
@@ -885,16 +793,12 @@ export function aggregateSalaryBillWorkers(items = [], options = {}) {
     });
 
     return Array.from(grouped.values()).map(summary => {
+        const status = (summary.totalAmount > 0 && summary.totalPaid >= summary.totalAmount)
+            ? 'paid'
+            : 'unpaid';
         const overallStart = summary.overallRangeStart;
         const overallEnd = summary.overallRangeEnd;
         const summaryRangeLabel = formatRangeLabel(overallStart, overallEnd);
-        const matchedBills = (summary.matchingIds.size > 0 || summary.matchingNames.size > 0)
-            ? allSalaryBills.filter(bill => matchesBillToWorker(summary, bill))
-            : [];
-        const hasMatchingBills = matchedBills.length > 0;
-        const workerHasUnpaid = matchedBills.some(bill => (bill.status || 'unpaid') !== 'paid');
-        const statusFromTotals = (summary.totalAmount > 0 && summary.totalPaid >= summary.totalAmount) ? 'paid' : 'unpaid';
-        const status = hasMatchingBills ? (workerHasUnpaid ? 'unpaid' : 'paid') : statusFromTotals;
         return {
             id: `worker-${summary.workerId}`,
             type: 'gaji',
@@ -903,19 +807,18 @@ export function aggregateSalaryBillWorkers(items = [], options = {}) {
             amount: summary.totalAmount,
             paidAmount: summary.totalPaid,
             status,
-            hasOutstandingBills: hasMatchingBills && workerHasUnpaid,
             dueDate: summary.dueDate,
             startDate: overallStart,
             endDate: overallEnd,
             summaryRangeLabel,
             primaryBillId: Array.from(summary.billIds)[0] || null,
             workerDetails: [{
-                workerId: summary.workerId,
-                id: summary.workerId,
-                name: summary.workerName,
-                amount: summary.totalAmount,
-                recordIds: Array.from(summary.recordIds)
-            }],
+            workerId: summary.workerId,
+            id: summary.workerId,
+            name: summary.workerName,
+            amount: summary.totalAmount,
+            recordIds: Array.from(summary.recordIds)
+        }],
             projectNames: Array.from(summary.projectNames),
             billIds: Array.from(summary.billIds),
             summaries: summary.summaries,
@@ -930,6 +833,7 @@ export function _getBillsListHTML(items, options = {}) {
     const pendingBills = options.pendingBills || new Map();
     const pendingExpenses = options.pendingExpenses || new Map();
     const aggregateSalary = options.aggregateSalary !== false;
+    const hidePayrollMetaBadges = Boolean(options.hidePayrollMetaBadges);
 
     const allComments = appState.comments || [];
     const salaryAggregates = aggregateSalary ? aggregateSalaryBillWorkers(items) : [];
@@ -972,6 +876,17 @@ export function _getBillsListHTML(items, options = {}) {
             const sup = appState.suppliers?.find(s => s.id === expenseData.supplierId);
             if (sup) localMetaBadges.push({ icon: 'storefront', text: sup.supplierName });
         }
+        else if (item.type === 'gaji' && isBill && !hidePayrollMetaBadges) {
+            const workerName = item.workerDetails && item.workerDetails.length === 1 
+                ? item.workerDetails[0].name 
+                : (item.workerDetails ? `${item.workerDetails.length} Pekerja` : '');
+            
+            if (workerName) localMetaBadges.push({ icon: 'hard_hat', text: workerName });
+            else if (item.workerId) {
+                const worker = (appState.workers || []).find(w => w.id === item.workerId);
+                if (worker) localMetaBadges.push({ icon: 'hard_hat', text: worker.workerName });
+            }
+        }
         // ...
 
         let title = item.description;
@@ -996,6 +911,13 @@ export function _getBillsListHTML(items, options = {}) {
             }
         }
         
+        if (isSalaryAggregate) {
+            const aggregateRangeLabel = item.summaryRangeLabel || formatRangeLabel(item.startDate, item.endDate);
+            if (!hidePayrollMetaBadges && aggregateRangeLabel && aggregateRangeLabel !== 'Rentang tidak tersedia') {
+                localMetaBadges.push({ icon: 'calendar-x-2', text: aggregateRangeLabel });
+            }
+        }
+
         const parentId = (isBill && isSalaryBill) ? (primaryBillId || item.id) : (expenseData?.id || (isBill ? item.expenseId : null));
         const parentType = (isBill && item.type === 'gaji') ? 'bill' : 'expense';
         const unreadCount = (parentId && parentType) ? getUnreadCommentCount(parentId, allComments.filter(c => c.parentType === parentType && c.parentId === parentId)) : 0;

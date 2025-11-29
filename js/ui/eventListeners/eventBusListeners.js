@@ -203,6 +203,10 @@ export function initializeEventBusListeners() {
          const { handleDeleteSalaryBill } = await import('../../services/data/jurnalService.js');
          handleDeleteSalaryBill(dataset.id);
     });
+    on('ui.action.delete-salary-summary', async (dataset) => {
+         const { handleDeleteSalaryBill } = await import('../../services/data/jurnalService.js');
+         handleDeleteSalaryBill(dataset.billId || dataset.id);
+    });
     on('ui.action.stok-in', (dataset) => emit('ui.modal.stokIn', dataset.itemId));
     on('ui.action.stok-out', (dataset) => emit('ui.modal.stokOut', dataset.itemId));
     on('ui.action.open-stock-history-modal', (dataset) => emit('ui.modal.openStockHistoryDetail', dataset));
@@ -422,6 +426,15 @@ export function initializeEventBusListeners() {
      on('ui.action.cetak-kwitansi', async (dataset) => {
         const { handleCetakKwitansi } = await import('../../services/receiptService.js');
         handleCetakKwitansi(dataset.itemId);
+    });
+    on('ui.action.print-bill', async (dataset) => {
+        const billId = dataset.billId || dataset.id || dataset.itemId;
+        if (!billId) {
+            toast('error', 'ID tagihan tidak ditemukan untuk dicetak.');
+            return;
+        }
+        const { handleCetakKwitansi } = await import('../../services/receiptService.js');
+        handleCetakKwitansi(billId);
     });
     on('ui.action.cetak-kwitansi-individu', async (dataset) => {
         const { handleCetakKwitansiIndividu } = await import('../../services/receiptService.js');

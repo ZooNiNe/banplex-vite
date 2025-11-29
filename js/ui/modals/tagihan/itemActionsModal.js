@@ -18,8 +18,12 @@ function createIcon(iconName, size = 18, classes = '') {
         delete: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2 ${classes}"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`,
         edit: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil ${classes}"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`,
         receipt_long: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt-text ${classes}"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M13 16H8"/></svg>`,
+        printer: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-printer ${classes}"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>`,
+        coins: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coins ${classes}"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg>`,
+        sticky_note: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sticky-note ${classes}"><path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/></svg>`,
+        calendar_x: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-x-2 ${classes}"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m10 16 4 4"/><path d="m14 16-4 4"/></svg>`
     };
-    return icons[iconName] || '';
+    return icons[iconName.replace(/-/g, '_')] || icons[iconName] || '';
 }
 
 function _openPaymentBillModal(bill, options = {}) {
@@ -29,7 +33,7 @@ function _openPaymentBillModal(bill, options = {}) {
         if (typeof value === 'string') return value.split(',').map(part => part.trim()).filter(Boolean);
         return [];
     };
-    
+
     const isSalaryBill = bill?.type === 'gaji';
     const rawBillIds = parseIdList(options.billIds || options['bill-ids']);
     const targetBillIds = isSalaryBill && rawBillIds.length ? rawBillIds : (bill?.id ? [bill.id] : []);
@@ -39,11 +43,11 @@ function _openPaymentBillModal(bill, options = {}) {
         || bill?.workerDetails?.[0]?.workerId
         || bill?.workerDetails?.[0]?.id
         || '';
-  
+
     const sourceBills = targetBillIds
         .map(id => (bill && bill.id === id ? bill : (appState.bills?.find(b => b.id === id) || null)))
         .filter(Boolean);
-  
+
     let workerSummary = null;
     if (isSalaryBill && typeof aggregateSalaryBillWorkers === 'function' && sourceBills.length) {
         const aggregates = aggregateSalaryBillWorkers(sourceBills, { allSalaryBills: sourceBills, sourceItems: sourceBills });
@@ -54,10 +58,10 @@ function _openPaymentBillModal(bill, options = {}) {
             workerSummary = aggregates[0];
         }
     }
-  
+
     let totalAmount = 0;
     let paidAmount = 0;
-  
+
     if (sourceBills.length > 0) {
         totalAmount = sourceBills.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
         paidAmount = sourceBills.reduce((sum, b) => sum + (Number(b.paidAmount) || 0), 0);
@@ -65,26 +69,26 @@ function _openPaymentBillModal(bill, options = {}) {
         totalAmount = Number(bill.amount || 0);
         paidAmount = Number(bill.paidAmount || 0);
     }
-  
+
     const remaining = Math.max(0, totalAmount - paidAmount);
     const amountFormatted = new Intl.NumberFormat('id-ID').format(remaining);
     const todayString = new Date().toISOString().slice(0, 10);
-    
+
     const workerName = workerSummary?.workerName || (bill?.workerDetails?.length === 1 ? bill.workerDetails[0].name : bill?.description) || 'Pekerja';
-    const summaryCount = sourceBills.length; 
-    
+    const summaryCount = sourceBills.length;
+
     const attachmentHTML = _createAttachmentManagerHTML({}, {
         singleOptional: true,
         inputName: 'paymentAttachment',
         containerId: 'new-payment-attachment-container'
     });
-  
+
     const remainingLabelText = isSalaryBill ? 'Sisa Gaji' : 'Sisa Tagihan';
-  
+
     const content = `
       <div class="payment-panel card card-pad">
           
-          <div class="payment-panel__hero payment-panel__hero--salary" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+          <div class="payment-panel__hero payment-panel__hero--salary">
               ${isSalaryBill ? `
               <div class="payment-panel__hero-card">
                   <span class="payment-panel__hero-label">Pekerja</span>
@@ -126,48 +130,49 @@ function _openPaymentBillModal(bill, options = {}) {
               </div>
           </form>
       </div>`;
-  
-      const footer = `
-          <div class="form-footer-actions">
-              <button type="submit" class="btn btn-primary" form="payment-form">
-                  ${createIcon('payment')} Konfirmasi Pembayaran
+
+    // REVISI: Pusatkan tombol bayar
+    const footer = `
+          <div class="form-footer-actions" style="justify-content: center; width: 100%;">
+              <button type="submit" class="btn btn-primary" form="payment-form" style="min-width: 200px; justify-content: center;">
+                  ${createIcon('payment')} <span style="margin-left:8px;">Konfirmasi Pembayaran</span>
               </button>
           </div>`;
-  
-      const detailPane = showDetailPane({ title: 'Pembayaran Tagihan', content, footer });
-      if (!detailPane) return;
-  
-      emit('ui.detailPane.formReady', { context: detailPane });
-  
-      _attachSingleFileUploadListener(detailPane, 'paymentAttachment', '#new-payment-attachment-container');
-  
-      const amountInput = detailPane.querySelector('#payment-input-amount');
-      const remainingAmountEl = detailPane.querySelector('#payment-remaining-amount');
-      const remainingLabelEl = detailPane.querySelector('#payment-remaining-label');
-      const originalRemaining = parseFloat(remainingAmountEl.dataset.rawAmount);
-  
-      if (amountInput && remainingAmountEl && remainingLabelEl) {
-          amountInput.addEventListener('input', () => {
-              const amountToPay = parseFormattedNumber(amountInput.value);
-              const newRemaining = originalRemaining - amountToPay;
-              animateNumber(remainingAmountEl, newRemaining);
-              remainingLabelEl.textContent = "Sisa Setelah Bayar";
-          });
-      }
-       emit('ui.forms.init', detailPane);
-  }
+
+    const detailPane = showDetailPane({ title: 'Pembayaran Tagihan', content, footer });
+    if (!detailPane) return;
+
+    emit('ui.detailPane.formReady', { context: detailPane });
+
+    _attachSingleFileUploadListener(detailPane, 'paymentAttachment', '#new-payment-attachment-container');
+
+    const amountInput = detailPane.querySelector('#payment-input-amount');
+    const remainingAmountEl = detailPane.querySelector('#payment-remaining-amount');
+    const remainingLabelEl = detailPane.querySelector('#payment-remaining-label');
+    const originalRemaining = parseFloat(remainingAmountEl.dataset.rawAmount);
+
+    if (amountInput && remainingAmountEl && remainingLabelEl) {
+        amountInput.addEventListener('input', () => {
+            const amountToPay = parseFormattedNumber(amountInput.value);
+            const newRemaining = originalRemaining - amountToPay;
+            animateNumber(remainingAmountEl, newRemaining);
+            remainingLabelEl.textContent = "Sisa Setelah Bayar";
+        });
+    }
+    emit('ui.forms.init', detailPane);
+}
 
 export function openBillPaymentModal(billId, options = {}) {
-  const bill = (appState.bills || []).find(b => b.id === billId);
-  if (!bill) {
-    emit('ui.toast', { args: ['error', 'Tagihan tidak ditemukan'] });
-    return;
-  }
-  _openPaymentBillModal(bill, options);
+    const bill = (appState.bills || []).find(b => b.id === billId);
+    if (!bill) {
+        emit('ui.toast', { args: ['error', 'Tagihan tidak ditemukan'] });
+        return;
+    }
+    _openPaymentBillModal(bill, options);
 }
 
 export function handleOpenItemActionsModal({ id, type, expenseId }, targetRect = null) {
-     const effectiveId = id.startsWith('expense-') ? id.substring(8) : id;
+    const effectiveId = id.startsWith('expense-') ? id.substring(8) : id;
     const effectiveExpenseId = expenseId || (type === 'expense' ? effectiveId : null);
 
     if (effectiveExpenseId) {
@@ -193,7 +198,7 @@ export function handleOpenItemActionsModal({ id, type, expenseId }, targetRect =
     actions.push({ label: 'Lihat Detail', action: 'open-bill-detail', icon: 'visibility', id: finalId, type: 'bill', expenseId: finalExpenseId });
 
     if ((bill.status || 'unpaid') !== 'paid') {
-        actions.push({ label: 'Bayar Tagihan', action: 'pay-bill', icon: 'payments', id: finalId, type: 'bill', expenseId: finalExpenseId });
+        actions.push({ label: 'Bayar Tagihan', action: 'pay-bill', icon: 'payment', id: finalId, type: 'bill', expenseId: finalExpenseId });
     }
 
     if (bill.paidAmount > 0) {
@@ -211,7 +216,6 @@ export function handleOpenItemActionsModal({ id, type, expenseId }, targetRect =
 
     if ((exp && Array.isArray(exp.items) && exp.items.length > 0) || finalExpenseId) {
         actions.push({ label: 'Detail Faktur Material', action: 'viewInvoiceItems', icon: 'list', id: finalId, expenseId: finalExpenseId });
-        console.error("Failed to open panel viewInvoiceItems:", e);
     }
 
     actions.push({ label: 'Hapus', action: 'delete-item', icon: 'delete', id: finalId, type: 'bill', isDanger: true });
@@ -276,7 +280,7 @@ export function handleOpenItemActionsModal({ id, type, expenseId }, targetRect =
                     closeModalImmediate(modalEl);
                 }, 50);
             } else {
-                 if (modalEl.parentNode) modalEl.remove();
+                if (modalEl.parentNode) modalEl.remove();
             }
         });
     }
@@ -330,63 +334,62 @@ export function handleOpenSuratJalanActionsModal({ id, type, expenseId }, target
 }
 
 export function openEditExpenseModal(expense, options = {}) {
-  try {
-    const { convert = false } = options;
-    const isSuratJalan = expense.status === 'delivery_order';
-    const isSuratJalanConversion = isSuratJalan && convert;
+    try {
+        const { convert = false } = options;
+        const isSuratJalan = expense.status === 'delivery_order';
+        const isSuratJalanConversion = isSuratJalan && convert;
 
-    const title = isSuratJalanConversion ? `Konversi: ${expense.description}` : `Edit: ${expense.description}`;
+        const title = isSuratJalanConversion ? `Konversi: ${expense.description}` : `Edit: ${expense.description}`;
 
-    let content = '';
-    const mapToOpts = (arr, key) => (arr || []).filter(x => x && !x.isDeleted).map(x => ({ value: x.id, text: x[key] }));
-    const allProjectOptions = mapToOpts(appState.projects, 'projectName');
-    const allSupplierOptions = mapToOpts(appState.suppliers, 'supplierName');
+        let content = '';
+        const mapToOpts = (arr, key) => (arr || []).filter(x => x && !x.isDeleted).map(x => ({ value: x.id, text: x[key] }));
+        const allProjectOptions = mapToOpts(appState.projects, 'projectName');
+        const allSupplierOptions = mapToOpts(appState.suppliers, 'supplierName');
 
-    if (expense.type === 'material') {
-        content = getFormFakturMaterialHTML(expense, { convertToInvoice: isSuratJalanConversion });
-    } else {
-        let categoryOptions = [];
-        let masterType = '';
-        let categoryLabel = 'Kategori';
-        let supplierCategoryFilter = '';
+        if (expense.type === 'material') {
+            content = getFormFakturMaterialHTML(expense, { convertToInvoice: isSuratJalanConversion });
+        } else {
+            let categoryOptions = [];
+            let masterType = '';
+            let categoryLabel = 'Kategori';
+            let supplierCategoryFilter = '';
 
-        if (expense.type === 'operasional') {
-          categoryOptions = mapToOpts(appState.operationalCategories, 'categoryName');
-          masterType = 'op-cats';
-          categoryLabel = 'Kategori Operasional';
-          supplierCategoryFilter = 'Operasional';
-        } else if (expense.type === 'lainnya') {
-          categoryOptions = mapToOpts(appState.otherCategories, 'categoryName');
-          masterType = 'other-cats';
-          categoryLabel = 'Kategori Lainnya';
-          supplierCategoryFilter = 'Lainnya';
+            if (expense.type === 'operasional') {
+                categoryOptions = mapToOpts(appState.operationalCategories, 'categoryName');
+                masterType = 'op-cats';
+                categoryLabel = 'Kategori Operasional';
+                supplierCategoryFilter = 'Operasional';
+            } else if (expense.type === 'lainnya') {
+                categoryOptions = mapToOpts(appState.otherCategories, 'categoryName');
+                masterType = 'other-cats';
+                categoryLabel = 'Kategori Lainnya';
+                supplierCategoryFilter = 'Lainnya';
+            }
+
+            const filteredSupplierOptions = supplierCategoryFilter
+                ? allSupplierOptions.filter(opt => {
+                    const supplier = appState.suppliers.find(s => s.id === opt.value);
+                    return supplier && supplier.category === supplierCategoryFilter;
+                })
+                : allSupplierOptions;
+
+            content = getFormPengeluaranHTML(expense.type, categoryOptions, masterType, categoryLabel, filteredSupplierOptions, allProjectOptions, expense);
         }
 
-        const filteredSupplierOptions = supplierCategoryFilter
-            ? allSupplierOptions.filter(opt => {
-                const supplier = appState.suppliers.find(s => s.id === opt.value);
-                return supplier && supplier.category === supplierCategoryFilter;
-            })
-            : allSupplierOptions;
+        const footer = `<div class="form-footer-actions"><button type="submit" class="btn btn-primary" form="edit-item-form">${createIcon('save', 18)}<span>Simpan</span></button></div>`;
 
-        content = getFormPengeluaranHTML(expense.type, categoryOptions, masterType, categoryLabel, filteredSupplierOptions, allProjectOptions, expense);
-    }
+        showDetailPane({ title, content, footer });
 
-    const footer = `<div class="form-footer-actions"><button type="submit" class="btn btn-primary" form="edit-item-form">${createIcon('save', 18)}<span>Simpan</span></button></div>`;
-
-    showDetailPane({ title, content, footer });
-
-    const detailPaneContext = document.getElementById('detail-pane');
-    if (detailPaneContext) {
-        emit('ui.detailPane.formReady', { context: detailPaneContext });
-        if (expense.type === 'material' || expense.type === 'operasional' || expense.type === 'lainnya') {
-            attachPengeluaranFormListeners(expense.type, detailPaneContext);
+        const detailPaneContext = document.getElementById('detail-pane');
+        if (detailPaneContext) {
+            emit('ui.detailPane.formReady', { context: detailPaneContext });
+            if (expense.type === 'material' || expense.type === 'operasional' || expense.type === 'lainnya') {
+                attachPengeluaranFormListeners(expense.type, detailPaneContext);
+            }
+            emit('ui.forms.init', detailPaneContext);
         }
-         emit('ui.forms.init', detailPaneContext);
+    } catch (e) {
+        console.error("Failed to open edit expense modal:", e);
+        // emit('ui.toast', {args: ['error', 'Gagal membuka form edit.']}); // Use emit instead of toast() which is undefined
     }
-  } catch (e) {
-    console.error("Failed to open edit expense modal:", e);
-    toast('error', 'Gagal membuka form edit.');
-  }
 }
-

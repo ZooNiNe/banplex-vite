@@ -403,63 +403,6 @@ body.page-laporan::before,
 .value--expense { color: var(--danger); }
 .value--balance { color: var(--primary); }
 
-/* --- CUSTOM CHECKBOX STYLE (Tick) --- */
-.custom-checkbox-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  padding: 6px 12px;
-  border-radius: 99px;
-  transition: all 0.2s;
-  box-shadow: var(--shadow-sm);
-}
-.custom-checkbox-label:hover {
-  background: var(--surface-muted);
-}
-.custom-checkbox-label input[type="checkbox"] {
-  display: none;
-}
-.custom-checkbox-visual {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  border: 2px solid var(--text-dim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  background: var(--panel);
-  position: relative;
-}
-.custom-checkbox-visual::after {
-  content: '';
-  width: 5px; 
-  height: 10px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg) scale(0);
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  margin-top: -2px;
-}
-.custom-checkbox-label input:checked + .custom-checkbox-visual {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-.custom-checkbox-label input:checked + .custom-checkbox-visual::after {
-  transform: rotate(45deg) scale(1);
-}
-.checkbox-text {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-dim);
-}
-.custom-checkbox-label input:checked ~ .checkbox-text {
-  color: var(--primary);
-}
-
 /* --- MEDIA QUERIES --- */
 
 @media (max-width: 640px) {

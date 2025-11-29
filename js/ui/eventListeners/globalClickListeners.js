@@ -130,7 +130,7 @@ export function initializeGlobalClickListeners() {
             'pay-loan', 'open-loan-payment-history', 'edit-item',
             'convert-surat-jalan', 'edit-surat-jalan', 'user-action',
             'stok-in', 'stok-out', 'edit-stock', 'delete-stock',
-            'delete-salary-bill', 'open-pemasukan-detail',
+            'delete-salary-bill', 'delete-salary-summary', 'print-bill', 'open-pemasukan-detail',
             'open-stock-history-modal',
             'close-selection-mode', 'toggle-selection', 'select-all-items',
             'delete-selected-items', 'restore-selected', 'delete-permanent-selected',

@@ -140,9 +140,6 @@ export function getItemActions(context) {
                 billId: firstBillId
             });
 
-            if (totalUnpaid > 0 && !isViewer()) {
-                baseActions.push({ label: 'Kelola Pembayaran', action: 'open-salary-payment-panel', icon: 'coins', workerId: context.workerId, billId: firstBillId, billIds: billIds.join(',') });
-            }
             if (!isViewer() && firstBillId) {
                 // Hapus rekap global (opsional, karena di detail juga ada hapus per item)
                 baseActions.push({ label: 'Hapus Semua Rekap', action: 'delete-salary-bill', icon: 'delete', isDanger: true, workerId: context.workerId, id: firstBillId });
@@ -175,9 +172,6 @@ export function getItemActions(context) {
                 if (item.type === 'gaji') {
                     baseActions.push({ label: 'Lihat Detail', action: 'open-bill-detail', icon: 'visibility' });
                     
-                    if (!isViewer()) {
-                        baseActions.push({ label: 'Kelola Pembayaran', action: 'open-salary-payment-panel', icon: 'coins' });
-                    }
                     
                     baseActions.push({ label: 'Riwayat Pembayaran', action: 'open-payment-history-modal', icon: 'history' });
                     
