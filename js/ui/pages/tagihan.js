@@ -9,43 +9,32 @@ import { getJSDate } from '../../utils/helpers.js';
 import { parseFormattedNumber, formatDate, fmtIDR } from '../../utils/formatters.js';
 import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
 import { createListSkeletonHTML } from '../components/skeleton.js';
-import { fetchAndCacheData } from '../../services/data/fetch.js';
-import { projectsCol, suppliersCol } from '../../config/firebase.js';
+import { 
+    billsCol, 
+    expensesCol, 
+    auth 
+} from '../../config/firebase.js';
 import { ensureMasterDataFresh } from '../../services/data/ensureMasters.js';
 import { loadDataForPage } from '../../services/localDbService.js';
-import { liveQueryMulti } from '../../state/liveQuery.js';
 import { initPullToRefresh, destroyPullToRefresh } from "../components/pullToRefresh.js";
 import { showLoadingModal, hideLoadingModal } from "../components/modal.js";
 import { getPendingQuotaMaps } from '../../services/pendingQuotaService.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+import { 
+    collection, query, where, orderBy, limit, startAfter, getDocs 
+} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
 const ITEMS_PER_PAGE = 15;
-const INITIAL_LOAD_THRESHOLD = 20;
-let unsubscribeLiveQuery = null;
 let pageAbortController = null;
 let pageEventListenerController = null;
-let renderDebounceTimer = null;
 let pageObserverInstance = null;
 
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
+// --- STATE LOKAL ---
+let lastVisibleDoc = null;
+let isFetching = false;
+let accumulatedItems = [];
+let currentTab = 'tagihan'; 
 
-function createIcon(iconName, size = 18, classes = '') {
-    const icons = {
-        'arrow-down': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-down ${classes}"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>`,
-        'arrow-up': `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up ${classes}"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>`,
-        sort: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-down ${classes}"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>`,
-    };
-    return icons[iconName] || '';
-}
 function groupItemsByDate(items, dateField = 'dueDate') {
     const todayKey = new Date().toISOString().slice(0, 10);
     const yesterdayKey = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -73,21 +62,13 @@ function groupItemsByDate(items, dateField = 'dueDate') {
         groups.get(groupKey).items.push(item);
     });
 
-    groups.forEach(group => {
-        group.items.sort((a, b) => {
-            const dateA = getJSDate(a.createdAt || a[dateField] || a.date);
-            const dateB = getJSDate(b.createdAt || b[dateField] || b.date);
-            return dateB - dateA;
-        });
-    });
-
     return Array.from(groups.values()).sort((a, b) => b.sortDate - a.sortDate);
 }
 
 function renderGroupedList(groupedData, pendingOptions = {}, renderOptions = {}) {
     const html = groupedData.map(group => {
         const bodyHTML = _getBillsListHTML(group.items, { ...pendingOptions, ...renderOptions });
-        if (!bodyHTML) return ''; // Skip empty groups
+        if (!bodyHTML) return ''; 
         return `
             <section class="date-group" data-group-key="${group.key}">
                 <div class="date-group-header">${group.label}</div>
@@ -98,214 +79,121 @@ function renderGroupedList(groupedData, pendingOptions = {}, renderOptions = {})
     return `<div class="wa-card-list-wrapper grouped" id="bills-grouped-wrapper">${html}</div>`;
 }
 
-function appendGroupedSections(wrapper, groups, pendingOptions = {}, renderOptions = {}) {
-    const insertedNodes = [];
-    groups.forEach(group => {
-        const existingSection = wrapper.querySelector(`.date-group[data-group-key="${group.key}"]`);
-        const bodyHTML = _getBillsListHTML(group.items, { ...pendingOptions, ...renderOptions });
-        if (!bodyHTML) return;
+// --- FUNGSI FETCH ---
+async function fetchBillsFromServer(isLoadMore = false) {
+    if (isFetching) return false;
+    isFetching = true;
 
-        if (existingSection) {
-            const body = existingSection.querySelector('.date-group-body');
-            if (!body) return;
-            const temp = document.createElement('div');
-            temp.innerHTML = bodyHTML;
-            Array.from(temp.children).forEach(node => {
-                body.appendChild(node);
-                if (node.classList?.contains('wa-card-v2-wrapper')) insertedNodes.push(node);
-            });
+    try {
+        const activeTab = currentTab;
+        const collRef = activeTab === 'surat_jalan' ? expensesCol : billsCol;
+        let qConstraints = [];
+
+        // 1. FILTER STATUS
+        if (activeTab === 'surat_jalan') {
+            qConstraints.push(where('status', '==', 'delivery_order'));
         } else {
-            const section = document.createElement('section');
-            section.className = 'date-group';
-            section.dataset.groupKey = group.key;
-            section.innerHTML = `<div class="date-group-header">${group.label}</div><div class="date-group-body">${bodyHTML}</div>`;
-            wrapper.appendChild(section);
-            section.querySelectorAll('.wa-card-v2-wrapper')?.forEach(node => insertedNodes.push(node));
+            const statusTarget = activeTab === 'tagihan' ? 'unpaid' : 'paid';
+            qConstraints.push(where('status', '==', statusTarget));
         }
-    });
-    return insertedNodes;
-}
 
-// ... buildWorkerPayrollSummary, renderWorkerPayrollSummaryList helpers ...
-// (Helper ini tidak digunakan di renderTagihanContent tapi tetap dipertahankan)
-function buildWorkerPayrollSummary(items, sortBy = 'dueDate', sortDirection = 'desc') {
-    const aggregates = aggregateSalaryBillWorkers(items);
-    const direction = (sortDirection === 'asc' ? 1 : -1);
-    const normalized = aggregates.map(summary => {
-        const totalAmount = Number(summary.amount || 0);
-        const totalPaid = Number(summary.paidAmount || 0);
-        return {
-            workerId: summary.workerId,
-            workerName: summary.workerName,
-            totalAmount,
-            totalPaid,
-            remaining: Math.max(0, totalAmount - totalPaid),
-            billCount: summary.summaryCount || (summary.billIds ? summary.billIds.length : 0),
-            billIds: summary.billIds || [],
-            projectCount: (summary.projectNames || []).length,
-            projectNames: summary.projectNames || [],
-            summaries: summary.summaries || []
-        };
-    });
-
-    normalized.sort((a, b) => {
-        if (sortBy === 'amount') {
-            return (a.remaining - b.remaining) * direction;
+        // 2. FILTER KATEGORI (Server Side)
+        const category = appState.billsFilter?.category || 'all';
+        if (category && category !== 'all') {
+            qConstraints.push(where('type', '==', category));
         }
-        return a.workerName.localeCompare(b.workerName) * direction;
-    });
 
-    return normalized;
-}
+        // 3. SORTING
+        const dateField = activeTab === 'surat_jalan' ? 'date' : 'dueDate';
+        const { sortDirection } = appState.billsFilter || { sortDirection: 'desc' };
+        qConstraints.push(orderBy(dateField, sortDirection || 'desc'));
 
-function renderWorkerPayrollSummaryList(summaries) {
-    if (!Array.isArray(summaries) || summaries.length === 0) return '';
-    // ... logic sama seperti file asli ...
-    const listHTML = summaries.map(summary => {
-        const amountValue = summary.remaining > 0 ? summary.remaining : summary.totalAmount;
-        const amountLabel = summary.remaining > 0 ? 'Sisa Gaji' : 'Total Gaji';
-        const amountColor = summary.remaining > 0 ? 'warn' : 'positive';
-        const projectsDisplay = summary.projectNames.length ? summary.projectNames.join(', ') : 'Tanpa Proyek';
-        const paidPercent = summary.totalAmount > 0 ? Math.min(100, Math.round((summary.totalPaid / summary.totalAmount) * 100)) : 0;
-        const miniProgress = `
-            <div class="payroll-progress" style="margin: 6px 0 4px; background: var(--line, #ececec); height: 6px; border-radius: 999px;">
-                <div style="width:${paidPercent}%; height:100%; background: var(--primary, #0b6bcb); border-radius: 999px; transition: width 0.3s ease;"></div>
-            </div>
-        `;
-        const allRanges = (summary.summaries || [])
-            .map(s => s.rangeLabel || formatDate(getJSDate(s.startDate || s.endDate), { day: 'numeric', month: 'short' }))
-            .filter(Boolean);
-        const rangeChips = allRanges.length
-            ? allRanges.map(r => `<span class="payroll-chip" style="display:inline-block; padding:2px 8px; border-radius:999px; background:var(--surface-muted, #f5f5f5); font-size:0.8rem; color:var(--text-dim, #555); margin:2px 4px;">${r}</span>`).join('')
-            : `<span class="wa-card-v2__description sub">Belum ada rentang absensi</span>`;
-        const mainContentHTML = `
-            <div class="payroll-simple" style="display:flex; flex-direction:column; gap:6px;">
-                <div class="wa-card-v2__description" style="margin:0;">${projectsDisplay}</div>
-                <div class="payroll-simple__row" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
-                    <span class="payroll-chip" style="display:inline-block; padding:2px 8px; border-radius:999px; background:var(--surface-muted, #f5f5f5); font-size:0.8rem; color:var(--text-dim, #555);">
-                        ${summary.billCount} rekap
-                    </span>
-                    ${paidPercent ? `
-                    <span class="payroll-chip" style="display:inline-block; padding:2px 8px; border-radius:999px; background:var(--surface-muted, #f5f5f5); font-size:0.8rem; color:var(--text-dim, #555);">
-                        ${paidPercent}% terbayar
-                    </span>` : ''}
-                </div>
-                ${miniProgress}
-                <div class="payroll-chip-row" style="margin-top:2px; display:flex; flex-wrap:wrap; justify-content:flex-start;">${rangeChips}</div>
-            </div>
-        `;
-        return createUnifiedCard({
-            id: `worker-payroll-${summary.workerId}`,
-            title: summary.workerName,
-            headerMeta: '',
-            metaBadges: [],
-            mainContentHTML,
-            amount: fmtIDR(amountValue),
-            amountLabel,
-            amountColorClass: amountColor,
-            dataset: { 
-                'item-id': `worker-${summary.workerId}`,
-                itemId: `worker-${summary.workerId}`,
-                type: 'worker-payroll',
-                workerId: summary.workerId,
-                'bill-ids': (summary.billIds || []).join(','),
-                totalUnpaid: summary.remaining,
-                totalAmount: summary.totalAmount,
-                billCount: summary.billCount,
-                pageContext: 'tagihan'
-            },
-            moreAction: true,
-            customClasses: 'payroll-summary-card'
-        });
-    }).join('');
-    return `<div class="wa-card-list-wrapper payroll-summary-list">${listHTML}</div>`;
+        // 4. PAGINATION
+        qConstraints.push(limit(ITEMS_PER_PAGE));
+        if (isLoadMore && lastVisibleDoc) {
+            qConstraints.push(startAfter(lastVisibleDoc));
+        }
+
+        const q = query(collRef, ...qConstraints);
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+            lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1];
+        } else {
+             if (isLoadMore) {
+                const sent = document.querySelector('#infinite-scroll-sentinel');
+                if (sent && pageObserverInstance) pageObserverInstance.unobserve(sent);
+                sent?.remove();
+             }
+        }
+
+        const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        if (isLoadMore) {
+            accumulatedItems = [...accumulatedItems, ...newItems];
+        } else {
+            accumulatedItems = newItems;
+        }
+
+        return newItems.length > 0;
+
+    } catch (error) {
+        console.error("[Tagihan] Error fetching data:", error);
+        if (error.code === 'permission-denied') {
+             if(!auth.currentUser) console.warn("User belum login");
+             emit('ui.toast', { message: 'Akses Ditolak. Relogin.', type: 'error' });
+        } else if (error.message && error.message.includes("requires an index")) {
+             emit('ui.toast', { message: 'Perlu Index Baru (Cek Console)', type: 'error' });
+        }
+        return false;
+    } finally {
+        isFetching = false;
+    }
 }
 
 async function renderTagihanContent(append = false) {
-    if (!append && pageAbortController) {
-        pageAbortController.abort();
-    }
-    if (!append) {
-        pageAbortController = new AbortController();
-    }
+    if (!append) pageAbortController?.abort();
+    if (!append) pageAbortController = new AbortController();
     const signal = pageAbortController?.signal;
 
     const container = $('#sub-page-content');
-    if (!container) {
-        return;
-    }
+    if (!container) return;
 
-    if (!append && container.innerHTML.trim() === '') {
+    if (!append) {
+        lastVisibleDoc = null;
+        accumulatedItems = [];
         container.innerHTML = createListSkeletonHTML(5);
+        await ensureMasterDataFresh(['suppliers', 'projects', 'workers'], { ttlMs: 10 * 60 * 1000, signal });
     }
 
     try {
-        if (!append) {
-            await ensureMasterDataFresh(['suppliers', 'projects'], { ttlMs: 5 * 60 * 1000, signal });
-            if (signal?.aborted) throw new DOMException('Operation aborted after master data fetch', 'AbortError');
-            if (!appState.bills || !appState.expenses) {
-                await loadDataForPage('tagihan');
-                if (signal?.aborted) throw new DOMException('Operation aborted after page data load', 'AbortError');
-            }
-        }
+        await fetchBillsFromServer(append);
+        if (signal?.aborted) return;
         
-        if (!appState.activeSubPage) appState.activeSubPage = new Map();
-        if (!appState.tagihan) appState.tagihan = {};
-
-        const activeTab = appState.activeSubPage.get('tagihan') || 'tagihan';
-        const dateField = (activeTab === 'surat_jalan') ? 'date' : 'dueDate';
-        const { searchTerm, category, status, supplierId, projectId, workerId, dateStart, dateEnd, sortBy, sortDirection } = appState.billsFilter || {};
+        let items = [...accumulatedItems];
+        
+        // 1. FILTER LOKAL
+        items = items.filter(item => item.isDeleted !== true);
+        const { searchTerm } = appState.billsFilter || {};
         const lowerSearchTerm = (searchTerm || '').toLowerCase();
-
-        const categoryNav = document.getElementById('category-sub-nav-container');
-        if (categoryNav) {
-            categoryNav.style.display = activeTab === 'surat_jalan' ? 'none' : 'flex';
+        if (lowerSearchTerm) {
+            items = items.filter(item => {
+                const desc = (item.description || '').toLowerCase();
+                const worker = (item.workerName || '').toLowerCase();
+                return desc.includes(lowerSearchTerm) || worker.includes(lowerSearchTerm);
+            });
         }
 
-        const allBills = appState.bills || [];
-        const allExpenses = appState.expenses || [];
-        const allSuppliers = appState.suppliers || [];
+        // 2. LOGIKA AGREGASI GAJI
+        if (currentTab === 'tagihan' || currentTab === 'lunas') {
+            const salaryItems = items.filter(i => i.type === 'gaji');
+            const otherItems = items.filter(i => i.type !== 'gaji');
 
-        // --- 1. PISAHKAN LOGIKA SALARY VS NON-SALARY ---
-        let items = [];
-        let nonSalaryItems = [];
-        let salaryItems = [];
-
-        // A. Ambil Item Non-Gaji (Sesuai Tab)
-        if (activeTab === 'surat_jalan') {
-            nonSalaryItems = allExpenses.filter(e => e.status === 'delivery_order' && !e.isDeleted);
-        } else {
-            const targetStatus = activeTab === 'tagihan' ? 'unpaid' : 'paid';
-            nonSalaryItems = allBills.filter(b => !b.isDeleted && b.type !== 'gaji' && (b.status || 'unpaid') === targetStatus);
-        }
-
-        // B. Ambil Item Gaji (Logika Agregasi Worker)
-        if (activeTab === 'tagihan' || activeTab === 'lunas') {
-            // Ambil SEMUA bill gaji aktif untuk dicek status global pekerjanya
-            const allSalaryBills = allBills.filter(b => !b.isDeleted && b.type === 'gaji');
-            
-            if (allSalaryBills.length > 0) {
-                // Agregasi per pekerja
-                const workerSummaries = aggregateSalaryBillWorkers(allSalaryBills);
+            let aggregatedSalary = [];
+            if (salaryItems.length > 0) {
+                const workerSummaries = aggregateSalaryBillWorkers(salaryItems);
                 
-                // Filter masuk ke tab mana
-                if (activeTab === 'tagihan') {
-                    // Masuk 'Belum Lunas' jika masih ada sisa (remaining > 0)
-                    salaryItems = workerSummaries.filter(w => {
-                        const remaining = (Number(w.amount) || 0) - (Number(w.paidAmount) || 0);
-                        return remaining > 100; // Toleransi floating point
-                    });
-                } else {
-                    // Masuk 'Lunas' HANYA jika sisa <= 0 (Lunas Total)
-                    salaryItems = workerSummaries.filter(w => {
-                        const remaining = (Number(w.amount) || 0) - (Number(w.paidAmount) || 0);
-                        return remaining <= 100;
-                    });
-                }
-
-                // Tambahkan properti pelengkap agar bisa difilter & di-sort dengan benar
-                salaryItems = salaryItems.map(w => {
-                    // Cari tanggal paling relevan (misal: terbaru) dari sub-items
+                aggregatedSalary = workerSummaries.map(w => {
                     const repBill = (w.summaries || []).reduce((prev, curr) => {
                         const dPrev = getJSDate(prev.dueDate || prev.date);
                         const dCurr = getJSDate(curr.dueDate || curr.date);
@@ -313,331 +201,85 @@ async function renderTagihanContent(append = false) {
                     }, w.summaries[0] || {});
 
                     return {
-                        ...w,
-                        type: 'gaji',
+                        ...w, 
+                        type: 'gaji', 
                         date: repBill.date,
-                        dueDate: repBill.dueDate, 
+                        dueDate: repBill.dueDate,
                         createdAt: repBill.createdAt,
-                        projectId: repBill.projectId, // Default project ID for quick filter
-                        // Status virtual agar lolos filter status di bawah (jika ada)
-                        status: activeTab === 'tagihan' ? 'unpaid' : 'paid' 
+                        projectId: repBill.projectId,
+                        status: currentTab === 'tagihan' ? 'unpaid' : 'paid',
+                        isWorkerAggregate: true,
+                        totalUnpaid: w.remaining || 0
                     };
                 });
             }
-        }
-
-        // Gabungkan kembali
-        items = [...salaryItems, ...nonSalaryItems];
-
-        // --- 2. FILTERING UMUM ---
-
-        // Filter Kategori
-        if (category && category !== 'all') {
-            items = items.filter(item => {
-                const expense = activeTab === 'surat_jalan' ? item : allExpenses.find(e => e.id === item.expenseId);
-                const type = item.type || expense?.type;
-                return type === category;
+            items = [...aggregatedSalary, ...otherItems];
+            
+            items.sort((a, b) => {
+               const dateA = getJSDate(a.dueDate || a.date);
+               const dateB = getJSDate(b.dueDate || b.date);
+               return dateB - dateA;
             });
         }
 
-        // Filter Status (Untuk non-gaji, gaji sudah difilter di atas)
-        if ((activeTab === 'tagihan' || activeTab === 'lunas') && status && status !== 'all') {
-            items = items.filter(item => {
-                if (item.type === 'gaji') return true; // Gaji sudah difilter by tab logic
-                return (item.status || 'unpaid') === status;
-            });
-        }
-
-        // Filter Supplier
-        if (supplierId && supplierId !== 'all') {
-            items = items.filter(item => {
-                const expense = activeTab === 'surat_jalan' ? item : allExpenses.find(e => e.id === item.expenseId);
-                return expense && expense.supplierId === supplierId;
-            });
-        }
-
-        // Filter Proyek
-        if (projectId && projectId !== 'all') {
-            items = items.filter(item => {
-                // Cek item biasa
-                const expense = activeTab === 'surat_jalan' ? item : allExpenses.find(e => e.id === item.expenseId);
-                const sourceProjectId = expense?.projectId || item.projectId;
-                if (sourceProjectId === projectId) return true;
-
-                // Cek item gaji (summary) yang mungkin punya banyak project
-                if (item.type === 'gaji' && Array.isArray(item.summaries)) {
-                    return item.summaries.some(s => s.projectId === projectId);
-                }
-                
-                return false;
-            });
-        }
-
-        // Filter Pekerja
-        if (workerId && workerId !== 'all') {
-            items = items.filter(item => {
-                if (item.type !== 'gaji') return true;
-                if (item.workerId === workerId) return true;
-                if (Array.isArray(item.workerDetails)) {
-                    return item.workerDetails.some(detail => detail.id === workerId || detail.workerId === workerId);
-                }
-                return false;
-            });
-        }
-
-        // Filter Tanggal
-        if (dateStart) {
-            const startDate = new Date(dateStart + 'T00:00:00');
-            items = items.filter(item => getJSDate(item[dateField] || item.date) >= startDate);
-        }
-        if (dateEnd) {
-            const endDate = new Date(dateEnd + 'T23:59:59');
-            items = items.filter(item => getJSDate(item[dateField] || item.date) <= endDate);
-        }
-
-        // Filter Pencarian
-        if (lowerSearchTerm) {
-            items = items.filter(item => {
-                const descriptionMatch = item.description && item.description.toLowerCase().includes(lowerSearchTerm);
-                let supplierNameMatch = false;
-                const expense = activeTab === 'surat_jalan' ? item : allExpenses.find(e => e.id === item.expenseId);
-                if (expense?.supplierId) {
-                    const supplier = allSuppliers.find(s => s.id === expense.supplierId);
-                    supplierNameMatch = supplier?.supplierName.toLowerCase().includes(lowerSearchTerm);
-                }
-                let workerNameMatch = false;
-                if (item.type === 'gaji') {
-                    // Cek nama worker di level summary atau detail
-                    if (item.workerName && item.workerName.toLowerCase().includes(lowerSearchTerm)) workerNameMatch = true;
-                    else if (Array.isArray(item.workerDetails)) {
-                        workerNameMatch = item.workerDetails.some(w => w.name && w.name.toLowerCase().includes(lowerSearchTerm));
-                    }
-                }
-                let materialMatch = false;
-                if (expense && Array.isArray(expense.items)) {
-                     materialMatch = expense.items.some(it => it.name && it.name.toLowerCase().includes(lowerSearchTerm));
-                }
-
-                return descriptionMatch || supplierNameMatch || workerNameMatch || materialMatch;
-            });
-        }
-
-        // --- SORTING ---
-        items.sort((a, b) => {
-            const safeDate = (value) => {
-                const date = getJSDate(value);
-                return date && !Number.isNaN(date.getTime()) ? date : new Date(0);
-            };
-            const dateA = safeDate(a[dateField] || a.date);
-            const dateB = safeDate(b[dateField] || b.date);
-            const createdAtA = safeDate(a.createdAt || a.date);
-            const createdAtB = safeDate(b.createdAt || b.date);
-            const amountA = Number(a.amount) || 0;
-            const amountB = Number(b.amount) || 0;
-            const direction = sortDirection === 'asc' ? 1 : -1;
-
-            let comparison = 0;
-            if (sortBy === 'amount') {
-                comparison = amountA - amountB;
-            } else {
-                comparison = dateA - dateB;
-            }
-
-            if (comparison === 0) {
-                comparison = createdAtA - createdAtB;
-            }
-
-            return comparison * direction;
-        });
-
-        if (appState.tagihan) {
-            appState.tagihan.currentList = items;
-        }
+        if (appState.tagihan) appState.tagihan.currentList = items;
 
         const pendingMaps = await getPendingQuotaMaps(['bills', 'expenses']);
         const pendingOptions = {
             pendingBills: pendingMaps.get('bills') || new Map(),
             pendingExpenses: pendingMaps.get('expenses') || new Map()
         };
-        
-        // aggregateSalary: false karena kita sudah melakukan agregasi manual di atas
         const renderOptions = { aggregateSalary: false, hidePayrollMetaBadges: true };
 
-        const paginationKey = `bills_${activeTab}`;
-        if (!appState.pagination[paginationKey]) {
-           appState.pagination[paginationKey] = { isLoading: false, hasMore: true, page: -1 };
-        }
-        const paginationState = appState.pagination[paginationKey];
-        
-        let itemsToDisplay = [];
-        let nextPage = 0;
-
-        if (!append) {
-            paginationState.page = -1;
-            paginationState.isLoading = false;
-            nextPage = 0;
-            if (items.length <= INITIAL_LOAD_THRESHOLD) {
-                itemsToDisplay = items;
-                paginationState.page = 0;
-                paginationState.hasMore = false;
-            } else {
-                itemsToDisplay = items.slice(0, ITEMS_PER_PAGE);
-                paginationState.page = 0;
-                paginationState.hasMore = items.length > ITEMS_PER_PAGE;
-            }
-        } else {
-            nextPage = paginationState.page + 1;
-            const startIndex = nextPage * ITEMS_PER_PAGE;
-            const endIndex = startIndex + ITEMS_PER_PAGE;
-            itemsToDisplay = items.slice(startIndex, endIndex);
-            if (itemsToDisplay.length > 0) {
-                paginationState.page = nextPage;
-            }
-            paginationState.hasMore = endIndex < items.length;
-        }
-
-        paginationState.isLoading = false;
-
-        // ... (Sisa kode rendering DOM untuk skeleton, sentinel, groupedData tetap sama) ...
-        const existingSkeleton = container.querySelector('#list-skeleton');
-        if (existingSkeleton) existingSkeleton.remove();
-        const existingSentinel = container.querySelector('#infinite-scroll-sentinel');
-        if (existingSentinel) {
-             if (pageObserverInstance) pageObserverInstance.unobserve(existingSentinel);
-             existingSentinel.remove();
-        }
-
-        if (signal?.aborted) throw new DOMException('Operation aborted before rendering list', 'AbortError');
-
         if (!append && items.length === 0) {
-            let title = `Tidak Ada ${activeTab === 'tagihan' ? 'Tagihan' : (activeTab === 'lunas' ? 'Tagihan Lunas' : 'Surat Jalan')}`;
-            let desc = 'Tidak ada data untuk filter yang dipilih atau halaman ini.';
+            let title = `Tidak Ada ${currentTab === 'tagihan' ? 'Tagihan' : (currentTab === 'lunas' ? 'Tagihan Lunas' : 'Surat Jalan')}`;
+            let desc = 'Tidak ada data ditemukan.';
             container.innerHTML = getEmptyStateHTML({ icon: 'receipt_long', title, desc });
             return;
         }
-        if (append && itemsToDisplay.length === 0) {
-             container.querySelector('#list-skeleton')?.remove();
-             return;
-        }
 
-        const groupedData = groupItemsByDate(itemsToDisplay, dateField);
-        let newlyAddedElements = []; 
+        const dateField = (currentTab === 'surat_jalan') ? 'date' : 'dueDate';
+        const groupedData = groupItemsByDate(items, dateField);
+        
+        container.innerHTML = renderGroupedList(groupedData, pendingOptions, renderOptions);
+        
         let billsGroupedWrapper = container.querySelector('#bills-grouped-wrapper');
-
-        if (!append || !billsGroupedWrapper) {
-            container.innerHTML = renderGroupedList(groupedData, pendingOptions, renderOptions);
-            billsGroupedWrapper = container.querySelector('#bills-grouped-wrapper');
-            if (!append) {
-                container.scrollTop = 0;
-            }
-            if (billsGroupedWrapper) {
-                newlyAddedElements = Array.from(billsGroupedWrapper.querySelectorAll('.wa-card-v2-wrapper'));
-            }
-        } else {
-            newlyAddedElements = appendGroupedSections(billsGroupedWrapper, groupedData, pendingOptions, renderOptions);
-        }
-
-        newlyAddedElements.forEach((el, idx) => {
-             el.style.animationDelay = `${Math.min(idx, 20) * 22}ms`;
-             el.classList.add('item-entering');
-             el.setAttribute('data-animated', 'true'); 
-             el.addEventListener('animationend', () => el.classList.remove('item-entering'), { once: true });
-        });
-
-        const existingEolPlaceholder = container.querySelector('.end-of-list-placeholder');
-        if (existingEolPlaceholder) {
-            existingEolPlaceholder.remove();
-        }
+        if (!append) container.scrollTop = 0;
 
         container.querySelector('#list-skeleton')?.remove();
-        const oldSentinel = container.querySelector('#infinite-scroll-sentinel');
-        if (oldSentinel) {
-            if (pageObserverInstance) pageObserverInstance.unobserve(oldSentinel);
-            oldSentinel.remove();
-        }
+        container.querySelector('#infinite-scroll-sentinel')?.remove();
+        
+        container.insertAdjacentHTML('beforeend', `<div id="infinite-scroll-sentinel" style="height: 20px; width: 100%;"></div>`);
+        
+        if (pageObserverInstance) pageObserverInstance.disconnect();
+        pageObserverInstance = initInfiniteScroll('#sub-page-content', () => loadMoreTagihan());
+        const sentinel = container.querySelector(`#infinite-scroll-sentinel`);
+        if(sentinel) pageObserverInstance.observe(sentinel);
 
-        if (paginationState.hasMore) {
-            container.insertAdjacentHTML('beforeend', `<div id="list-skeleton" class="skeleton-wrapper">${createListSkeletonHTML(3)}</div>`);
-            
-            const sentinel = document.createElement('div');
-            sentinel.id = 'infinite-scroll-sentinel';
-            sentinel.style.height = '10px';
-            container.appendChild(sentinel);
-
-            if (pageObserverInstance) {
-                pageObserverInstance.observe(sentinel);
-            } else {
-                pageObserverInstance = initInfiniteScroll('#sub-page-content');
-                if (pageObserverInstance) pageObserverInstance.observe(sentinel);
-            }
-        } else if (items.length > 0) {
-            if (getEndOfListPlaceholderHTML) {
-                container.insertAdjacentHTML('beforeend', getEndOfListPlaceholderHTML());
-            }
-        }
-
-        if (billsGroupedWrapper && !billsGroupedWrapper.__collapseBound) {
-            billsGroupedWrapper.addEventListener('click', (e) => {
+        if (billsGroupedWrapper) {
+            billsGroupedWrapper.onclick = (e) => {
                 const header = e.target.closest('.date-group-header');
-                if (!header) return;
-                const body = header.nextElementSibling;
-                if (body?.classList.contains('date-group-body')) {
+                if (header && header.nextElementSibling?.classList.contains('date-group-body')) {
                     header.classList.toggle('collapsed');
-                    body.classList.toggle('collapsed');
+                    header.nextElementSibling.classList.toggle('collapsed');
                 }
-            });
-            billsGroupedWrapper.__collapseBound = true;
+            };
         }
 
     } catch (e) {
-        if (e.name === 'AbortError' || e.message?.includes('aborted')) return;
-        
-        console.error("Error rendering Tagihan:", e);
-        container.innerHTML = getEmptyStateHTML({
-            icon: 'error',
-            title: 'Gagal Memuat',
-            desc: 'Terjadi kesalahan saat memuat data tagihan.'
-        });
-        container.querySelector('#infinite-scroll-sentinel')?.remove();
-    } finally {
-        if (!append && signal === pageAbortController?.signal) {
-            pageAbortController = null;
-        }
-        const activeTab = appState.activeSubPage?.get('tagihan') || 'tagihan';
-        const paginationKey = `bills_${activeTab}`;
-        if (appState.pagination[paginationKey]) {
-            appState.pagination[paginationKey].isLoading = false;
-        }
+        console.error("Render Error:", e);
+        if(!append) container.innerHTML = getEmptyStateHTML({ icon:'error', title:'Error', desc:'Gagal menampilkan data.'});
     }
 }
 
 function loadMoreTagihan() {
-    if (appState.activePage !== 'tagihan') return;
-
-    // Safe Check
-    if (!appState.activeSubPage) appState.activeSubPage = new Map();
-    const activeTab = appState.activeSubPage.get('tagihan') || 'tagihan';
-    
-    const paginationKey = `bills_${activeTab}`;
-    let paginationState = appState.pagination[paginationKey];
-    if (!paginationState) {
-        appState.pagination[paginationKey] = { isLoading: false, hasMore: true, page: -1 };
-        paginationState = appState.pagination[paginationKey];
-    }
-    if (paginationState.isLoading || !paginationState.hasMore) {
-        if(!paginationState.hasMore || paginationState.isLoading) {
-             $('#sub-page-content')?.querySelector('#list-skeleton')?.remove();
-        }
-        return;
-    }
-    paginationState.isLoading = true;
+    if (appState.activePage !== 'tagihan' || isFetching) return;
     const container = $('#sub-page-content');
     if (container && !container.querySelector('#list-skeleton')) {
-         container.insertAdjacentHTML('beforeend', `<div id="list-skeleton" class="skeleton-wrapper">${createListSkeletonHTML(3)}</div>`);
+         container.insertAdjacentHTML('beforeend', `<div id="list-skeleton" class="skeleton-wrapper">${createListSkeletonHTML(2)}</div>`);
     }
     renderTagihanContent(true);
 }
-
 
 function initTagihanPage() {
     if (pageEventListenerController) pageEventListenerController.abort();
@@ -645,41 +287,32 @@ function initTagihanPage() {
     const listenerSignal = pageEventListenerController.signal;
     if (pageAbortController) pageAbortController.abort();
     pageAbortController = null;
-    pageObserverInstance = null;
     destroyPullToRefresh();
+    
     const container = $('.page-container');
     container.classList.add('page-container--has-panel');
 
-    // FIX: Initialize appState.tagihan explicitly
     if (!appState.tagihan) appState.tagihan = {};
     if (!appState.activeSubPage) appState.activeSubPage = new Map();
-
     if (!appState.billsFilter) {
-        appState.billsFilter = { searchTerm: '', projectId: 'all', supplierId: 'all', workerId: 'all', sortBy: 'dueDate', sortDirection: 'desc', category: 'all', status: 'all', dateStart: '', dateEnd: '' };
-    } else {
-        appState.billsFilter.sortBy = appState.billsFilter.sortBy || 'dueDate';
-        appState.billsFilter.sortDirection = appState.billsFilter.sortDirection || 'desc';
-        appState.billsFilter.workerId = appState.billsFilter.workerId || 'all';
+        appState.billsFilter = { searchTerm: '', sortBy: 'dueDate', sortDirection: 'desc', category: 'all' };
     }
 
-    appState.pagination.bills_tagihan = { isLoading: false, hasMore: true, page: -1 };
-    appState.pagination.bills_lunas = { isLoading: false, hasMore: true, page: -1 };
-    appState.pagination.bills_surat_jalan = { isLoading: false, hasMore: true, page: -1 };
+    currentTab = appState.activeSubPage.get('tagihan') || 'tagihan';
+    lastVisibleDoc = null;
+    accumulatedItems = [];
 
     const pageToolbarHTML = createPageToolbarHTML({ title: 'Tagihan' });
     const mainTabsData = [ { id: 'tagihan', label: 'Belum Lunas' }, { id: 'lunas', label: 'Lunas' }, { id: 'surat_jalan', label: 'Surat Jalan' } ];
-    const initialActiveTab = appState.activeSubPage.get('tagihan') || 'tagihan';
-    appState.activeSubPage.set('tagihan', initialActiveTab);
-    const mainTabsHTML = createTabsHTML({ id: 'tagihan-tabs', tabs: mainTabsData, activeTab: initialActiveTab, customClasses: 'tabs-underline three-tabs' });
     const categoryFiltersData = [ { id: 'all', label: 'Semua' }, { id: 'gaji', label: 'Gaji' }, { id: 'material', label: 'Material' }, { id: 'operasional', label: 'Operasional' }, { id: 'lainnya', label: 'Lainnya' } ];
+    
+    const mainTabsHTML = createTabsHTML({ id: 'tagihan-tabs', tabs: mainTabsData, activeTab: currentTab, customClasses: 'tabs-underline three-tabs' });
     const categoryFiltersHTML = createTabsHTML({ id: 'category-sub-nav-container', tabs: categoryFiltersData, activeTab: appState.billsFilter.category || 'all', customClasses: 'category-sub-nav' });
-    const hideBillsHero = localStorage.getItem('ui.hideHero.bills') === '1';
-    const heroHTML = hideBillsHero ? '' : `<div id="bills-hero-carousel" class="dashboard-hero-carousel hero-billing"></div>`;
+
     container.innerHTML = `
         <div class="content-panel">
             <div class="panel-header">
                 ${pageToolbarHTML}
-                ${heroHTML}
                 ${mainTabsHTML}
                 ${categoryFiltersHTML}
             </div>
@@ -687,67 +320,28 @@ function initTagihanPage() {
         </div>
     `;
 
-    pageObserverInstance = initInfiniteScroll('#sub-page-content');
-
     initPullToRefresh({
-        triggerElement: '.panel-header', // Area statis di atas
-        scrollElement: '#sub-page-content',  // Konten yang di-scroll
-        indicatorContainer: '#ptr-indicator-container', // Target dari index.html
-        
+        triggerElement: '.panel-header', 
+        scrollElement: '#sub-page-content', 
+        indicatorContainer: '#ptr-indicator-container', 
         onRefresh: async () => {
-            showLoadingModal('Memperbarui tagihan...');
-            try {
-                const activeTab = appState.activeSubPage.get('tagihan') || 'tagihan';
-                const paginationKey = `bills_${activeTab}`;
-
-                appState.pagination[paginationKey] = { isLoading: false, hasMore: true, page: -1 };
-
-                await renderTagihanContent(false);
-
-            } catch (err) {
-                console.error("PTR Error (Tagihan):", err);
-                emit('ui.toast', { message: 'Gagal memperbarui tagihan', type: 'error' });
-            } finally {
-                hideLoadingModal();
-            }
+            showLoadingModal('Memperbarui...');
+            lastVisibleDoc = null;
+            accumulatedItems = [];
+            await renderTagihanContent(false);
+            hideLoadingModal();
         }
     });
 
-    if (unsubscribeLiveQuery && typeof unsubscribeLiveQuery.unsubscribe === 'function') {
-        unsubscribeLiveQuery.unsubscribe();
-        unsubscribeLiveQuery = null;
-    }
-
-    unsubscribeLiveQuery = liveQueryMulti(['bills', 'expenses', 'suppliers', 'projects'], (changedKeys) => {
-        if (appState.activePage === 'tagihan') {
+    on('data.transaction.success', () => {
+        if(appState.activePage === 'tagihan') {
+            lastVisibleDoc = null; 
+            accumulatedItems = []; 
             renderTagihanContent(false);
         }
-    });
-    const cleanupTagihan = () => {
-        if (pageAbortController) {
-            pageAbortController.abort();
-            pageAbortController = null;
-        }
-        if (pageEventListenerController) {
-            pageEventListenerController.abort();
-            pageEventListenerController = null;
-        }
-        if (unsubscribeLiveQuery && typeof unsubscribeLiveQuery.unsubscribe === 'function') {
-            unsubscribeLiveQuery.unsubscribe();
-            unsubscribeLiveQuery = null;
-        }
-        if (pageObserverInstance) {
-            pageObserverInstance.disconnect();
-            pageObserverInstance = null;
-        }
-        cleanupInfiniteScroll(); 
-        off('app.unload.tagihan', cleanupTagihan);
-    };
-    off('app.unload.tagihan', cleanupTagihan);
-    on('app.unload.tagihan', cleanupTagihan);
+    }, { signal: listenerSignal });
 
-    renderTagihanContent(false);
-    if (!hideBillsHero) initBillsHeroCarousel();
+    // TABS LISTENER
     const mainTabsContainer = container.querySelector('#tagihan-tabs');
     if (mainTabsContainer) {
         mainTabsContainer.addEventListener('click', (e) => {
@@ -755,138 +349,66 @@ function initTagihanPage() {
              if (tabButton && !tabButton.classList.contains('active')) {
                  mainTabsContainer.querySelector('.active')?.classList.remove('active');
                  tabButton.classList.add('active');
-                 const newTab = tabButton.dataset.tab;
-                 appState.activeSubPage.set('tagihan', newTab);
-                 appState.billsFilter.category = 'all';
-                 const paginationKey = `bills_${newTab}`;
-                 appState.pagination[paginationKey] = { isLoading: false, hasMore: true, page: -1 };
-                 const categoryNav = document.getElementById('category-sub-nav-container');
-                 if (categoryNav) {
-                    categoryNav.querySelector('.sub-nav-item.active')?.classList.remove('active');
-                    categoryNav.querySelector('.sub-nav-item[data-tab="all"]')?.classList.add('active');
-                    categoryNav.style.display = newTab === 'surat_jalan' ? 'none' : 'flex';
+                 
+                 currentTab = tabButton.dataset.tab;
+                 appState.activeSubPage.set('tagihan', currentTab);
+                 
+                 lastVisibleDoc = null;
+                 accumulatedItems = [];
+
+                 const catNav = document.getElementById('category-sub-nav-container');
+                 if (catNav) {
+                     catNav.style.display = currentTab === 'surat_jalan' ? 'none' : 'flex';
+                     appState.billsFilter.category = 'all';
+                     catNav.querySelector('.active')?.classList.remove('active');
+                     catNav.querySelector('[data-tab="all"]')?.classList.add('active');
                  }
+                 
                  renderTagihanContent(false);
              }
         }, { signal: listenerSignal });
     }
-    const categoryTabsContainer = container.querySelector('#category-sub-nav-container');
-    if (categoryTabsContainer) {
-         categoryTabsContainer.addEventListener('click', (e) => {
-             const tabButton = e.target.closest('.sub-nav-item');
-             if (tabButton && !tabButton.classList.contains('active')) {
-                 categoryTabsContainer.querySelector('.active')?.classList.remove('active');
-                 tabButton.classList.add('active');
-                 appState.billsFilter = appState.billsFilter || {};
-                 appState.billsFilter.category = tabButton.dataset.tab;
-                 const activeTab = appState.activeSubPage.get('tagihan') || 'tagihan';
-                 const paginationKey = `bills_${activeTab}`;
-                 appState.pagination[paginationKey] = { isLoading: false, hasMore: true, page: -1 };
-                 renderTagihanContent(false);
-             }
-         }, { signal: listenerSignal });
-    }
-    
-    on('request-more-data', loadMoreTagihan, { signal: listenerSignal });
-}
 
+    const catTabs = container.querySelector('#category-sub-nav-container');
+    if(catTabs) {
+        catTabs.addEventListener('click', (e) => {
+            const btn = e.target.closest('.sub-nav-item');
+            if(btn && !btn.classList.contains('active')) {
+                catTabs.querySelector('.active')?.classList.remove('active');
+                btn.classList.add('active');
+                appState.billsFilter.category = btn.dataset.tab;
+                
+                lastVisibleDoc = null;
+                accumulatedItems = [];
+                renderTagihanContent(false);
+            }
+        });
+    }
+
+    let authUnsub = null;
+    const startLoad = () => {
+        renderTagihanContent(false);
+    };
+
+    if (auth.currentUser) {
+        startLoad();
+    } else {
+        $('#sub-page-content').innerHTML = createListSkeletonHTML(5);
+        authUnsub = onAuthStateChanged(auth, (user) => {
+            if (user && accumulatedItems.length === 0) startLoad();
+        });
+    }
+
+    const cleanupTagihan = () => {
+        if(pageObserverInstance) pageObserverInstance.disconnect();
+        if(authUnsub) authUnsub();
+        destroyPullToRefresh();
+        off('app.unload.tagihan', cleanupTagihan);
+    };
+    off('app.unload.tagihan', cleanupTagihan);
+    on('app.unload.tagihan', cleanupTagihan);
+}
 
 on('ui.tagihan.renderContent', () => renderTagihanContent(false));
 
 export { initTagihanPage };
-
-function initBillsHeroCarousel() {
-    const wrap = document.getElementById('bills-hero-carousel');
-    if (!wrap) return;
-    if (wrap.dataset.initialized === '1') return; wrap.dataset.initialized = '1';
-
-    const toIDR = (n) => { try { return fmtIDR(n || 0); } catch(_) { return (n||0).toLocaleString('id-ID'); } };
-
-    const today = new Date();
-    const toISO = (d) => new Date(d).toISOString().slice(0,10);
-    const itemsAll = (appState.bills || []).filter(b => !b.isDeleted);
-    const unpaid = itemsAll.filter(b => b.status === 'unpaid');
-    const paid = itemsAll.filter(b => b.status === 'paid');
-    const overdue = unpaid.filter(b => {
-        const due = new Date(b.dueDate || b.date || today);
-        return due < new Date(toISO(today));
-    });
-    const dueSoon = unpaid.filter(b => {
-        const due = new Date(b.dueDate || b.date || today);
-        const diff = (due - today) / (1000*60*60*24);
-        return diff >= 0 && diff <= 7;
-    });
-    const totalOutstanding = unpaid.reduce((s,b) => s + Math.max(0, (b.amount||0) - (b.paidAmount||0)), 0);
-    const totalPaidAmt = paid.reduce((s,b) => s + (b.paidAmount || b.amount || 0), 0);
-
-    const slides = [
-        { title: 'Ringkasan Tagihan', tone: 'warning',
-          lines: [
-            `Belum Lunas: ${unpaid.length}/${itemsAll.length}`,
-            `Outstanding: ${toIDR(totalOutstanding)}`
-          ] },
-        { title: 'Jatuh Tempo', tone: 'danger',
-          lines: [
-            `Terlambat: ${overdue.length}`,
-            `Jatuh Tempo ≤7 hari: ${dueSoon.length}`
-          ] },
-        { title: 'Pembayaran', tone: 'success',
-          lines: [
-            `Sudah Lunas: ${paid.length}`,
-            `Total Dibayar: ${toIDR(totalPaidAmt)}`
-          ] },
-    ];
-
-    slides.sort(() => Math.random() - 0.5);
-
-    wrap.innerHTML = [
-        ...slides.map((s, idx) => `
-            <div class="dashboard-hero hero-slide${idx===0?' active':''}" data-index="${idx}" data-tone="${s.tone}">
-                <div class="hero-content">
-                    <h1>${s.title}</h1>
-                    <p>${s.lines.join(' · ')}</p>
-                </div>
-                <div class="hero-illustration" aria-hidden="true">
-                    <svg viewBox="0 0 200 100" preserveAspectRatio="xMidYMid meet">
-                        <defs>
-                            <linearGradient id="billHero1" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" style="stop-color:var(--hero-rose);stop-opacity:0.18" />
-                                <stop offset="100%" style="stop-color:var(--hero-sun);stop-opacity:0.3" />
-                            </linearGradient>
-                            <linearGradient id="billHero2" x1="100%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" style="stop-color:var(--hero-indigo);stop-opacity:0.12" />
-                                <stop offset="100%" style="stop-color:var(--hero-emerald);stop-opacity:0.22" />
-                            </linearGradient>
-                        </defs>
-                        <circle cx="48" cy="52" r="42" fill="url(#billHero1)" class="hero-circle1" />
-                        <circle cx="146" cy="60" r="34" fill="url(#billHero2)" class="hero-circle2" />
-                        <path d="M 18 78 Q 50 50 96 58 T 182 68" stroke="var(--hero-indigo)" stroke-width="3" fill="none" stroke-linecap="round" class="hero-line" opacity="0.25"/>
-                    </svg>
-                </div>
-            </div>
-        `),
-        `<div class="hero-indicators">${slides.map((_,i)=>`<span class="dot${i===0?' active':''}" data-idx="${i}"></span>`).join('')}</div>`
-    ].join('');
-
-    let index = 0; const total = slides.length;
-    const setIndex = (i) => {
-        index = (i + total) % total;
-        wrap.querySelectorAll('.hero-slide').forEach((el, idx) => el.classList.toggle('active', idx===index));
-        wrap.querySelectorAll('.hero-indicators .dot').forEach((d, idx) => d.classList.toggle('active', idx===index));
-    };
-
-    if (wrap._timer) clearInterval(wrap._timer);
-    wrap._timer = setInterval(()=>setIndex(index+1), 7000);
-
-    wrap.querySelectorAll('.hero-indicators .dot').forEach(dot => {
-        dot.addEventListener('click', () => {
-            const idx = parseInt(dot.getAttribute('data-idx')) || 0; setIndex(idx);
-            if (wrap._timer) { clearInterval(wrap._timer); wrap._timer = setInterval(()=>setIndex(index+1), 7000); }
-        });
-    });
-
-    let startX=0, curX=0, drag=false;
-    wrap.addEventListener('touchstart', e => { startX=e.touches[0].clientX; curX=startX; drag=true; }, { passive: true });
-    wrap.addEventListener('touchmove', e => { if(!drag) return; curX=e.touches[0].clientX; }, { passive: true });
-    wrap.addEventListener('touchend', ()=>{ if(!drag) return; const dx=curX-startX; drag=false; if(Math.abs(dx)>40){ setIndex(index+(dx<0?1:-1)); if (wrap._timer) { clearInterval(wrap._timer); wrap._timer = setInterval(()=>setIndex(index+1), 7000);} } });
-}

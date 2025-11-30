@@ -20,11 +20,11 @@ function createIcon(iconName, size = 26, classes = '') {
     return icons[iconName] || '';
 }
 
-
 async function renderPageContent() {
     const { activePage, userStatus } = appState;
     if (userStatus !== 'active') return;
 
+    // Bersihkan FAB di awal render
     const fabContainer = $('#fab-container');
     if (fabContainer) {
         fabContainer.innerHTML = '';
@@ -66,6 +66,7 @@ async function renderPageContent() {
     try {
         await loadDataForPage(activePage);
     } catch (e) {
+        // ignore error
     }
 
     try {
@@ -103,6 +104,10 @@ async function renderPageContent() {
                  initFunctionName = 'initRecycleBinPage';
                  pageModule = await import('./recycleBin.js');
                  break;
+            case 'mutasi':
+                initFunctionName = 'initMutasiPage';
+                pageModule = await import('./mutasi.js');
+                break;
             case 'master_data':
                 initFunctionName = 'initMasterDataPage';
                 pageModule = await import('./master_data.js');
@@ -138,27 +143,34 @@ async function renderPageContent() {
     } catch (e) {
         emit('ui.transitionContent', container, getEmptyStateHTML({ icon: 'error', title: 'Kesalahan Memuat Halaman', desc: `Terjadi masalah saat memuat halaman ${activePage}.` }));
     }
+    
+    // Render ulang FAB setelah konten dimuat
     if (activePage !== 'absensi') {
         restorePageFab();
     }
 }
+
 function restorePageFab() {
     const fabContainer = document.getElementById('fab-container');
     if (!fabContainer) return;
-    if (typeof isViewer === 'function' && isViewer()) {
+
+    // --- REVISI: Pengecekan Role Viewer Lebih Robust ---
+    // Menggunakan appState.userRole secara eksplisit sebagai fallback 
+    // jika helper isViewer() gagal mendeteksi role dengan benar.
+    const isViewerUser = appState.userRole === 'Viewer' || (typeof isViewer === 'function' && isViewer());
+
+    if (isViewerUser) {
         fabContainer.innerHTML = '';
         return;
     }
+
     const page = appState.activePage;
-    
     let fabHTML = '';
 
     const fabConfigs = {
         pemasukan: { action: 'navigate', nav: 'pemasukan_form', icon: 'account_balance_wallet', label: 'Buat Pemasukan', tooltip: 'Tambah Pemasukan Baru' },
         tagihan: { action: 'navigate', nav: 'pengeluaran', icon: 'post_add', label: 'Buat Tagihan', tooltip: 'Buat Pengeluaran / Tagihan Baru' },
         jurnal: { action: 'navigate', nav: 'absensi', icon: 'person_add', label: 'Input Absensi', tooltip: 'Buka Halaman Input Absensi' },
-        // dashboard: { action: 'navigate', nav: 'komentar', icon: 'chat', label: 'Chat', tooltip: 'Buka Halaman Chat' },
-        // komentar: { action: 'navigate', nav: 'chat', icon: 'post_add', label: 'Diskusi Baru', tooltip: 'Mulai Diskusi Baru' },
     };
 
     const config = fabConfigs[page];

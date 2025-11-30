@@ -55,6 +55,8 @@
 @import "pages/_analysis.css";
 @import "pages/_search.css"; /* Added */
 @import "pages/_file-storage.css";
+@import "pages/_jurnal.css"; /* Added */
+@import "pages/_mutasi.css"; /* Added */
 
 /* 5. THEMES (Dark Mode, Print) */
 @import "themes/_dark.css";

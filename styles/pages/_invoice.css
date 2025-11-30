@@ -721,3 +721,29 @@
       grid-column: span 2;
   }
 }
+
+/* Layout Utils */
+.grid-2-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.text-success { color: #10b981; }
+.text-danger { color: #ef4444; }
+.bg-soft-success { background-color: rgba(16, 185, 129, 0.1); color: #10b981; }
+.bg-soft-danger { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+/* Skeleton Text Animation */
+.skeleton-text {
+  color: transparent;
+  background: #e0e0e0;
+  border-radius: 4px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}

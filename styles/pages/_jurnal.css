@@ -1,0 +1,42 @@
+/* styles/pages/_jurnal.css */
+
+/* --- Jurnal Static Hero (Rentang Tanggal) --- */
+.hero-journal.static-hero {
+    background: var(--surface-muted);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+    
+    /* Memastikan konten di tengah */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.hero-journal.static-hero:hover {
+    background-color: var(--surface); /* Efek hover agar terasa bisa diklik */
+    border-color: var(--primary);
+}
+
+.hero-journal.static-hero:active {
+    transform: scale(0.99); /* Efek tekan halus */
+}
+
+.hero-journal.static-hero h1 {
+    font-size: 1.1rem;
+    margin: 0 0 4px 0;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.hero-journal.static-hero .hero-subtitle {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-style: italic;
+}

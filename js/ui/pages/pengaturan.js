@@ -45,8 +45,6 @@ function renderPengaturanContent() {
         ]},
         { title: 'Utilitas', items: [
             { label: 'Tools Aplikasi', action: 'open-tools-grid', icon: 'hard_hat', role: ['Owner', 'Editor'] },
-            { label: 'Log Aktivitas', action: 'navigate', nav: 'log_aktivitas', icon: 'history', role: ['Owner', 'Editor', 'Viewer'] },
-            { label: 'Keranjang Sampah', action: 'navigate', nav: 'recycle_bin', icon: 'trash', role: ['Owner', 'Editor'] }
         ]},
         { title: '', items: [
             { label: 'Keluar', action: 'auth-action', icon: 'logout', role: ['Owner', 'Editor', 'Viewer'] }
@@ -72,7 +70,7 @@ function renderPengaturanContent() {
 function initPengaturanPage() {
     const container = $('.page-container');
     container.innerHTML = `
-        <div class="content-panel transparent-panel">
+        <div class="content-panel settings-panel">
             <div class="panel-header">
                 ${createPageToolbarHTML({ title: 'Pengaturan' })}
             </div>

@@ -11,7 +11,9 @@ import { on, emit } from "./state/eventBus.js";
 import { appState } from "./state/appState.js";
 import { renderErrorPage } from "./ui/errorScreens.js";
 import { subscribeToPushNotifications } from "./services/notificationService.js";
+import { runOneTimeDataRepair } from './services/data/migrationService.js';
 
+window.perbaikiData = runOneTimeDataRepair;
 
 let globalFallbackTimer = null;
 

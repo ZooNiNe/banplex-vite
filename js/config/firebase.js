@@ -62,6 +62,7 @@ export const incomesCol = collection(db, 'teams', TEAM_ID, 'incomes');
 export const fundingSourcesCol = collection(db, 'teams', TEAM_ID, 'funding_sources');
 export const expensesCol = collection(db, 'teams', TEAM_ID, 'expenses');
 export const billsCol = collection(db, 'teams', TEAM_ID, 'bills');
+export const dashboardStatsDocRef = doc(db, 'teams', TEAM_ID, 'statistics', 'billing');
 export const logsCol = collection(db, 'teams', TEAM_ID, 'logs');
 export const materialsCol = collection(db, 'teams', TEAM_ID, 'materials');
 export const stockTransactionsCol = collection(db, 'teams', TEAM_ID, 'stock_transactions');

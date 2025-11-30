@@ -6,7 +6,7 @@
 import { appState } from '../../state/appState.js';
 import { $ } from '../../utils/dom.js';
 import { createPageToolbarHTML } from '../components/toolbar.js';
-import { getApplicants, deleteApplicant } from '../../services/data/hrdApplicantService.js';
+import { deleteApplicant } from '../../services/data/hrdApplicantService.js';
 import { getEmptyStateHTML } from '../components/emptyState.js';
 import { toast } from '../components/toast.js';
 import { startGlobalLoading, createModal } from '../components/modal.js';
@@ -18,6 +18,10 @@ import { APPLICANT_FIELD_KEYS as FIELD_KEYS } from './jobApplicantFieldMap.js';
 import * as XLSX from 'xlsx';
 import { createPdfDoc } from '../../services/reportService.js';
 import { createHrdInfoButton, showHrdInfoModal } from './hrdApplicantsInfoModal.js';
+import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
+import { hrdApplicantsCol, auth } from '../../config/firebase.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
+import { query, where, orderBy, limit, startAfter, getDocs } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js';
 
 const TABLE_COLUMNS = [
     { key: 'select', label: '', className: 'col-select' },
@@ -94,6 +98,7 @@ const STATUS_CLASS_MAP = {
     'daftar hitam': 'status-badge negative',
 };
 
+const FETCH_PAGE_SIZE = 15;
 const PER_PAGE_OPTIONS = [20, 50, 100];
 const HRD_APPLICANTS_PER_PAGE_KEY = 'hrdApplicants.perPage';
 const pdfAssetCache = new Map();
@@ -118,10 +123,15 @@ function createIcon(iconName, size = 16, classes = '') {
 let searchDebounceTimer = null;
 let cleanupFns = [];
 let unloadHandler = null;
-let requestToken = 0;
-let lastRenderedItems = [];
 let isDeletingRecords = false;
 let lastFilterCount = 0;
+let accumulatedItems = [];
+let lastVisibleDoc = null;
+let isFetching = false;
+let hasMoreData = true;
+let infiniteScrollObserver = null;
+let infiniteScrollController = null;
+let authStateUnsubscribe = null;
 
 function ensureHrdApplicantsState() {
     if (!appState.hrdApplicants) {
@@ -182,11 +192,28 @@ function initHrdApplicantsPage() {
     ensureHrdApplicantsState();
     renderPageShell();
     attachEventListeners();
-    const refreshHandler = () => fetchHrdApplicantsList(true);
+    const refreshHandler = () => fetchHrdApplicantsFromServer(false);
     on('data.hrdApplicants.refresh', refreshHandler);
     cleanupFns.push(() => off('data.hrdApplicants.refresh', refreshHandler));
-    renderHrdApplicantsTable();
-    fetchHrdApplicantsList();
+    setupInfiniteScrollListener();
+    const tableWrapper = $('#hrd-applicants-table');
+    const startFetch = () => fetchHrdApplicantsFromServer(false);
+    if (auth.currentUser) {
+        startFetch();
+    } else {
+        if (tableWrapper) {
+            tableWrapper.innerHTML = getTableSkeletonHTML();
+        }
+        if (authStateUnsubscribe) {
+            authStateUnsubscribe();
+            authStateUnsubscribe = null;
+        }
+        authStateUnsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                startFetch();
+            }
+        });
+    }
     registerUnloadHandler();
 }
 
@@ -303,7 +330,7 @@ function attachEventListeners() {
 
     const refreshBtn = $('#hrd-applicants-refresh-btn');
     if (refreshBtn) {
-        const handler = () => fetchHrdApplicantsList(true);
+        const handler = () => fetchHrdApplicantsFromServer(false);
         refreshBtn.addEventListener('click', handler);
         cleanupFns.push(() => refreshBtn.removeEventListener('click', handler));
     }
@@ -359,7 +386,7 @@ function handleSearchInput(event) {
 function handleFilterChange(key, value) {
     setFilter(key, value);
     clearSelection();
-    renderHrdApplicantsTable();
+    fetchHrdApplicantsFromServer(false);
 }
 
 function setFilter(key, value) {
@@ -381,56 +408,71 @@ function getViewState() {
     return appState.hrdApplicants.view;
 }
 
-function fetchHrdApplicantsList(force = false) {
+async function fetchHrdApplicantsFromServer(isLoadMore = false) {
     ensureHrdApplicantsState();
-    if (appState.hrdApplicants.isLoading && !force) return;
+    if (isFetching) return false;
+    isFetching = true;
+    if (!isLoadMore) {
+        lastVisibleDoc = null;
+        accumulatedItems = [];
+        hasMoreData = true;
+        appState.hrdApplicants.isLoading = true;
+        showLoadingState();
+    }
 
-    const currentToken = ++requestToken;
-    appState.hrdApplicants.isLoading = true;
-    showLoadingState();
+    try {
+        const { gender = 'all', statusAplikasi = 'all' } = getFilters();
+        const constraints = [];
+        if (gender !== 'all') {
+            constraints.push(where('jenisKelamin', '==', gender));
+        }
+        if (statusAplikasi !== 'all') {
+            constraints.push(where('statusAplikasi', '==', statusAplikasi));
+        }
+        constraints.push(orderBy('createdAt', 'desc'));
+        constraints.push(limit(FETCH_PAGE_SIZE));
+        if (isLoadMore && lastVisibleDoc) {
+            constraints.push(startAfter(lastVisibleDoc));
+        }
 
-    getApplicants()
-        .then(items => {
-            if (currentToken !== requestToken) return;
-            const normalized = Array.isArray(items) ? items.slice() : [];
-            // --- Mengurutkan berdasarkan namaLengkap ---
-            normalized.sort((a, b) => {
-                const nameA = getSafeString(pickValue(a, 'namaLengkap')).toLocaleLowerCase('id');
-                const nameB = getSafeString(pickValue(b, 'namaLengkap')).toLocaleLowerCase('id');
-                if (nameA && nameB) return nameA.localeCompare(nameB, 'id');
-                if (nameA) return -1;
-                if (nameB) return 1;
-                return 0;
-            });
-            appState.hrdApplicants.list = normalized;
-            clearSelection();
-            appState.hrdApplicants.isLoading = false;
-            renderHrdApplicantsTable();
-        })
-        .catch(error => {
-            if (currentToken !== requestToken) return;
-            console.error('[HrdApplicants] Gagal memuat data:', error);
-            const tableWrapper = $('#hrd-applicants-table');
-            if (tableWrapper) {
-                tableWrapper.innerHTML = getEmptyStateHTML({
-                    icon: 'error',
-                    title: 'Gagal Memuat Data Pelamar',
-                    desc: error?.message || 'Periksa koneksi Anda, lalu coba segarkan kembali.',
-                });
+        const q = query(hrdApplicantsCol, ...constraints);
+        const snapshot = await getDocs(q);
+        const docs = Array.isArray(snapshot?.docs) ? snapshot.docs : [];
+        if (docs.length > 0) {
+            const fetchedItems = docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            lastVisibleDoc = docs[docs.length - 1];
+            if (isLoadMore) {
+                accumulatedItems = [...accumulatedItems, ...fetchedItems];
+            } else {
+                accumulatedItems = fetchedItems;
             }
+            hasMoreData = docs.length === FETCH_PAGE_SIZE;
+        } else {
+            if (!isLoadMore) {
+                accumulatedItems = [];
+            }
+            hasMoreData = false;
+        }
+        clearSelection();
+        return docs.length > 0;
+    } catch (error) {
+        console.error('[HrdApplicants] Gagal memuat data:', error);
+        if (error?.message?.includes('requires an index')) {
+            toast('error', 'Perlu index Firestore baru. Cek console.');
+        } else if (error?.code !== 'permission-denied') {
             toast('error', 'Gagal memuat data pelamar.');
-            appState.hrdApplicants.isLoading = false;
-        })
-        .finally(() => {
-            if (currentToken !== requestToken) return;
-            appState.hrdApplicants.isLoading = false;
-        });
+        }
+        return false;
+    } finally {
+        isFetching = false;
+        appState.hrdApplicants.isLoading = false;
+        renderHrdApplicantsTable();
+    }
 }
 
 function showLoadingState() {
     const tableWrapper = $('#hrd-applicants-table');
     if (tableWrapper) {
-        lastRenderedItems = [];
         tableWrapper.innerHTML = getTableSkeletonHTML();
     }
 }
@@ -439,7 +481,7 @@ function renderHrdApplicantsTable() {
     const tableWrapper = $('#hrd-applicants-table');
     if (!tableWrapper) return;
 
-    if (appState.hrdApplicants.isLoading) {
+    if (appState.hrdApplicants.isLoading && accumulatedItems.length === 0) {
         showLoadingState();
         return;
     }
@@ -447,44 +489,30 @@ function renderHrdApplicantsTable() {
     const filtered = getFilteredList();
     lastFilterCount = filtered.length;
     updateSummaryCounters(filtered.length);
+    appState.hrdApplicants.list = filtered;
 
     if (filtered.length === 0) {
-        lastRenderedItems = [];
         tableWrapper.innerHTML = `${renderBulkActionsBar(getSelectedCount())}${getEmptyStateHTML({
             icon: 'database',
             title: 'Belum Ada Data Pelamar',
             desc: 'Gunakan tombol "Input Pelamar" untuk menambahkan data baru.',
         })}`;
+        cleanupInfiniteScroll();
         return;
     }
 
-    const viewState = getViewState();
-    const perPage = viewState.perPage;
-    const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
-    if (viewState.currentPage > totalPages) {
-        viewState.currentPage = totalPages;
-    }
-    const startIndex = (viewState.currentPage - 1) * perPage;
-    const visibleItems = filtered.slice(startIndex, startIndex + perPage);
-    lastRenderedItems = visibleItems.slice();
-    const allVisibleSelected = visibleItems.length > 0 && visibleItems.every(item => isRowSelected(item.id));
-    const hasPartialSelection = visibleItems.some(item => isRowSelected(item.id));
+    const allVisibleSelected = filtered.length > 0 && filtered.every(item => isRowSelected(item.id));
+    const partialSelection = filtered.some(item => isRowSelected(item.id));
     const selectedCount = getSelectedCount();
-    const paginationHTML = renderPaginationControls({
-        perPage,
-        currentPage: viewState.currentPage,
-        totalPages,
-        totalItems: filtered.length,
-        startIndex,
-        visibleCount: visibleItems.length,
-    });
-
     const headerRow = TABLE_COLUMNS.map(col => `<th class="${col.className || ''}">${formatHeaderCell(col, allVisibleSelected)}</th>`).join('');
-    const bodyRows = visibleItems.map((item, index) => `
+    const bodyRows = filtered.map((item, index) => `
         <tr>
-            ${TABLE_COLUMNS.map(col => `<td class="${col.className || ''}">${formatCellValue(col, item, startIndex + index)}</td>`).join('')}
+            ${TABLE_COLUMNS.map(col => `<td class="${col.className || ''}">${formatCellValue(col, item, index)}</td>`).join('')}
         </tr>
     `).join('');
+
+    cleanupInfiniteScroll();
+    const sentinelHTML = hasMoreData ? '<div id="infinite-scroll-sentinel" style="height: 20px; width: 100%;"></div>' : '';
 
     tableWrapper.innerHTML = `
         ${renderBulkActionsBar(selectedCount)}
@@ -494,44 +522,60 @@ function renderHrdApplicantsTable() {
                 <tbody>${bodyRows}</tbody>
             </table>
         </div>
-        ${paginationHTML}
+        ${sentinelHTML}
     `;
 
     const selectAllCheckbox = tableWrapper.querySelector('.fs-select-all-checkbox');
     if (selectAllCheckbox) {
-        selectAllCheckbox.indeterminate = hasPartialSelection && !allVisibleSelected;
+        selectAllCheckbox.indeterminate = partialSelection && !allVisibleSelected;
+    }
+
+    if (hasMoreData) {
+        infiniteScrollObserver = initInfiniteScroll('#main-scroll-container');
+        const sentinel = tableWrapper.querySelector('#infinite-scroll-sentinel');
+        if (infiniteScrollObserver && sentinel) {
+            infiniteScrollObserver.observe(sentinel);
+        }
     }
 }
 
+function loadMoreApplicants() {
+    if (!hasMoreData || isFetching) return;
+    fetchHrdApplicantsFromServer(true);
+}
+
+function setupInfiniteScrollListener() {
+    if (infiniteScrollController) {
+        infiniteScrollController.abort();
+    }
+    infiniteScrollController = new AbortController();
+    on('request-more-data', loadMoreApplicants, { signal: infiniteScrollController.signal });
+}
+
 function getVisibleItemsSnapshot() {
-    const filtered = getFilteredList();
-    const viewState = getViewState();
-    const startIndex = (viewState.currentPage - 1) * viewState.perPage;
-    return filtered.slice(startIndex, startIndex + viewState.perPage);
+    return getFilteredList();
 }
 
 function getFilteredList() {
-    const { list = [] } = appState.hrdApplicants || {};
     const { search = '', gender = 'all', statusAplikasi = 'all' } = getFilters();
     const searchTerm = search.trim().toLowerCase();
     const genderFilter = gender.toLowerCase();
-    const statusFilter = statusAplikasi.toLowerCase(); // --- BARU ---
+    const statusFilter = statusAplikasi.toLowerCase();
+    const baseList = Array.isArray(accumulatedItems) ? [...accumulatedItems] : [];
 
-    return list.filter(item => {
+    return baseList.filter(item => {
+        if (item?.isDeleted === true) return false;
         if (genderFilter !== 'all') {
             const genderValue = getSafeString(pickValue(item, 'jenisKelamin')).toLowerCase();
             if (genderValue !== genderFilter) return false;
         }
-        // --- Filter Status Baru ---
         if (statusFilter !== 'all') {
             const statusValue = getSafeString(pickValue(item, 'statusAplikasi')).toLowerCase();
             if (statusValue !== statusFilter) return false;
         }
         if (!searchTerm) return true;
-        
-        // --- Haystack Pencarian Baru ---
         const haystack = [
-            pickValue(item, 'namaLengkap'), // (was 'namaPenerima')
+            pickValue(item, 'namaLengkap'),
             pickValue(item, 'nik'),
             pickValue(item, 'email'),
             pickValue(item, 'noTelepon'),
@@ -656,7 +700,8 @@ function formatHeaderCell(column, isAllSelected) {
 function updateSummaryCounters(visibleCount) {
     const totalEl = $('#hrd-applicants-total-count');
     if (totalEl) {
-        totalEl.textContent = appState.hrdApplicants?.list?.length || 0;
+        const loadedCount = accumulatedItems.length;
+        totalEl.textContent = loadedCount > 0 ? `${loadedCount}${hasMoreData ? '+' : ''}` : '0';
     }
     const visibleEl = $('#hrd-applicants-visible-count');
     if (visibleEl) {
@@ -702,6 +747,20 @@ function cleanupHrdApplicantsPage() {
         off('app.unload.hrd_applicants', unloadHandler);
         unloadHandler = null;
     }
+    cleanupInfiniteScroll();
+    if (infiniteScrollController) {
+        infiniteScrollController.abort();
+        infiniteScrollController = null;
+    }
+    infiniteScrollObserver = null;
+    if (authStateUnsubscribe) {
+        authStateUnsubscribe();
+        authStateUnsubscribe = null;
+    }
+    accumulatedItems = [];
+    lastVisibleDoc = null;
+    hasMoreData = true;
+    isFetching = false;
 }
 
 function getSafeString(value) {
@@ -1651,6 +1710,7 @@ function removeRecordsFromState(ids = []) {
     const selection = getSelectionState();
     const idSet = new Set(ids);
     appState.hrdApplicants.list = (appState.hrdApplicants.list || []).filter(item => !idSet.has(item.id));
+    accumulatedItems = (accumulatedItems || []).filter(item => !idSet.has(item.id));
     ids.forEach(id => selection.ids.delete(id));
 }
 

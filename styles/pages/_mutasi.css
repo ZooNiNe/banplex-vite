@@ -1,0 +1,247 @@
+/* =========================================
+   MUTASI PAGE STYLES (FIXED & ISOLATED)
+   ========================================= */
+
+/* --- 2. Hero Grid (Stats Panel) --- */
+.mutasi-panel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing, 1rem);
+    margin-bottom: 1rem;
+}
+
+.mutasi-stat-card {
+    position: relative;
+    padding: 1rem;
+    border-radius: var(--radius, 12px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background-color: var(--panel);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    min-height: 80px;
+}
+
+/* Dekorasi background halus */
+.mutasi-stat-card::after {
+    content: '';
+    position: absolute;
+    right: -15px;
+    bottom: -15px;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    opacity: 0.06;
+    background: currentColor;
+    pointer-events: none;
+}
+
+.mutasi-stat-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.8;
+    margin-bottom: 6px;
+    color: var(--text-dim);
+}
+
+.mutasi-stat-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.1;
+    font-family: var(--font-mono, monospace);
+    color: var(--text);
+    z-index: 1;
+}
+
+@media (min-width: 480px) {
+    .mutasi-stat-value { font-size: 1.35rem; }
+}
+
+/* --- 3. Filter Bar --- */
+.mutasi-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--panel);
+    padding: 8px;
+    border-radius: var(--radius, 12px);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1.25rem;
+}
+
+.mutasi-filter-bar input[type="date"] {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--line);
+    background: var(--bg-start);
+    border-radius: var(--radius-sm, 8px);
+    padding: 0 8px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    color: var(--text);
+    text-align: center;
+    height: 36px;
+    appearance: none;
+}
+
+.mutasi-filter-bar input[type="date"]:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: var(--panel);
+}
+
+.mutasi-filter-sep {
+    color: var(--text-dim);
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+/* Tombol Apply Filter */
+.mutasi-filter-bar #btn-apply-filter {
+    flex: 0 0 36px;
+    height: 36px;
+    border-radius: var(--radius-sm, 8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+}
+
+.mutasi-filter-bar #btn-apply-filter:active {
+    transform: scale(0.95);
+    filter: brightness(0.9);
+}
+
+/* --- 4. List & Spacing (Scoped Mutasi Only) --- */
+.mutasi-date-group {
+    margin-bottom: 1.5rem;
+    display: block; /* Pastikan visible */
+}
+
+.mutasi-group-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 0.75rem;
+    padding-left: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mutasi-group-header::after {
+    content: '▼';
+    font-size: 0.6em;
+    opacity: 0.5;
+    transition: transform 0.2s;
+}
+
+.mutasi-group-header.collapsed::after {
+    transform: rotate(-90deg);
+}
+
+/* Container Body dengan Gap */
+.mutasi-group-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px; /* Jarak antar list */
+    width: 100%;
+}
+
+/* Card Transaksi Spesifik Mutasi */
+.mutasi-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius, 12px);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.1s;
+    padding: 1rem;
+    display: block;
+    width: 100%;
+}
+
+.mutasi-card:active {
+    transform: scale(0.98);
+}
+
+/* --- 5. Layout Flex Item (Rata Kanan Nominal) --- */
+.mutasi-item-row {
+    display: flex;
+    justify-content: space-between; /* Kiri Kanan */
+    align-items: flex-start; /* Alignment atas agar jika teks panjang tetap rapi */
+    margin-bottom: 0.5rem;
+    width: 100%;
+}
+
+.mutasi-title {
+    font-weight: bold;
+    color: var(--text);
+    font-size: 0.95rem;
+    margin-right: 1rem;
+    /* Penanganan teks panjang */
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.3;
+}
+
+.mutasi-amount {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.9rem;
+    font-weight: bold;
+    white-space: nowrap;
+    text-align: right;
+    margin-left: auto; /* KUNCI: Memaksa ke kanan mentok */
+    flex-shrink: 0; /* Jangan mengecil */
+}
+
+.mutasi-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+
+.mutasi-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mutasi-meta-item svg {
+    width: 13px;
+    height: 13px;
+    opacity: 0.7;
+}
+
+/* --- 6. Utilities --- */
+.bg-soft-success { background-color: color-mix(in srgb, var(--success) 10%, transparent); color: var(--success); }
+.text-success { color: var(--success); }
+
+.bg-soft-danger { background-color: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+.text-danger { color: var(--danger); }
+
+/* Animation (Diperbaiki agar default visible) */
+.mutasi-fade-in {
+    animation: mutasiFadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes mutasiFadeUp { 
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); } 
+}

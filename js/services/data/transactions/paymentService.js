@@ -2,6 +2,7 @@ import { emit } from "../../../state/eventBus.js";
 import { appState } from "../../../state/appState.js";
 import { localDB, loadAllLocalDataToState } from "../../localDbService.js";
 import { db, expensesCol, billsCol, incomesCol, fundingSourcesCol, attendanceRecordsCol } from "../../../config/firebase.js";
+// REVISI: Tambah serverTimestamp
 import { doc, runTransaction, serverTimestamp, Timestamp, collection, getDoc, setDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { syncToServer, _isQuotaExceeded, requestSync, syncFromServer } from "../../syncService.js";
 import { toast } from "../../../ui/components/toast.js";
@@ -33,10 +34,15 @@ function _getBillRecipientDetails(billId, currentState) {
         recipient = workerDetail.name || 'Pekerja';
         description = `Pembayaran gaji untuk ${recipient}`;
     } else if (bill.expenseId) {
-        // Logika Biaya/Expense
-        const expense = currentState.expenses.find(e => e.id === bill.expenseId);
-        const supplier = expense ? currentState.suppliers.find(s => s.id === expense.supplierId) : null;
-        recipient = supplier?.supplierName || 'Penerima Biaya';
+        // Logika Biaya/Expense - Prioritaskan Nama Supplier yang tersimpan
+        if (bill.supplierName) {
+             recipient = bill.supplierName;
+        } else {
+             // Fallback logic lama
+             const expense = currentState.expenses.find(e => e.id === bill.expenseId);
+             const supplier = expense ? currentState.suppliers.find(s => s.id === expense.supplierId) : null;
+             recipient = supplier?.supplierName || 'Penerima Biaya';
+        }
         description = bill.description;
     } else {
         description = bill.description;
@@ -53,9 +59,10 @@ export async function handleProcessBillPayment(formElement) {
     const amountToPay = parseFormattedNumber(formElement.elements.amount.value);
     const amountFormatted = fmtIDR(amountToPay);
     const billId = formElement.dataset.id;
+    
+    // REVISI: Ambil tanggal saja tanpa jam lokal
     const dateInput = new Date(formElement.elements.date.value);
-    const now = new Date();
-    const date = new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate(), now.getHours(), now.getMinutes(), 0, 0);
+    const date = new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate());
     const file = formElement.elements.paymentAttachment?.files?.[0];
 
     if (amountToPay <= 0) {
@@ -114,17 +121,21 @@ export async function handleProcessBillPayment(formElement) {
                                     status: isNowPaid ? 'paid' : 'unpaid',
                                     rev: (billData.rev || 0) + 1,
                                     updatedAt: serverTimestamp(),
-                                    ...(isNowPaid && { paidAt: Timestamp.fromDate(date) })
+                                    ...(isNowPaid && { paidAt: serverTimestamp() }) // REVISI: PaidAt server
                                 });
                                 
                                 const paymentRef = doc(collection(billRef, 'payments'), clientPaymentId);
                                 const paymentData = {
                                     amount: amountToPay,
                                     date: Timestamp.fromDate(date),
-                                    createdAt: serverTimestamp(),
+                                    createdAt: serverTimestamp(), // REVISI: CreatedAt server
                                     ...(attachmentUrl && { attachmentUrl: attachmentUrl }),
                                     // Detail Gaji Individual (Jika ada)
-                                    ...(workerDetail?.id && { workerId: workerDetail.id, workerName: workerDetail.name }),
+                                    ...(workerDetail?.id 
+                                        ? { workerId: workerDetail.id, workerName: workerDetail.name } 
+                                        : { recipientName: initialRecipientName } // <--- TAMBAHAN
+                                    ),
+                                    description: billDescription
                                 };
                                 transaction.set(paymentRef, paymentData);
                             });
@@ -171,27 +182,29 @@ export async function handleProcessBillPayment(formElement) {
                                         await localDB.expenses.where('id').equals(bill.expenseId).modify({ status: 'paid', syncState: 'pending_update' });
                                     }
                                     if (bill.type === 'gaji' && bill.recordIds && bill.recordIds.length > 0) {
-                                        // Asumsi semua records yang terkait di bill dibayar lunas
                                         await localDB.attendance_records.where('id').anyOf(bill.recordIds).modify({ isPaid: true, syncState: 'pending_update' });
                                     }
                                 }
                                 
                                 // Tambahkan pending payment
-                            await localDB.pending_payments.add({ 
-                                billId, amount: amountToPay, date, 
-                                localAttachmentId, createdAt: new Date(), paymentId: clientPaymentId,
-                                // Detail Gaji Individual (Jika ada)
-                                ...(workerDetail?.id && { workerId: workerDetail.id, workerName: workerDetail.name, paymentType: 'salary' }),
+                                await localDB.pending_payments.add({ 
+                                    billId, amount: amountToPay, date, 
+                                    localAttachmentId, createdAt: new Date(), paymentId: clientPaymentId,
+                                    ...(workerDetail?.id 
+                                        ? { workerId: workerDetail.id, workerName: workerDetail.name, paymentType: 'salary' }
+                                        : { recipientName: initialRecipientName, paymentType: 'bill' } // <--- TAMBAHAN
+                                    ),
+                                    description: billDescription
+                                });
                             });
-                        });
-                        
-                        _logActivity(`Membayar ${initialBill.type === 'gaji' ? `Gaji ${workerDetail.name}` : 'Tagihan'} (Offline)`, { billId, amount: amountToPay });
-                        paymentLogged = true;
-                        requestSync({ silent: true });
-                    } catch(error){
-                        console.error("[processPayment - Offline] Error:", error);
-                        throw error;
-                    }
+                            
+                            _logActivity(`Membayar ${initialBill.type === 'gaji' ? `Gaji ${workerDetail.name}` : 'Tagihan'} (Offline)`, { billId, amount: amountToPay });
+                            paymentLogged = true;
+                            requestSync({ silent: true });
+                        } catch(error){
+                            console.error("[processPayment - Offline] Error:", error);
+                            throw error;
+                        }
                     }
                 };
 
@@ -271,7 +284,8 @@ export async function handleProcessPayment(formElement) {
     const amountToPay = parseFormattedNumber(formElement.elements.amount.value);
     const dateInput = new Date(formElement.elements.date.value);
     const now = new Date();
-    const date = new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate(), now.getHours(), now.getMinutes(), 0, 0);
+    // REVISI: Ambil tanggal saja
+    const date = new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate());
     const file = formElement.elements.paymentAttachment?.files?.[0];
 
     if (amountToPay <= 0) {
@@ -289,8 +303,14 @@ export async function handleProcessPayment(formElement) {
         formElement.dataset.paymentId = clientPaymentId;
     }
 
+    // Ambil Data Kreditur
+    const loan = appState.fundingSources.find(f => f.id === id);
+    const creditor = loan ? appState.fundingCreditors.find(c => c.id === loan.creditorId) : null;
+    // Fallback: Jika di loan sudah ada nama (hasil denormalisasi addPemasukan), pakai itu. Jika tidak, cari di creditor list.
+    const creditorName = loan?.creditorName || creditor?.creditorName || 'Kreditur';
+
     createModal('confirmPayBill', {
-        message: `Anda akan membayar cicilan pinjaman sebesar <strong>${amountFormatted}</strong>. Lanjutkan?`,
+        message: `Anda akan membayar cicilan pinjaman sebesar <strong>${amountFormatted}</strong> kepada <strong>${creditorName}</strong>. Lanjutkan?`,
         onConfirm: async () => {
              let containerToClose = null;
             try {
@@ -320,7 +340,12 @@ export async function handleProcessPayment(formElement) {
                                     ...(isPaidServer && { paidAt: Timestamp.fromDate(date) })
                                 });
                                 const paymentRef = doc(collection(loanRef, 'payments'), clientPaymentId);
-                                const paymentData = { amount: amountToPay, date: Timestamp.fromDate(date), createdAt: serverTimestamp() };
+                                const paymentData = { 
+                                    amount: amountToPay, 
+                                    date: Timestamp.fromDate(date), 
+                                    createdAt: serverTimestamp(), // REVISI: JAM AKURAT
+                                    creditorName: creditorName // <--- TAMBAHAN
+                                };
                                 if (attachmentUrl) paymentData.attachmentUrl = attachmentUrl;
                                 transaction.set(paymentRef, paymentData);
                             });
@@ -362,7 +387,8 @@ export async function handleProcessPayment(formElement) {
                                     date,
                                     localAttachmentId,
                                     createdAt: new Date(),
-                                    paymentId: clientPaymentId
+                                    paymentId: clientPaymentId,
+                                    creditorName: creditorName // <--- TAMBAHAN
                                 });
                             });
                             _logActivity(`Membayar Cicilan Pinjaman (Offline)`, { loanId: id, amount: amountToPay });
@@ -386,11 +412,10 @@ export async function handleProcessPayment(formElement) {
                 }
                 // *** AKHIR PERBAIKAN ***
 
-                const loan = appState.fundingSources.find(f => f.id === id);
-                if (!loan) throw new Error("Data pinjaman tidak ditemukan setelah pemrosesan.");
+                const loanRefreshed = appState.fundingSources.find(f => f.id === id);
+                if (!loanRefreshed) throw new Error("Data pinjaman tidak ditemukan setelah pemrosesan.");
 
-                const creditor = appState.fundingCreditors.find(c => c.id === loan.creditorId);
-                const isNowPaid = loan.status === 'paid';
+                const isNowPaid = loanRefreshed.status === 'paid';
 
                 // Tutup modal/detail pane
                 if (containerToClose) {
@@ -410,10 +435,10 @@ export async function handleProcessPayment(formElement) {
 
                 emit('uiInteraction.showPaymentSuccessPreviewPanel', {
                     title: 'Pembayaran Cicilan Berhasil!',
-                    description: `Pembayaran cicilan untuk pinjaman dari: ${creditor ? creditor.creditorName : 'Kreditur'}`,
+                    description: `Pembayaran cicilan untuk pinjaman dari: ${creditorName}`,
                     amount: amountToPay,
                     date: date,
-                    recipient: creditor ? creditor.creditorName : 'Kreditur',
+                    recipient: creditorName,
                     isLunas: isNowPaid,
                     billId: id,
                 }, 'pemasukan');

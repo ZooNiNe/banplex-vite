@@ -2,6 +2,7 @@ import { emit, on } from "../../../state/eventBus.js";
 import { appState } from "../../../state/appState.js";
 import { localDB, loadAllLocalDataToState } from "../../localDbService.js";
 import { db, expensesCol, billsCol } from "../../../config/firebase.js";
+// TAMBAHAN: Import serverTimestamp
 import { doc, runTransaction, serverTimestamp, Timestamp, collection, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { generateUUID } from "../../../utils/helpers.js";
 import { syncToServer, requestSync } from "../../syncService.js";
@@ -23,11 +24,22 @@ export async function handleAddPengeluaran(form, type, statusOverride) {
             throw new Error('Proyek harus dipilih.');
         }
 
-        const date = new Date(form.elements['pengeluaran-tanggal']?.value || form.elements['date']?.value);
+        // REVISI: Ambil tanggal saja, gunakan serverTimestamp untuk waktu akurat
+        const dateInput = new Date(form.elements['pengeluaran-tanggal']?.value || form.elements['date']?.value);
+        const date = new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate());
+        
         const notes = form.elements.notes?.value.trim() || '';
         let expenseDetails = {};
         const formMode = form.elements['formType']?.value || 'faktur';
 
+        const supplierIdInput = form.elements['supplier-id']?.value || form.elements['expense-supplier']?.value;
+        let supplierName = '';
+        if (supplierIdInput && appState.suppliers) {
+             const supp = appState.suppliers.find(s => s.id === supplierIdInput);
+             supplierName = supp?.supplierName || '';
+        }
+
+        // ... (Logika type === 'material' dan else TETAP SAMA seperti file Anda) ...
         if (type === 'material') {
             specificExpenseType = 'material';
             const items = [];
@@ -42,7 +54,13 @@ export async function handleAddPengeluaran(form, type, statusOverride) {
                     }
                 });
                 if (items.length === 0) { throw new Error('Harap tambahkan minimal satu barang.'); }
-                expenseDetails = { amount: 0, description: form.elements['description'].value.trim() || 'Surat Jalan', supplierId: form.elements['supplier-id'].value, items };
+                expenseDetails = { 
+                    amount: 0, 
+                    description: form.elements['description'].value.trim() || 'Surat Jalan', 
+                    supplierId: supplierIdInput, 
+                    supplierName: supplierName,
+                    items 
+                };
             } else {
                 form.querySelectorAll('.multi-item-row').forEach(row => {
                     const materialIdInput = row.querySelector('.custom-select-wrapper input[type="hidden"]');
@@ -56,11 +74,23 @@ export async function handleAddPengeluaran(form, type, statusOverride) {
                     }
                 });
                 if (items.length === 0) { throw new Error('Harap tambahkan minimal satu barang.'); }
-                expenseDetails = { amount: items.reduce((sum, item) => sum + item.total, 0), description: form.elements['description'].value.trim() || `Faktur ${items[0].name}`, supplierId: form.elements['supplier-id'].value, items };
+                expenseDetails = { 
+                    amount: items.reduce((sum, item) => sum + item.total, 0), 
+                    description: form.elements['description'].value.trim() || `Faktur ${items[0].name}`, 
+                    supplierId: supplierIdInput, 
+                    supplierName: supplierName,
+                    items 
+                };
             }
         } else {
             specificExpenseType = type;
-            expenseDetails = { amount: parseFormattedNumber(form.elements['pengeluaran-jumlah'].value), description: form.elements['pengeluaran-deskripsi'].value.trim(), supplierId: form.elements['expense-supplier'].value, categoryId: form.elements['expense-category']?.value || '' };
+            expenseDetails = { 
+                amount: parseFormattedNumber(form.elements['pengeluaran-jumlah'].value), 
+                description: form.elements['pengeluaran-deskripsi'].value.trim(), 
+                supplierId: supplierIdInput, 
+                supplierName: supplierName,
+                categoryId: form.elements['expense-category']?.value || '' 
+            };
         }
 
         if (formMode !== 'surat_jalan' && expenseDetails.amount <= 0) {
@@ -81,14 +111,14 @@ export async function handleAddPengeluaran(form, type, statusOverride) {
             notes,
             createdBy: appState.currentUser.uid,
             createdByName: appState.currentUser.displayName,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            // REVISI: Gunakan serverTimestamp
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
             syncState: 'pending_create',
             isDeleted: 0,
             attachments: syncedUrls,
             attachmentsLocalIds: []
         };
-
 
         const transactionTables = ['expenses', 'bills', 'files', 'outbox', 'pending_payments', 'materials', 'stock_transactions'];
 
@@ -117,15 +147,16 @@ export async function handleAddPengeluaran(form, type, statusOverride) {
                     type: specificExpenseType,
                     projectId: projectId,
                     supplierId: expenseDetails.supplierId,
+                    supplierName: supplierName,
                     createdBy: appState.currentUser.uid,
                     createdByName: appState.currentUser.displayName,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
+                    // REVISI: Timestamp Bill
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
                     paidAmount: finalBillStatus === 'paid' ? expenseDetails.amount : 0,
-                    ...(finalBillStatus === 'paid' && { paidAt: new Date() }),
+                    ...(finalBillStatus === 'paid' && { paidAt: serverTimestamp() }), // Paid at juga serverTimestamp
                     syncState: 'pending_create',
                     isDeleted: 0,
-
                 };
                 await localDB.bills.add(billData);
                 await queueOutbox({ table: 'bills', docId: billData.id, op: 'upsert', payload: billData, priority: 7 });
@@ -133,7 +164,7 @@ export async function handleAddPengeluaran(form, type, statusOverride) {
                 if (formMode === 'faktur' && expenseToStore.items && expenseToStore.items.length > 0) {
                     for (const item of expenseToStore.items) {
                         if (item.materialId && item.qty > 0) {
-                            
+                            // ... (Logika Stok sama) ...
                             const stockTxId = generateUUID();
                             const stockTx = {
                                 id: stockTxId,
@@ -177,7 +208,8 @@ export async function handleAddPengeluaran(form, type, statusOverride) {
                         billId: billData.id,
                         amount: billData.amount,
                         date: billData.dueDate,
-                        createdAt: new Date()
+                        createdAt: new Date(),
+                        recipientName: supplierName || 'Penerima'
                     });
                 }
                 billDataForPreview = billData;
@@ -207,14 +239,15 @@ export async function handleAddPengeluaran(form, type, statusOverride) {
 
         emit('uiInteraction.showSuccessPreviewPanel', { expense: expenseToStore, bill: billDataForPreview }, specificExpenseType);
 
-
     } catch (error) {
-
         throw error;
     }
 }
 
+// ... (HandleUpdatePengeluaran tetap sama, hanya saran: jika mau akurat gunakan serverTimestamp() di updatedAt)
 export async function handleUpdatePengeluaran(form) {
+    // (Copy paste kode handleUpdatePengeluaran dari file Anda sebelumnya, tidak ada perubahan logika kritis di sini selain timestamp jika diinginkan)
+    // ...
     const { id, type } = form.dataset;
     if (type !== 'expense') return { success: false };
 
@@ -229,6 +262,14 @@ export async function handleUpdatePengeluaran(form) {
     try {
         expenseAmount = 0;
         expenseDescription = form.elements.description.value;
+        
+        const supplierIdInput = form.elements['supplier-id']?.value || form.elements['expense-supplier']?.value;
+        let supplierName = '';
+        if (supplierIdInput && appState.suppliers) {
+             const supp = appState.suppliers.find(s => s.id === supplierIdInput);
+             supplierName = supp?.supplierName || '';
+        }
+
         let expenseItems = [];
 
         if (form.querySelector('#invoice-items-container')) {
@@ -245,7 +286,8 @@ export async function handleUpdatePengeluaran(form) {
 
             dataToUpdate = {
                 projectId: form.elements['project-id'].value,
-                supplierId: form.elements['supplier-id'].value,
+                supplierId: supplierIdInput,
+                supplierName: supplierName,
                 description: expenseDescription,
                 date: new Date(form.elements.date.value),
                 items: expenseItems,
@@ -264,7 +306,8 @@ export async function handleUpdatePengeluaran(form) {
                 description: expenseDescription,
                 date: new Date(form.elements.date.value),
                 projectId: form.elements['expense-project'].value,
-                supplierId: form.elements['expense-supplier'].value,
+                supplierId: supplierIdInput,
+                supplierName: supplierName,
                 categoryId: form.elements['expense-category']?.value || '',
                 notes
             };
@@ -311,7 +354,7 @@ export async function handleUpdatePengeluaran(form) {
                  dueDate: dataToUpdate.date || new Date(),
                  syncState: 'pending_update',
                  updatedAt: new Date(),
-
+                 supplierName: supplierName, 
              };
 
              if (localBill) {
@@ -342,7 +385,6 @@ export async function handleUpdatePengeluaran(form) {
                      createdBy: appState.currentUser.uid,
                      createdByName: appState.currentUser.displayName,
                      createdAt: new Date(),
-
                  };
                  await localDB.bills.add(newBillToCreate);
                   await queueOutbox({ table: 'bills', docId: newBillId, op: 'upsert', payload: newBillToCreate, priority: 7 });
@@ -363,11 +405,8 @@ export async function handleUpdatePengeluaran(form) {
         const updatedBill = appState.bills?.find(b => b.expenseId === id);
         return { success: true, itemData: { expense: updatedExpense, bill: updatedBill }, itemType: specificExpenseType };
 
-
     } catch (error) {
-
         toast('error', `Gagal menyimpan: ${error.message}`);
         return { success: false };
     }
 }
-

@@ -529,6 +529,7 @@ async function _prepareAnalisisBebanDataForPdf() {
         fetchAndCacheData('bills', billsCol, 'createdAt')
     ]);
 
+    const attendanceProjectMap = buildReportAttendanceProjectMap();
     const totals = {
         main: { material: { paid: 0, unpaid: 0 }, operasional: { paid: 0, unpaid: 0 }, lainnya: { paid: 0, unpaid: 0 }, gaji: { paid: 0, unpaid: 0 } },
         internal: { material: { paid: 0, unpaid: 0 }, operasional: { paid: 0, unpaid: 0 }, lainnya: { paid: 0, unpaid: 0 }, gaji: { paid: 0, unpaid: 0 } }
@@ -537,7 +538,8 @@ async function _prepareAnalisisBebanDataForPdf() {
     const mainProjectId = mainProject ? mainProject.id : null;
 
     (appState.bills || []).filter(bill => !bill.isDeleted).forEach(bill => {
-        const group = (bill.projectId === mainProjectId) ? 'main' : 'internal';
+        const billProjectIds = getReportBillProjectIds(bill, attendanceProjectMap);
+        const group = (mainProjectId && billProjectIds.has(mainProjectId)) ? 'main' : 'internal';
         if (totals[group] && totals[group][bill.type]) {
             const totalAmount = parseFloat(bill.amount || 0);
             if (bill.status === 'paid') {
@@ -550,6 +552,20 @@ async function _prepareAnalisisBebanDataForPdf() {
             }
         }
     });
+
+    const allSalaryTotals = calculateReportSalaryTotals({ attendanceProjectMap });
+    const mainSalaryTotals = mainProjectId
+        ? calculateReportSalaryTotals({
+            attendanceProjectMap,
+            projectPredicate: (projectIds) => projectIds.has(mainProjectId)
+        })
+        : { totalWagesPaid: 0, totalWagesUnpaid: 0 };
+    const internalSalaryTotals = {
+        totalWagesPaid: Math.max(0, allSalaryTotals.totalWagesPaid - mainSalaryTotals.totalWagesPaid),
+        totalWagesUnpaid: Math.max(0, allSalaryTotals.totalWagesUnpaid - mainSalaryTotals.totalWagesUnpaid)
+    };
+    totals.main.gaji = { paid: mainSalaryTotals.totalWagesPaid, unpaid: mainSalaryTotals.totalWagesUnpaid };
+    totals.internal.gaji = { paid: internalSalaryTotals.totalWagesPaid, unpaid: internalSalaryTotals.totalWagesUnpaid };
     const sections = [];
     const categories = [
         { key: 'material', label: 'Beban Material' },
@@ -590,7 +606,12 @@ async function _prepareAnalisisBebanDataForPdf() {
         });
     }
 
-    const grandTotal = totalMain + totalInternal;
+    const loanInterest = (appState.fundingSources || []).filter(loan => !loan.isDeleted).reduce((sum, loan) => {
+        const principal = Number(loan.totalAmount || loan.amount || 0);
+        const repayable = Number(loan.totalRepaymentAmount || principal);
+        return sum + Math.max(0, repayable - principal);
+    }, 0);
+    const grandTotal = totalMain + totalInternal + loanInterest;
     sections.push({
         sectionTitle: `Ringkasan Total`,
         headers: ["Deskripsi", "Jumlah"],
@@ -600,6 +621,17 @@ async function _prepareAnalisisBebanDataForPdf() {
         ],
         foot: [["Grand Total Semua Beban", fmtIDRFormat(grandTotal)]]
     });
+
+    if (loanInterest > 0) {
+        sections.push({
+            sectionTitle: 'Analisis Bunga Pinjaman',
+            headers: ['Deskripsi', { content: 'Jumlah', styles: { halign: 'right' } }],
+            body: [
+                ['Total Bunga Pinjaman', { content: fmtIDRFormat(loanInterest), styles: { halign: 'right' } }]
+            ],
+            foot: []
+        });
+    }
 
     return {
         title: 'Laporan Analisis Beban',
@@ -933,6 +965,65 @@ function _calculateOutstandingSalaryInstallments({ inRange, byProject }) {
         .reduce((sum, rec) => sum + (rec.totalPay || 0), 0);
 
     return outstandingBills + outstandingAttendance;
+}
+
+function buildReportAttendanceProjectMap() {
+    const map = new Map();
+    (appState.attendanceRecords || []).forEach(rec => {
+        if (rec && rec.id && rec.projectId) {
+            map.set(rec.id, rec.projectId);
+        }
+    });
+    return map;
+}
+
+function getReportBillProjectIds(bill, attendanceProjectMap) {
+    const ids = new Set();
+    if (!bill) return ids;
+    if (bill.projectId) ids.add(bill.projectId);
+    if (Array.isArray(bill.recordIds)) {
+        bill.recordIds.forEach(recordId => {
+            const pid = attendanceProjectMap.get(recordId);
+            if (pid) ids.add(pid);
+        });
+    }
+    return ids;
+}
+
+function getReportBillEffectiveDate(bill) {
+    if (!bill) return null;
+    const candidates = [bill.createdAt, bill.dueDate, bill.date, bill.startDate, bill.updatedAt];
+    for (const value of candidates) {
+        const date = getJSDate(value);
+        if (date) return date;
+    }
+    return null;
+}
+
+function calculateReportSalaryTotals({ start, end, projectPredicate, attendanceProjectMap }) {
+    const map = attendanceProjectMap || buildReportAttendanceProjectMap();
+    const startDate = start ? new Date(`${start}T00:00:00`) : null;
+    const endDate = end ? new Date(`${end}T23:59:59`) : null;
+    const isInRange = (date) => {
+        if (!date) return true;
+        if (startDate && date < startDate) return false;
+        if (endDate && date > endDate) return false;
+        return true;
+    };
+    const salaryBills = (appState.bills || []).filter(bill => {
+        if (!bill || bill.isDeleted) return false;
+        if (!['gaji', 'fee'].includes(bill.type)) return false;
+        const billDate = getReportBillEffectiveDate(bill);
+        if (billDate && !isInRange(billDate)) return false;
+        if (projectPredicate) {
+            const projectIds = getReportBillProjectIds(bill, map);
+            if (!projectPredicate(projectIds)) return false;
+        }
+        return true;
+    });
+    const totalWagesPaid = salaryBills.reduce((sum, bill) => sum + (bill.paidAmount || 0), 0);
+    const totalWagesUnpaid = salaryBills.reduce((sum, bill) => sum + Math.max(0, (bill.amount || 0) - (bill.paidAmount || 0)), 0);
+    return { totalWagesPaid, totalWagesUnpaid, salaryBills, attendanceProjectMap: map };
 }
 
 async function _fetchBillPayments(billId) {

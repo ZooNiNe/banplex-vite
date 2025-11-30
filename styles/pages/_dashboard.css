@@ -52,7 +52,7 @@
   font-size: clamp(0.9rem, 2.5vw, 1rem); /* Ukuran font adaptif */
   color: color-mix(in srgb, var(--hero-text) 75%, transparent);
   margin: 0;
-  max-width: 90%; /* Batasi lebar teks di mobile */
+  max-width: 100%; /* Batasi lebar teks di mobile */
 }
 .hero-metrics {
   display: flex;

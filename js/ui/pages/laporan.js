@@ -395,8 +395,9 @@ function aggregateReportData({ start, end, projectId }) {
     const expenseOps = expenses.filter(e => e.type === 'operasional').reduce((s, e) => s + (e.amount || 0), 0);
     const expenseOther = expenses.filter(e => !['material', 'operasional'].includes(e.type)).reduce((s, e) => s + (e.amount || 0), 0);
 
-    const wageBills = bills.filter(b => b.type === 'gaji' || b.type === 'fee');
-    const totalWageBillAmount = wageBills.reduce((s, b) => s + (b.amount || 0), 0);
+    const attendanceProjectMap = buildAttendanceProjectMap();
+    const salaryTotals = calculateSalaryTotals({ start, end, projectId, attendanceProjectMap });
+    const totalWageBillAmount = salaryTotals.totalWagesPaid + salaryTotals.totalWagesUnpaid;
 
     const unpaidBills = bills.filter(b => b.status === 'unpaid');
     const unpaidBillsAmount = unpaidBills.reduce((s, b) => s + Math.max(0, (b.amount || 0) - (b.paidAmount || 0)), 0);
@@ -416,7 +417,7 @@ function aggregateReportData({ start, end, projectId }) {
     const projects = (appState.projects || []).filter(p => !p.isDeleted && p.budget > 0);
     const projectHealth = projects.map(p => {
         const projExpenses = (appState.expenses || []).filter(e => !e.isDeleted && e.projectId === p.id).reduce((s,e)=>s+(e.amount||0),0);
-        const projBills = (appState.bills || []).filter(b => !b.isDeleted && b.projectId === p.id && (b.type==='gaji'||b.type==='fee')).reduce((s,b)=>s+(b.amount||0),0);
+        const projBills = (appState.bills || []).filter(b => !b.isDeleted && (b.type==='gaji'||b.type==='fee') && getBillProjectIds(b, attendanceProjectMap).has(p.id)).reduce((s,b)=>s+(b.amount||0),0);
         const used = projExpenses + projBills;
         const pct = (used / p.budget) * 100;
         const income = (appState.incomes || []).filter(i => !i.isDeleted && i.projectId === p.id).reduce((s,i)=>s+(i.amount||0),0);
@@ -433,6 +434,67 @@ function aggregateReportData({ start, end, projectId }) {
         },
         projectHealth
     };
+}
+
+function buildAttendanceProjectMap() {
+    const map = new Map();
+    (appState.attendanceRecords || []).forEach(rec => {
+        if (rec && rec.id && rec.projectId) {
+            map.set(rec.id, rec.projectId);
+        }
+    });
+    return map;
+}
+
+function getBillProjectIds(bill, attendanceProjectMap) {
+    const ids = new Set();
+    if (!bill) return ids;
+    if (bill.projectId) ids.add(bill.projectId);
+    if (Array.isArray(bill.recordIds)) {
+        bill.recordIds.forEach(recordId => {
+            const projectId = attendanceProjectMap.get(recordId);
+            if (projectId) ids.add(projectId);
+        });
+    }
+    return ids;
+}
+
+function getBillEffectiveDate(bill) {
+    if (!bill) return null;
+    const candidates = [bill.createdAt, bill.dueDate, bill.date, bill.startDate, bill.updatedAt];
+    for (const value of candidates) {
+        const date = getJSDate(value);
+        if (date) return date;
+    }
+    return null;
+}
+
+function calculateSalaryTotals({ start, end, projectId, projectPredicate, attendanceProjectMap }) {
+    const map = attendanceProjectMap || buildAttendanceProjectMap();
+    const startDate = start ? new Date(`${start}T00:00:00`) : null;
+    const endDate = end ? new Date(`${end}T23:59:59`) : null;
+    const inDateRange = (date) => {
+        if (!date) return true;
+        if (startDate && date < startDate) return false;
+        if (endDate && date > endDate) return false;
+        return true;
+    };
+    const predicate = projectPredicate || ((projectIds) => {
+        if (!projectId || projectId === 'all') return true;
+        return projectIds.has(projectId);
+    });
+    const salaryBills = (appState.bills || []).filter(bill => {
+        if (!bill || bill.isDeleted) return false;
+        if (!['gaji', 'fee'].includes(bill.type)) return false;
+        const billDate = getBillEffectiveDate(bill);
+        if (billDate && !inDateRange(billDate)) return false;
+        const projectIds = getBillProjectIds(bill, map);
+        if (!predicate(projectIds)) return false;
+        return true;
+    });
+    const totalWagesPaid = salaryBills.reduce((sum, bill) => sum + (bill.paidAmount || 0), 0);
+    const totalWagesUnpaid = salaryBills.reduce((sum, bill) => sum + Math.max(0, (bill.amount || 0) - (bill.paidAmount || 0)), 0);
+    return { totalWagesPaid, totalWagesUnpaid, salaryBills, attendanceProjectMap: map };
 }
 
 // Cashflow by Period Logic

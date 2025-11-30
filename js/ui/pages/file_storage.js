@@ -1,7 +1,7 @@
 import { appState } from '../../state/appState.js';
 import { $ } from '../../utils/dom.js';
 import { createPageToolbarHTML } from '../components/toolbar.js';
-import { getBeneficiaries, deleteBeneficiary } from '../../services/data/adminService.js';
+import { deleteBeneficiary } from '../../services/data/adminService.js';
 import { getEmptyStateHTML } from '../components/emptyState.js';
 import { toast } from '../components/toast.js';
 import { startGlobalLoading } from '../components/modal.js';
@@ -13,6 +13,10 @@ import { FIELD_KEYS } from './fileStorageFieldMap.js';
 import { normalizeDistanceToMeters } from '../../utils/helpers.js';
 import * as XLSX from 'xlsx';
 import { createPdfDoc } from '../../services/reportService.js';
+import { initInfiniteScroll, cleanupInfiniteScroll } from '../components/infiniteScroll.js';
+import { db, auth } from '../../config/firebase.js';
+import { collection, query, where, orderBy, limit, startAfter, getDocs } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
 
 const TABLE_COLUMNS = [
     { key: 'select', label: '', className: 'col-select' },
@@ -72,6 +76,21 @@ const STATUS_CLASS_MAP = {
 const PER_PAGE_OPTIONS = [20, 50, 100];
 const FILE_STORAGE_PER_PAGE_KEY = 'fileStorage.perPage';
 const SELECT_FILTER_KEYS = new Set(['gender', 'jenjang', 'agency']);
+
+const FILE_STORAGE_FETCH_LIMIT = 15;
+const BENEFICIARY_COLLECTION_NAME = 'penerimaManfaat';
+const FILE_STORAGE_SCROLL_CONTAINER = '.file-storage-panel .panel-content';
+
+let accumulatedItems = [];
+let lastVisibleDoc = null;
+let hasMoreItems = true;
+let isFetchingFromServer = false;
+let lastFetchError = null;
+let fileStorageObserverInstance = null;
+let fileStorageSentinel = null;
+let isFileStoragePageActive = false;
+let authStateUnsub = null;
+let infiniteScrollHandler = null;
 
 function createIcon(iconName, size = 16, classes = '') {
     const icons = {
@@ -151,13 +170,40 @@ function ensureFileStorageState() {
 
 function initFileStoragePage() {
     ensureFileStorageState();
+    resetFileStorageStreamState();
+    isFileStoragePageActive = true;
     renderPageShell();
     attachEventListeners();
-    const refreshHandler = () => fetchFileStorageList(true);
+    setupFileStorageInfiniteScroll();
+
+    const refreshHandler = () => refreshFileStorageData(true);
     on('data.fileStorage.refresh', refreshHandler);
     cleanupFns.push(() => off('data.fileStorage.refresh', refreshHandler));
-    renderFileStorageTable();
-    fetchFileStorageList();
+
+    infiniteScrollHandler = () => loadMoreFileStorage();
+    on('request-more-data', infiniteScrollHandler);
+    cleanupFns.push(() => off('request-more-data', infiniteScrollHandler));
+
+    const startLoad = () => {
+        refreshFileStorageData(true);
+    };
+
+    if (auth.currentUser) {
+        startLoad();
+    } else {
+        appState.fileStorage.isLoading = true;
+        showLoadingState();
+        authStateUnsub = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                startLoad();
+                if (authStateUnsub) {
+                    authStateUnsub();
+                    authStateUnsub = null;
+                }
+            }
+        });
+    }
+
     registerUnloadHandler();
 }
 
@@ -229,9 +275,9 @@ function renderPageShell() {
 }
 
 function getAgencyFilterOptions() {
-    const { list = [] } = appState.fileStorage || {};
+    const sourceList = Array.isArray(accumulatedItems) ? accumulatedItems : [];
     const unique = new Set();
-    list.forEach(item => {
+    sourceList.forEach(item => {
         const name = getSafeString(pickValue(item, 'namaInstansi'));
         if (name) {
             unique.add(name);
@@ -306,7 +352,7 @@ function attachEventListeners() {
 
     const refreshBtn = $('#file-storage-refresh-btn');
     if (refreshBtn) {
-        const handler = () => fetchFileStorageList(true);
+        const handler = () => refreshFileStorageData(true);
         refreshBtn.addEventListener('click', handler);
         cleanupFns.push(() => refreshBtn.removeEventListener('click', handler));
     }
@@ -362,7 +408,7 @@ function handleSearchInput(event) {
 function handleFilterChange(key, value) {
     setFilter(key, value);
     clearSelection();
-    renderFileStorageTable();
+    refreshFileStorageData(true);
 }
 
 function setFilter(key, value) {
@@ -385,50 +431,101 @@ function getViewState() {
     return appState.fileStorage.view;
 }
 
-function fetchFileStorageList(force = false) {
+function resetFileStorageStreamState() {
+    accumulatedItems = [];
+    lastVisibleDoc = null;
+    hasMoreItems = true;
+    appState.fileStorage.list = accumulatedItems;
+    lastFetchError = null;
+}
+
+async function refreshFileStorageData(force = false) {
+    if (isFetchingFromServer && !force) return;
+    clearSelection();
+    resetFileStorageStreamState();
+    const viewState = getViewState();
+    viewState.currentPage = 1;
+    await fetchFileStorageFromServer(false);
+    renderFileStorageTable();
+}
+
+function setupFileStorageInfiniteScroll() {
+    fileStorageObserverInstance = initInfiniteScroll(FILE_STORAGE_SCROLL_CONTAINER);
+}
+
+async function fetchFileStorageFromServer(isLoadMore = false) {
     ensureFileStorageState();
-    if (appState.fileStorage.isLoading && !force) return;
+    if (isFetchingFromServer) return false;
+    if (isLoadMore && !hasMoreItems) return false;
 
+    isFetchingFromServer = true;
     const currentToken = ++requestToken;
-    appState.fileStorage.isLoading = true;
-    showLoadingState();
+    lastFetchError = null;
+    if (!isLoadMore) {
+        appState.fileStorage.isLoading = true;
+        showLoadingState();
+    }
 
-    getBeneficiaries()
-        .then(items => {
-            if (currentToken !== requestToken) return;
-            const normalized = Array.isArray(items) ? items.slice() : [];
-            normalized.sort((a, b) => {
-                const nameA = getSafeString(pickValue(a, 'namaPenerima')).toLocaleLowerCase('id');
-                const nameB = getSafeString(pickValue(b, 'namaPenerima')).toLocaleLowerCase('id');
-                if (nameA && nameB) return nameA.localeCompare(nameB, 'id');
-                if (nameA) return -1;
-                if (nameB) return 1;
-                return 0;
-            });
-            appState.fileStorage.list = normalized;
-            renderAgencyFilterControl(getFilters().agency || 'all');
-            clearSelection();
-            appState.fileStorage.isLoading = false;
-            renderFileStorageTable();
-        })
-        .catch(error => {
-            if (currentToken !== requestToken) return;
-            console.error('[FileStorage] Gagal memuat data:', error);
-            const tableWrapper = $('#file-storage-table');
-            if (tableWrapper) {
-                tableWrapper.innerHTML = getEmptyStateHTML({
-                    icon: 'error',
-                    title: 'Gagal Memuat Data',
-                    desc: error?.message || 'Periksa koneksi Anda, lalu coba segarkan kembali.',
-                });
-            }
-            toast('error', 'Gagal memuat data File Storage.');
-            appState.fileStorage.isLoading = false;
-        })
-        .finally(() => {
-            if (currentToken !== requestToken) return;
-            appState.fileStorage.isLoading = false;
+    const filters = getFilters();
+    const collectionRef = collection(db, BENEFICIARY_COLLECTION_NAME);
+    const queryConstraints = [];
+    if (filters.gender && filters.gender !== 'all') {
+        queryConstraints.push(where('jenisKelamin', '==', filters.gender));
+    }
+    if (filters.jenjang && filters.jenjang !== 'all') {
+        queryConstraints.push(where('jenjang', '==', filters.jenjang));
+    }
+    if (filters.agency && filters.agency !== 'all') {
+        queryConstraints.push(where('namaInstansi', '==', filters.agency));
+    }
+    queryConstraints.push(orderBy('createdAt', 'desc'));
+    if (isLoadMore && lastVisibleDoc) {
+        queryConstraints.push(startAfter(lastVisibleDoc));
+    }
+    queryConstraints.push(limit(FILE_STORAGE_FETCH_LIMIT));
+
+    try {
+        const queryTarget = queryConstraints.length > 0 ? query(collectionRef, ...queryConstraints) : collectionRef;
+        const snapshot = await getDocs(queryTarget);
+        if (currentToken !== requestToken) return false;
+        const fetchedItems = [];
+        snapshot.forEach(docSnap => {
+            fetchedItems.push({ id: docSnap.id, ...docSnap.data() });
         });
+
+        if (isLoadMore) {
+            accumulatedItems = [...accumulatedItems, ...fetchedItems];
+        } else {
+            accumulatedItems = fetchedItems;
+        }
+        appState.fileStorage.list = accumulatedItems;
+
+        if (snapshot.docs.length > 0) {
+            lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1];
+        } else if (!isLoadMore) {
+            lastVisibleDoc = null;
+        }
+
+        hasMoreItems = snapshot.size === FILE_STORAGE_FETCH_LIMIT;
+        renderAgencyFilterControl(getFilters().agency || 'all');
+        return true;
+    } catch (error) {
+        if (currentToken !== requestToken) return false;
+        lastFetchError = error;
+        console.error('[FileStorage] Gagal memuat data:', error);
+        toast('error', 'Gagal memuat data File Storage.');
+        return false;
+    } finally {
+        isFetchingFromServer = false;
+        appState.fileStorage.isLoading = false;
+    }
+}
+
+async function loadMoreFileStorage() {
+    if (!isFileStoragePageActive) return;
+    if (isFetchingFromServer || !hasMoreItems) return;
+    await fetchFileStorageFromServer(true);
+    renderFileStorageTable(true);
 }
 
 function showLoadingState() {
@@ -439,7 +536,7 @@ function showLoadingState() {
     }
 }
 
-function renderFileStorageTable() {
+function renderFileStorageTable(isLoadMore = false) {
     const tableWrapper = $('#file-storage-table');
     if (!tableWrapper) return;
 
@@ -452,6 +549,20 @@ function renderFileStorageTable() {
     lastFilterCount = filtered.length;
     updateSummaryCounters(filtered.length);
 
+    if (lastFetchError && filtered.length === 0) {
+        lastRenderedItems = [];
+        tableWrapper.innerHTML = `${renderBulkActionsBar(getSelectedCount())}${getEmptyStateHTML({
+            icon: 'error',
+            title: 'Gagal Memuat Data',
+            desc: lastFetchError?.message || 'Periksa koneksi Anda, lalu coba segarkan kembali.',
+        })}`;
+        attachInfiniteScrollSentinel(tableWrapper, false);
+        return;
+    }
+    if (lastFetchError) {
+        lastFetchError = null;
+    }
+
     if (filtered.length === 0) {
         lastRenderedItems = [];
         tableWrapper.innerHTML = `${renderBulkActionsBar(getSelectedCount())}${getEmptyStateHTML({
@@ -459,13 +570,18 @@ function renderFileStorageTable() {
             title: 'Belum Ada Data',
             desc: 'Gunakan tombol "Input Data" untuk menambahkan penerima baru sesuai format Excel.',
         })}`;
+        attachInfiniteScrollSentinel(tableWrapper, false);
         return;
     }
 
     const viewState = getViewState();
     const perPage = viewState.perPage;
-    const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+    let totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
     if (viewState.currentPage > totalPages) {
+        viewState.currentPage = totalPages;
+    }
+    if (isLoadMore) {
+        totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
         viewState.currentPage = totalPages;
     }
     const startIndex = (viewState.currentPage - 1) * perPage;
@@ -505,6 +621,27 @@ function renderFileStorageTable() {
     if (selectAllCheckbox) {
         selectAllCheckbox.indeterminate = hasPartialSelection && !allVisibleSelected;
     }
+
+    const shouldAttachSentinel = hasMoreItems && viewState.currentPage >= totalPages;
+    attachInfiniteScrollSentinel(tableWrapper, shouldAttachSentinel);
+}
+
+function attachInfiniteScrollSentinel(container, shouldAttach) {
+    if (!container) return;
+    const existing = container.querySelector('#infinite-scroll-sentinel');
+    if (existing) {
+        if (fileStorageObserverInstance && fileStorageSentinel) {
+            fileStorageObserverInstance.unobserve(fileStorageSentinel);
+        }
+        existing.remove();
+    }
+    fileStorageSentinel = null;
+    if (!shouldAttach || !fileStorageObserverInstance) return;
+    container.insertAdjacentHTML('beforeend', `<div id="infinite-scroll-sentinel" style="height: 1px; width: 100%;"></div>`);
+    fileStorageSentinel = container.querySelector('#infinite-scroll-sentinel');
+    if (fileStorageSentinel) {
+        fileStorageObserverInstance.observe(fileStorageSentinel);
+    }
 }
 
 function getVisibleItemsSnapshot() {
@@ -515,14 +652,15 @@ function getVisibleItemsSnapshot() {
 }
 
 function getFilteredList() {
-    const { list = [] } = appState.fileStorage || {};
+    const sourceList = Array.isArray(accumulatedItems) ? accumulatedItems : [];
     const { search = '', gender = 'all', jenjang = 'all', agency = 'all' } = getFilters();
     const searchTerm = search.trim().toLowerCase();
     const genderFilter = gender.toLowerCase();
     const jenjangFilter = jenjang.toLowerCase();
     const agencyFilter = agency.toLowerCase();
 
-    return list.filter(item => {
+    return sourceList.filter(item => {
+        if (item?.isDeleted === true) return false;
         if (genderFilter !== 'all') {
             const genderValue = getSafeString(pickValue(item, 'jenisKelamin')).toLowerCase();
             if (genderValue !== genderFilter) return false;
@@ -631,7 +769,7 @@ function formatHeaderCell(column, isAllSelected) {
 function updateSummaryCounters(visibleCount) {
     const totalEl = $('#file-storage-total-count');
     if (totalEl) {
-        totalEl.textContent = appState.fileStorage?.list?.length || 0;
+        totalEl.textContent = Array.isArray(accumulatedItems) ? accumulatedItems.length : 0;
     }
     const visibleEl = $('#file-storage-visible-count');
     if (visibleEl) {
@@ -681,6 +819,15 @@ function cleanupFileStoragePage() {
         off('app.unload.file_storage', unloadHandler);
         unloadHandler = null;
     }
+    if (authStateUnsub) {
+        authStateUnsub();
+        authStateUnsub = null;
+    }
+    cleanupInfiniteScroll();
+    fileStorageObserverInstance = null;
+    fileStorageSentinel = null;
+    infiniteScrollHandler = null;
+    isFileStoragePageActive = false;
 }
 
 function getSafeString(value) {
@@ -1146,8 +1293,8 @@ function startEditRecord(recordId) {
 
 function getRecordById(recordId) {
     if (!recordId) return null;
-    const { list = [] } = appState.fileStorage || {};
-    return list.find(item => item.id === recordId) || null;
+    const sourceList = Array.isArray(accumulatedItems) ? accumulatedItems : [];
+    return sourceList.find(item => item.id === recordId) || null;
 }
 
 function confirmDeleteRecords(ids = []) {
@@ -1207,7 +1354,8 @@ function removeRecordsFromState(ids = []) {
     ensureFileStorageState();
     const selection = getSelectionState();
     const idSet = new Set(ids);
-    appState.fileStorage.list = (appState.fileStorage.list || []).filter(item => !idSet.has(item.id));
+    accumulatedItems = (Array.isArray(accumulatedItems) ? accumulatedItems : []).filter(item => !idSet.has(item.id));
+    appState.fileStorage.list = accumulatedItems;
     ids.forEach(id => selection.ids.delete(id));
     renderAgencyFilterControl(getFilters().agency || 'all');
 }

@@ -9,7 +9,7 @@ import { startGlobalLoading } from "../ui/components/modal.js";
 export const localDB = new Dexie('BanPlexDevLocalDB');
 
 export async function setupLocalDatabase() {
-    localDB.version(21).stores({
+    localDB.version(22).stores({
         expenses: '&id, projectId, date, type, status, isDeleted, attachmentNeedsSync, syncState, category',
         bills: '&id, expenseId, status, dueDate, type, isDeleted, syncState',
         incomes: '&id, projectId, date, isDeleted, syncState',
