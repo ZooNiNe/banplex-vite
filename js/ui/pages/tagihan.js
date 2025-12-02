@@ -28,12 +28,36 @@ const ITEMS_PER_PAGE = 15;
 let pageAbortController = null;
 let pageEventListenerController = null;
 let pageObserverInstance = null;
+let currentTagihanSentinel = null;
+let hasMoreBills = true;
 
 // --- STATE LOKAL ---
 let lastVisibleDoc = null;
 let isFetching = false;
 let accumulatedItems = [];
 let currentTab = 'tagihan'; 
+
+function cleanupCurrentSentinel() {
+    if (currentTagihanSentinel && pageObserverInstance) {
+        pageObserverInstance.unobserve(currentTagihanSentinel);
+    }
+    if (currentTagihanSentinel) {
+        currentTagihanSentinel.remove();
+    }
+    currentTagihanSentinel = null;
+}
+
+function attachTagihanSentinel(container) {
+    if (!hasMoreBills || !container) return;
+    container.insertAdjacentHTML('beforeend', `<div id="infinite-scroll-sentinel" style="height: 20px; width: 100%;"></div>`);
+    const sentinel = container.querySelector('#infinite-scroll-sentinel');
+    if (sentinel) {
+        currentTagihanSentinel = sentinel;
+        if (pageObserverInstance) {
+            pageObserverInstance.observe(sentinel);
+        }
+    }
+}
 
 function groupItemsByDate(items, dateField = 'dueDate') {
     const todayKey = new Date().toISOString().slice(0, 10);
@@ -117,17 +141,13 @@ async function fetchBillsFromServer(isLoadMore = false) {
         const q = query(collRef, ...qConstraints);
         const snapshot = await getDocs(q);
 
-        if (!snapshot.empty) {
-            lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1];
-        } else {
-             if (isLoadMore) {
-                const sent = document.querySelector('#infinite-scroll-sentinel');
-                if (sent && pageObserverInstance) pageObserverInstance.unobserve(sent);
-                sent?.remove();
-             }
+        const fetchedDocs = snapshot.docs;
+        if (fetchedDocs.length) {
+            lastVisibleDoc = fetchedDocs[fetchedDocs.length - 1];
         }
+        hasMoreBills = fetchedDocs.length === ITEMS_PER_PAGE;
 
-        const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const newItems = fetchedDocs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         if (isLoadMore) {
             accumulatedItems = [...accumulatedItems, ...newItems];
@@ -159,9 +179,12 @@ async function renderTagihanContent(append = false) {
     const container = $('#sub-page-content');
     if (!container) return;
 
+    cleanupCurrentSentinel();
+
     if (!append) {
         lastVisibleDoc = null;
         accumulatedItems = [];
+        hasMoreBills = true;
         container.innerHTML = createListSkeletonHTML(5);
         await ensureMasterDataFresh(['suppliers', 'projects', 'workers'], { ttlMs: 10 * 60 * 1000, signal });
     }
@@ -247,14 +270,10 @@ async function renderTagihanContent(append = false) {
         if (!append) container.scrollTop = 0;
 
         container.querySelector('#list-skeleton')?.remove();
-        container.querySelector('#infinite-scroll-sentinel')?.remove();
-        
-        container.insertAdjacentHTML('beforeend', `<div id="infinite-scroll-sentinel" style="height: 20px; width: 100%;"></div>`);
-        
-        if (pageObserverInstance) pageObserverInstance.disconnect();
-        pageObserverInstance = initInfiniteScroll('#sub-page-content', () => loadMoreTagihan());
-        const sentinel = container.querySelector(`#infinite-scroll-sentinel`);
-        if(sentinel) pageObserverInstance.observe(sentinel);
+        attachTagihanSentinel(container);
+        if (!hasMoreBills) {
+            container.insertAdjacentHTML('beforeend', getEndOfListPlaceholderHTML());
+        }
 
         if (billsGroupedWrapper) {
             billsGroupedWrapper.onclick = (e) => {
@@ -273,7 +292,7 @@ async function renderTagihanContent(append = false) {
 }
 
 function loadMoreTagihan() {
-    if (appState.activePage !== 'tagihan' || isFetching) return;
+    if (appState.activePage !== 'tagihan' || isFetching || !hasMoreBills) return;
     const container = $('#sub-page-content');
     if (container && !container.querySelector('#list-skeleton')) {
          container.insertAdjacentHTML('beforeend', `<div id="list-skeleton" class="skeleton-wrapper">${createListSkeletonHTML(2)}</div>`);
@@ -332,6 +351,9 @@ function initTagihanPage() {
             hideLoadingModal();
         }
     });
+
+    pageObserverInstance = initInfiniteScroll('#sub-page-content');
+    on('request-more-data', loadMoreTagihan, { signal: listenerSignal });
 
     on('data.transaction.success', () => {
         if(appState.activePage === 'tagihan') {
@@ -400,8 +422,14 @@ function initTagihanPage() {
     }
 
     const cleanupTagihan = () => {
-        if(pageObserverInstance) pageObserverInstance.disconnect();
-        if(authUnsub) authUnsub();
+        cleanupCurrentSentinel();
+        cleanupInfiniteScroll();
+        pageObserverInstance = null;
+        if (pageEventListenerController) {
+            pageEventListenerController.abort();
+            pageEventListenerController = null;
+        }
+        if (authUnsub) authUnsub();
         destroyPullToRefresh();
         off('app.unload.tagihan', cleanupTagihan);
     };
