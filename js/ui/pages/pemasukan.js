@@ -33,6 +33,9 @@ const ITEMS_PER_PAGE = 15;
 let pageAbortController = null;
 let pageObserverInstance = null;
 let containerClickHandler = null;
+let incomeInfiniteController = null;
+let currentIncomeSentinel = null;
+let hasMorePemasukan = true;
 
 // --- STATE LOKAL ---
 let lastVisibleDoc = null;
@@ -128,6 +131,32 @@ function appendPemasukanGroups(wrapper, groups, type, pendingMaps = {}) {
     return inserted;
 }
 
+function cleanupIncomeSentinel() {
+    if (currentIncomeSentinel && pageObserverInstance) {
+        pageObserverInstance.unobserve(currentIncomeSentinel);
+    }
+    if (currentIncomeSentinel) {
+        currentIncomeSentinel.remove();
+    }
+    currentIncomeSentinel = null;
+}
+
+function attachIncomeSentinel(container) {
+    if (!hasMorePemasukan || !container) return;
+    const sentinel = document.createElement('div');
+    sentinel.id = 'infinite-scroll-sentinel';
+    sentinel.style.height = '20px';
+    container.appendChild(sentinel);
+    currentIncomeSentinel = sentinel;
+    if (pageObserverInstance) {
+        pageObserverInstance.observe(sentinel);
+    }
+}
+
+function removeIncomeEndPlaceholder(container) {
+    container.querySelector('.end-of-list-placeholder')?.remove();
+}
+
 async function fetchPemasukanFromServer(isLoadMore = false) {
     if (isFetching) return false;
     isFetching = true;
@@ -154,18 +183,14 @@ async function fetchPemasukanFromServer(isLoadMore = false) {
 
         const q = query(collRef, ...qConstraints);
         const snapshot = await getDocs(q);
+        const fetchedDocs = snapshot.docs;
 
-        if (!snapshot.empty) {
-            lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1];
-        } else {
-             if (isLoadMore) {
-                const sent = document.querySelector('#infinite-scroll-sentinel');
-                if (sent && pageObserverInstance) pageObserverInstance.unobserve(sent);
-                sent?.remove();
-             }
+        if (fetchedDocs.length) {
+            lastVisibleDoc = fetchedDocs[fetchedDocs.length - 1];
         }
+        hasMorePemasukan = fetchedDocs.length === ITEMS_PER_PAGE;
 
-        const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const newItems = fetchedDocs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         if (isLoadMore) {
             accumulatedItems = [...accumulatedItems, ...newItems];
@@ -195,7 +220,11 @@ async function renderPemasukanContent(append = false) {
     const container = $('#sub-page-content');
     if (!container) return;
 
+    cleanupIncomeSentinel();
+
     if (!append) {
+        hasMorePemasukan = true;
+        removeIncomeEndPlaceholder(container);
         if (!accumulatedItems.length || !appState.selectionMode?.active) {
              lastVisibleDoc = null;
              accumulatedItems = [];
@@ -257,14 +286,13 @@ async function renderPemasukanContent(append = false) {
         });
 
         container.querySelector('#list-skeleton')?.remove();
-        container.querySelector('#infinite-scroll-sentinel')?.remove();
-        
-        container.insertAdjacentHTML('beforeend', `<div id="infinite-scroll-sentinel" style="height: 20px;"></div>`);
-        const sentinel = container.querySelector('#infinite-scroll-sentinel');
+        removeIncomeEndPlaceholder(container);
 
-        if (pageObserverInstance) pageObserverInstance.disconnect();
-        pageObserverInstance = initInfiniteScroll('#sub-page-content', () => loadMorePemasukan());
-        if(sentinel) pageObserverInstance.observe(sentinel);
+        if (hasMorePemasukan) {
+            attachIncomeSentinel(container);
+        } else if (accumulatedItems.length > 0) {
+            container.insertAdjacentHTML('beforeend', getEndOfListPlaceholderHTML());
+        }
 
     } catch(e) {
         if (e.name !== 'AbortError') {
@@ -275,7 +303,7 @@ async function renderPemasukanContent(append = false) {
 }
 
 function loadMorePemasukan() {
-    if (appState.activePage !== 'pemasukan' || isFetching) return;
+    if (appState.activePage !== 'pemasukan' || isFetching || !hasMorePemasukan) return;
     const container = $('#sub-page-content');
     if (container && !container.querySelector('#list-skeleton')) {
         container.insertAdjacentHTML('beforeend', `<div id="list-skeleton" class="skeleton-wrapper">${createListSkeletonHTML(2)}</div>`);
@@ -560,18 +588,9 @@ function initPemasukanPage() {
         }
     });
 
-    initPullToRefresh({
-        triggerElement: '.panel-header', 
-        scrollElement: '#sub-page-content', 
-        indicatorContainer: '#ptr-indicator-container',
-        onRefresh: async () => {
-            showLoadingModal('Memperbarui...');
-            lastVisibleDoc = null;
-            accumulatedItems = [];
-            await renderPemasukanContent(false);
-            hideLoadingModal();
-        }
-    });
+    pageObserverInstance = initInfiniteScroll('#sub-page-content');
+    incomeInfiniteController = new AbortController();
+    on('request-more-data', loadMorePemasukan, { signal: incomeInfiniteController.signal });
 
     const refreshTransactions = () => {
         if(appState.activePage === 'pemasukan') {
@@ -635,7 +654,13 @@ function initPemasukanPage() {
     }
 
     const cleanupPemasukan = () => {
-        if(pageObserverInstance) pageObserverInstance.disconnect();
+        cleanupIncomeSentinel();
+        cleanupInfiniteScroll();
+        pageObserverInstance = null;
+        if (incomeInfiniteController) {
+            incomeInfiniteController.abort();
+            incomeInfiniteController = null;
+        }
         if(authUnsub) authUnsub();
         destroyPullToRefresh();
         const containerEl = $('.page-container');

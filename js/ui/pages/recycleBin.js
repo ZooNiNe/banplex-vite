@@ -35,10 +35,37 @@ function getMainCategory(tableName) {
     return 'lainnya';
 }
 
+function cleanupTrashSentinel() {
+    if (currentTrashSentinel && trashObserverInstance) {
+        trashObserverInstance.unobserve(currentTrashSentinel);
+    }
+    if (currentTrashSentinel) {
+        currentTrashSentinel.remove();
+    }
+    currentTrashSentinel = null;
+}
+
+function attachTrashSentinel(container) {
+    if (!container) return;
+    const sentinel = document.createElement('div');
+    sentinel.id = 'infinite-scroll-sentinel';
+    sentinel.style.height = '10px';
+    container.appendChild(sentinel);
+    currentTrashSentinel = sentinel;
+    if (trashObserverInstance) {
+        trashObserverInstance.observe(sentinel);
+    }
+}
+
+function removeTrashEndPlaceholder(container) {
+    container.querySelector('.end-of-list-placeholder')?.remove();
+}
+
 const ITEMS_PER_PAGE_TRASH = 30;
 let trashObserverInstance = null;
 let pageAbortController = null;
 let pageEventListenerController = null;
+let currentTrashSentinel = null;
 
 async function renderRecycleBinContent(append = false) {
     if (!append && pageAbortController) pageAbortController.abort();
@@ -278,24 +305,12 @@ async function renderRecycleBinContent(append = false) {
         });
         
         container.querySelector('#list-skeleton')?.remove();
-        const oldSentinel = container.querySelector('#infinite-scroll-sentinel');
-        if (oldSentinel) {
-            if (trashObserverInstance) trashObserverInstance.unobserve(oldSentinel);
-            oldSentinel.remove();
-        }
+        cleanupTrashSentinel();
+        removeTrashEndPlaceholder(container);
 
         if (paginationState.hasMore) {
             container.insertAdjacentHTML('beforeend', `<div id="list-skeleton" class="skeleton-wrapper">${createListSkeletonHTML(3)}</div>`);
-            const sentinel = document.createElement('div');
-            sentinel.id = 'infinite-scroll-sentinel';
-            sentinel.style.height = '10px';
-            container.appendChild(sentinel);
-            if (trashObserverInstance) {
-                trashObserverInstance.observe(sentinel);
-            } else {
-                trashObserverInstance = initInfiniteScroll('#sub-page-content');
-                if (trashObserverInstance) trashObserverInstance.observe(sentinel);
-            }
+            attachTrashSentinel(container);
         } else {
             container.insertAdjacentHTML('beforeend', getEndOfListPlaceholderHTML());
         }
@@ -393,6 +408,7 @@ function initRecycleBinPage() {
     trashObserverInstance = initInfiniteScroll('#sub-page-content');
 
     const cleanupRecycleBin = () => {
+        cleanupTrashSentinel();
         try { cleanupInfiniteScroll(); } catch(_) {}
         if (pageAbortController) pageAbortController.abort();
         if (pageEventListenerController) pageEventListenerController.abort();

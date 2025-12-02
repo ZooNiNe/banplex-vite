@@ -15,6 +15,8 @@ import { showPaymentSuccessPreviewPanel } from '../../services/data/uiInteractio
 const BATCH_SIZE = 15;
 let pageAbortController = null;
 let observerInstance = null;
+let mutasiRequestController = null;
+let currentMutasiSentinel = null;
 
 const ICONS = {
     tag: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200Zm-24-24H64a8,8,0,0,1,0-16H192a8,8,0,0,1,0,16Z"></path></svg>`,
@@ -32,6 +34,32 @@ let state = {
 };
 
 const clean = (str) => (str && typeof str === 'string' && str.trim() !== '') ? str.trim() : null;
+
+function cleanupMutasiSentinel() {
+    if (currentMutasiSentinel && observerInstance) {
+        observerInstance.unobserve(currentMutasiSentinel);
+    }
+    if (currentMutasiSentinel) {
+        currentMutasiSentinel.remove();
+    }
+    currentMutasiSentinel = null;
+}
+
+function attachMutasiSentinel(container) {
+    if (!container) return;
+    const sentinel = document.createElement('div');
+    sentinel.id = 'mutasi-sentinel';
+    sentinel.style.height = '20px';
+    container.appendChild(sentinel);
+    currentMutasiSentinel = sentinel;
+    if (observerInstance) {
+        observerInstance.observe(sentinel);
+    }
+}
+
+function removeMutasiEndPlaceholder(container) {
+    container.querySelector('.end-of-list-placeholder')?.remove();
+}
 
 // --- 1. RESOLVE DATE (Sama seperti sebelumnya, ini sudah bagus) ---
 function resolveDate(data) {
@@ -289,6 +317,9 @@ async function renderMutasi(isLoadMore = false) {
     const container = $('#mutasi-list-container');
     if (!container) return;
 
+    cleanupMutasiSentinel();
+    removeMutasiEndPlaceholder(container);
+
     if (!isLoadMore) {
         state.mergedItems = [];
         state.cursors = { payment: null, income: null, loan: null };
@@ -312,21 +343,19 @@ async function renderMutasi(isLoadMore = false) {
     container.innerHTML = createDateGroupedListHTML(state.mergedItems);
 
     const anyMore = Object.values(state.hasMore).some(v => v);
-    const oldSentinel = document.getElementById('mutasi-sentinel');
-    if (oldSentinel) oldSentinel.remove();
 
     if (anyMore) {
-        const sentinel = document.createElement('div');
-        sentinel.id = 'mutasi-sentinel';
-        sentinel.style.height = '20px';
-        container.appendChild(sentinel);
-        
-        if (observerInstance) observerInstance.disconnect();
-        observerInstance = initInfiniteScroll('#sub-page-content', () => renderMutasi(true));
-        if (observerInstance) observerInstance.observe(sentinel);
-    } else {
+        attachMutasiSentinel(container);
+    } else if (state.mergedItems.length > 0) {
         container.insertAdjacentHTML('beforeend', getEndOfListPlaceholderHTML());
     }
+}
+
+function loadMoreMutasi() {
+    if (state.isLoading) return;
+    const anyMore = Object.values(state.hasMore).some(v => v);
+    if (!anyMore) return;
+    renderMutasi(true);
 }
 
 function initMutasiPage() {
@@ -390,11 +419,19 @@ function initMutasiPage() {
         }
     });
 
+    observerInstance = initInfiniteScroll('#sub-page-content');
+    mutasiRequestController = new AbortController();
+    on('request-more-data', loadMoreMutasi, { signal: mutasiRequestController.signal });
     renderMutasi(false);
 
     on('app.unload.mutasi', () => {
-        if(observerInstance) observerInstance.disconnect();
+        cleanupMutasiSentinel();
         cleanupInfiniteScroll();
+        observerInstance = null;
+        if (mutasiRequestController) {
+            mutasiRequestController.abort();
+            mutasiRequestController = null;
+        }
     });
 }
 

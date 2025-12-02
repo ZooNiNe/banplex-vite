@@ -19,6 +19,7 @@ let pageAbortController = null;
 let pageEventListenerController = null;
 let unsubscribeLiveQuery = null;
 let renderDebounceTimer = null;
+let currentStockSentinel = null;
 
 function debounce(func, wait) {
   let timeout;
@@ -30,6 +31,32 @@ function debounce(func, wait) {
     clearTimeout(timeout);
     timeout = setTimeout(later, wait);
   };
+}
+
+function cleanupStockSentinel() {
+    if (currentStockSentinel && stockObserverInstance) {
+        stockObserverInstance.unobserve(currentStockSentinel);
+    }
+    if (currentStockSentinel) {
+        currentStockSentinel.remove();
+    }
+    currentStockSentinel = null;
+}
+
+function attachStockSentinel(container) {
+    if (!container) return;
+    const sentinel = document.createElement('div');
+    sentinel.id = 'infinite-scroll-sentinel';
+    sentinel.style.height = '10px';
+    container.appendChild(sentinel);
+    currentStockSentinel = sentinel;
+    if (stockObserverInstance) {
+        stockObserverInstance.observe(sentinel);
+    }
+}
+
+function removeStockEndPlaceholder(container) {
+    container.querySelector('.end-of-list-placeholder')?.remove();
 }
 
 function createIcon(iconName, size = 18, classes = '') {
@@ -292,24 +319,12 @@ async function renderStokContent(append = false) {
         });
 
         container.querySelector('#list-skeleton')?.remove();
-        const oldSentinel = container.querySelector('#infinite-scroll-sentinel');
-        if (oldSentinel) {
-            if (stockObserverInstance) stockObserverInstance.unobserve(oldSentinel);
-            oldSentinel.remove();
-        }
+        cleanupStockSentinel();
+        removeStockEndPlaceholder(container);
 
         if (state.hasMore) {
             container.insertAdjacentHTML('beforeend', `<div id="list-skeleton" class="skeleton-wrapper">${createListSkeletonHTML(3)}</div>`);
-            const sentinel = document.createElement('div');
-            sentinel.id = 'infinite-scroll-sentinel';
-            sentinel.style.height = '10px';
-            container.appendChild(sentinel);
-            if (stockObserverInstance) {
-                stockObserverInstance.observe(sentinel);
-            } else {
-                stockObserverInstance = initInfiniteScroll('#sub-page-content');
-                if (stockObserverInstance) stockObserverInstance.observe(sentinel);
-            }
+            attachStockSentinel(container);
         } else if (sourceItems.length > 0) {
             container.insertAdjacentHTML('beforeend', getEndOfListPlaceholderHTML());
         }
@@ -446,6 +461,7 @@ function initStokPage() {
             pageEventListenerController.abort();
             pageEventListenerController = null;
         }
+        cleanupStockSentinel();
         cleanupInfiniteScroll();
         stockObserverInstance = null;
     };
