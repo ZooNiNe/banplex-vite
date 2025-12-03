@@ -15,31 +15,22 @@ import { getPendingQuotaMaps } from '../../services/pendingQuotaService.js';
 import { downloadCustomTablePdf } from '../../services/reportService.js';
 import { toast } from '../components/toast.js';
 import { createModalSelectField, initModalSelects } from '../components/forms/index.js';
-import { 
-    incomesCol, 
-    fundingSourcesCol, 
-    fundingCreditorsCol,
-    auth 
-} from '../../config/firebase.js';
+import { fundingSourcesCol, fundingCreditorsCol, auth } from '../../config/firebase.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
-import { 
-    query, where, orderBy, limit, startAfter, getDocs 
-} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+import { query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 import { showLoadingModal, hideLoadingModal } from "../components/modal.js";
 import { initPullToRefresh, destroyPullToRefresh } from "../components/pullToRefresh.js";
 import { showPaymentSuccessPreviewPanel } from '../../services/data/uiInteractionService.js';
 
 const ITEMS_PER_PAGE = 15;
-let pageAbortController = null;
 let pageObserverInstance = null;
 let containerClickHandler = null;
 let incomeInfiniteController = null;
 let currentIncomeSentinel = null;
+let sortModalHandler = null;
 let hasMorePemasukan = true;
-
-// --- STATE LOKAL ---
-let lastVisibleDoc = null;
-let isFetching = false;
+let pagesLoaded = 0;
+let isRendering = false;
 let accumulatedItems = [];
 let currentTab = 'pinjaman'; // 'termin' | 'pinjaman'
 
@@ -71,6 +62,44 @@ function groupItemsByDate(items, dateField = 'date') {
     });
 
     return Array.from(groups.values()).sort((a, b) => b.sortDate - a.sortDate);
+}
+
+function isItemDeleted(item) {
+    return !!item && (item.isDeleted === true || item.isDeleted === 1);
+}
+
+function getActiveSourceItems() {
+    const source = currentTab === 'termin' ? appState.incomes : appState.fundingSources;
+    return Array.isArray(source) ? [...source] : [];
+}
+
+function resolveSortValue(item, sortBy) {
+    if (!item) return 0;
+    if (sortBy === 'amount') {
+        return Number(item.amount ?? item.totalAmount ?? 0);
+    }
+    const dateVal = item[sortBy] ?? item.date ?? item.createdAt;
+    const parsed = getJSDate(dateVal);
+    return parsed && !Number.isNaN(parsed.getTime()) ? parsed.getTime() : 0;
+}
+
+function getFilteredSortedItems() {
+    const sourceItems = getActiveSourceItems().filter(item => !isItemDeleted(item));
+    let filteredItems = sourceItems;
+    if (currentTab === 'pinjaman') {
+        const statusFilter = (appState.pemasukanFilter?.status || 'all').toLowerCase();
+        if (statusFilter !== 'all') {
+            filteredItems = filteredItems.filter(item => ((item.status || '').toLowerCase()) === statusFilter);
+        }
+    }
+
+    const { sortBy = 'date', sortDirection = 'desc' } = appState.pemasukanFilter || {};
+    const direction = (sortDirection || 'desc').toLowerCase() === 'asc' ? 1 : -1;
+
+    return filteredItems.sort((a, b) => {
+        const diff = resolveSortValue(a, sortBy) - resolveSortValue(b, sortBy);
+        return direction * diff;
+    });
 }
 
 function renderGroupedList(groupedData, type, pendingMaps = {}) {
@@ -157,99 +186,48 @@ function removeIncomeEndPlaceholder(container) {
     container.querySelector('.end-of-list-placeholder')?.remove();
 }
 
-async function fetchPemasukanFromServer(isLoadMore = false) {
-    if (isFetching) return false;
-    isFetching = true;
-
-    try {
-        const activeTab = currentTab;
-        const collRef = activeTab === 'termin' ? incomesCol : fundingSourcesCol;
-        let qConstraints = [];
-
-        if (activeTab === 'pinjaman') {
-            const statusFilter = appState.pemasukanFilter?.status || 'all';
-            if (statusFilter !== 'all') {
-                qConstraints.push(where('status', '==', statusFilter));
-            }
-        }
-        
-        const { sortBy = 'date', sortDirection = 'desc' } = appState.pemasukanFilter || {};
-        qConstraints.push(orderBy(sortBy, sortDirection));
-
-        qConstraints.push(limit(ITEMS_PER_PAGE));
-        if (isLoadMore && lastVisibleDoc) {
-            qConstraints.push(startAfter(lastVisibleDoc));
-        }
-
-        const q = query(collRef, ...qConstraints);
-        const snapshot = await getDocs(q);
-        const fetchedDocs = snapshot.docs;
-
-        if (fetchedDocs.length) {
-            lastVisibleDoc = fetchedDocs[fetchedDocs.length - 1];
-        }
-        hasMorePemasukan = fetchedDocs.length === ITEMS_PER_PAGE;
-
-        const newItems = fetchedDocs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        if (isLoadMore) {
-            const mergedMap = new Map(accumulatedItems.map(item => [item.id, item]));
-            for (const doc of newItems) {
-                mergedMap.set(doc.id, doc);
-            }
-            accumulatedItems = Array.from(mergedMap.values());
-        } else {
-            accumulatedItems = newItems;
-        }
-
-        return newItems.length > 0;
-
-    } catch (error) {
-        console.error("[Pemasukan] Error fetching:", error);
-        if (error.code === 'permission-denied') {
-             if(!auth.currentUser) console.warn("User belum login");
-             emit('ui.toast', { message: 'Akses Ditolak. Relogin.', type: 'error' });
-        } 
-        return false;
-    } finally {
-        isFetching = false;
-    }
-}
-
 async function renderPemasukanContent(append = false) {
-    if (!append) pageAbortController?.abort();
-    if (!append) pageAbortController = new AbortController();
-    const signal = pageAbortController?.signal;
-    
+    if (isRendering) return;
+    isRendering = true;
+
     const container = $('#sub-page-content');
-    if (!container) return;
+    if (!container) {
+        isRendering = false;
+        return;
+    }
 
     cleanupIncomeSentinel();
 
     if (!append) {
         hasMorePemasukan = true;
+        pagesLoaded = 0;
+        accumulatedItems = [];
         removeIncomeEndPlaceholder(container);
-        if (!accumulatedItems.length || !appState.selectionMode?.active) {
-             lastVisibleDoc = null;
-             accumulatedItems = [];
-             container.innerHTML = createListSkeletonHTML(5);
-             await ensureMasterDataFresh(['projects', 'fundingCreditors'], { signal });
-        } else {
-             container.innerHTML = '';
-        }
+        container.innerHTML = createListSkeletonHTML(5);
+        await ensureMasterDataFresh(['projects', 'fundingCreditors']);
     }
 
     try {
-        if (accumulatedItems.length === 0 || append) {
-             await fetchPemasukanFromServer(append);
+        const allItems = getFilteredSortedItems();
+        const totalCount = allItems.length;
+        const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / ITEMS_PER_PAGE);
+
+        if (append) {
+            if (totalPages === 0 || pagesLoaded >= totalPages - 1) {
+                hasMorePemasukan = false;
+                container.querySelector('#list-skeleton')?.remove();
+                return;
+            }
+            pagesLoaded = Math.min(pagesLoaded + 1, Math.max(0, totalPages - 1));
+        } else {
+            pagesLoaded = 0;
         }
-        
-        if (signal?.aborted) return;
 
-        let items = [...accumulatedItems];
-        items = items.filter(item => item.isDeleted !== true);
-
-        if (appState.pemasukan) appState.pemasukan.currentList = items;
+        const visibleCount = Math.min((pagesLoaded + 1) * ITEMS_PER_PAGE, totalCount);
+        const previousCount = append ? Math.min(accumulatedItems.length, totalCount) : 0;
+        const newBatch = allItems.slice(previousCount, visibleCount);
+        accumulatedItems = allItems.slice(0, visibleCount);
+        hasMorePemasukan = visibleCount < totalCount;
 
         const pendingMaps = await getPendingQuotaMaps(['incomes', 'funding_sources']);
         const pendingOptions = {
@@ -257,26 +235,29 @@ async function renderPemasukanContent(append = false) {
             funding: pendingMaps.get('funding_sources') || new Map()
         };
 
-        if (!append && items.length === 0) {
+        if (!append && accumulatedItems.length === 0) {
             let title = `Tidak Ada ${currentTab === 'termin' ? 'Termin' : 'Pinjaman'}`;
             let desc = `Belum ada data ${currentTab} yang tercatat.`;
-            if (currentTab === 'pinjaman' && appState.pemasukanFilter?.status !== 'all') {
+            if (currentTab === 'pinjaman' && (appState.pemasukanFilter?.status || 'all') !== 'all') {
                 desc = `Tidak ada data dengan status tersebut.`;
             }
             container.innerHTML = getEmptyStateHTML({ icon: 'account_balance_wallet', title, desc });
             return;
         }
 
-        const groupedData = groupItemsByDate(items, 'date');
+        if (appState.pemasukan) appState.pemasukan.currentList = [...accumulatedItems];
+
         let listWrapper = container.querySelector('#income-grouped-wrapper');
         let newlyAddedElements = [];
 
         if (!append || !listWrapper) {
+            const groupedData = groupItemsByDate(accumulatedItems, 'date');
             container.innerHTML = `<div class="wa-card-list-wrapper grouped" id="income-grouped-wrapper">${renderGroupedList(groupedData, currentTab, pendingOptions)}</div>`;
             listWrapper = container.querySelector('#income-grouped-wrapper');
             if (!append) container.scrollTop = 0;
             if (listWrapper) newlyAddedElements = Array.from(listWrapper.querySelectorAll('.wa-card-v2-wrapper'));
-        } else {
+        } else if (newBatch.length > 0) {
+            const groupedData = groupItemsByDate(newBatch, 'date');
             newlyAddedElements = appendPemasukanGroups(listWrapper, groupedData, currentTab, pendingOptions);
         }
 
@@ -298,16 +279,18 @@ async function renderPemasukanContent(append = false) {
             container.insertAdjacentHTML('beforeend', getEndOfListPlaceholderHTML());
         }
 
-    } catch(e) {
-        if (e.name !== 'AbortError') {
-            console.error("Render Error:", e);
-            if(!append) container.innerHTML = getEmptyStateHTML({ icon: 'error', title: 'Gagal Memuat', desc: 'Terjadi kesalahan saat memuat data.' });
+    } catch (e) {
+        console.error("Render Error:", e);
+        if (!append) {
+            container.innerHTML = getEmptyStateHTML({ icon: 'error', title: 'Gagal Memuat', desc: 'Terjadi kesalahan saat memuat data.' });
         }
+    } finally {
+        isRendering = false;
     }
 }
 
 function loadMorePemasukan() {
-    if (appState.activePage !== 'pemasukan' || isFetching || !hasMorePemasukan) return;
+    if (appState.activePage !== 'pemasukan' || isRendering || !hasMorePemasukan) return;
     const container = $('#sub-page-content');
     if (container && !container.querySelector('#list-skeleton')) {
         container.insertAdjacentHTML('beforeend', `<div id="list-skeleton" class="skeleton-wrapper">${createListSkeletonHTML(2)}</div>`);
@@ -457,9 +440,13 @@ function _showPemasukanSortModal(onApply) {
         appState.pemasukanFilter.sortBy = form.querySelector('input[name="sortBy"]:checked').value;
         appState.pemasukanFilter.sortDirection = form.querySelector('input[name="sortDir"]:checked').value;
         
-        lastVisibleDoc = null;
         accumulatedItems = [];
-        renderPemasukanContent(false);
+        pagesLoaded = 0;
+        if (typeof onApply === 'function') {
+            onApply();
+        } else {
+            renderPemasukanContent(false);
+        }
         closeModal(modal);
     };
 }
@@ -467,8 +454,6 @@ function _showPemasukanSortModal(onApply) {
 // --- INIT PAGE ---
 
 function initPemasukanPage() {
-    if (pageAbortController) pageAbortController.abort();
-    pageAbortController = null;
     destroyPullToRefresh();
     
     const container = $('.page-container');
@@ -481,15 +466,13 @@ function initPemasukanPage() {
     if (!appState.pemasukan) appState.pemasukan = {};
 
     currentTab = appState.activeSubPage.get('pemasukan') || 'pinjaman';
-    lastVisibleDoc = null;
     accumulatedItems = [];
+    pagesLoaded = 0;
 
     const pageToolbarHTML = createPageToolbarHTML({
         title: 'Pemasukan',
         actions: [
             { action: 'open-pemasukan-creditor-report', icon: 'download', label: 'Unduh Laporan' },
-            { action: 'open-sort', icon: 'sort', label: 'Urutkan' },
-            { action: 'toggle-selection-mode', icon: 'check-square', label: 'Pilih Banyak' }
         ]
     });
 
@@ -550,30 +533,14 @@ function initPemasukanPage() {
         e.stopPropagation();
         const action = actionTarget.dataset.action;
 
-        if (action === 'open-sort') {
-            _showPemasukanSortModal();
-            return;
-        }
         if (action === 'open-pemasukan-creditor-report') {
             _openLoanReportModal();
             return;
         }
-        if (action === 'toggle-selection-mode') {
-            if (appState.selectionMode?.active) {
-                emit('ui.selection.deactivate');
-            } else {
-                emit('ui.selection.activate', {
-                    pageContext: 'pemasukan',
-                    supportedActions: [
-                        { action: 'delete-selected-items', icon: 'trash-2', label: 'Hapus', danger: true },
-                        { action: 'open-selection-summary', icon: 'list', label: 'Rincian' }
-                    ]
-                });
-            }
-            return;
-        }
     };
     container.addEventListener('click', containerClickHandler);
+    sortModalHandler = (onApply) => _showPemasukanSortModal(onApply);
+    on('ui.modal.showPemasukanSort', sortModalHandler);
 
     // --- RE-RENDER ON SELECTION MODE CHANGES ---
     const selectionRenderHandler = () => renderPemasukanContent(false);
@@ -585,7 +552,7 @@ function initPemasukanPage() {
         indicatorContainer: '#ptr-indicator-container',
         onRefresh: async () => {
             showLoadingModal('Memperbarui...');
-            lastVisibleDoc = null;
+            pagesLoaded = 0;
             accumulatedItems = [];
             await renderPemasukanContent(false);
             hideLoadingModal();
@@ -599,7 +566,7 @@ function initPemasukanPage() {
 
     const refreshTransactions = () => {
         if(appState.activePage === 'pemasukan') {
-            lastVisibleDoc = null;
+            pagesLoaded = 0;
             accumulatedItems = [];
             renderPemasukanContent(false);
         }
@@ -624,7 +591,7 @@ function initPemasukanPage() {
                 currentTab = btn.dataset.tab;
                 appState.activeSubPage.set('pemasukan', currentTab);
                 
-                lastVisibleDoc = null;
+                pagesLoaded = 0;
                 accumulatedItems = [];
                 updateStatusVisibility();
                 renderPemasukanContent(false);
@@ -641,7 +608,7 @@ function initPemasukanPage() {
                 btn.classList.add('active');
                 appState.pemasukanFilter.status = btn.dataset.tab;
                 
-                lastVisibleDoc = null;
+                pagesLoaded = 0;
                 accumulatedItems = [];
                 renderPemasukanContent(false);
             }
@@ -673,6 +640,8 @@ function initPemasukanPage() {
             containerEl.removeEventListener('click', containerClickHandler);
             containerClickHandler = null;
         }
+        off('ui.modal.showPemasukanSort', sortModalHandler);
+        sortModalHandler = null;
         off('ui.pemasukan.renderContent', selectionRenderHandler);
         off('data.transaction.success', refreshTransactions);
         off('app.unload.pemasukan', cleanupPemasukan);

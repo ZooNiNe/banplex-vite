@@ -44,7 +44,6 @@ export function createPageToolbarHTML({ title, searchId, searchPlaceholder, acti
     // Update: Tambahkan 'pemasukan' ke dalam Set ini
     const pagesWithoutMoreVert = new Set([
         'pengeluaran', 
-        'pemasukan', // Added
         'pemasukan_form', 
         'hrd_applicants_form', 
         'hrd_applicants', 
