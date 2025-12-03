@@ -19,6 +19,55 @@ function createIcon(iconName, size = 20, classes = '') {
     return icons[iconName] || '';
 }
 
+function createSelectionActionButton(icon, action, title, context = {}) {
+    const contextAttributes = Object.entries(context)
+        .map(([key, value]) => `data-${key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}="${String(value ?? '').replace(/"/g, '&quot;')}"`)
+        .join(' ');
+    return `
+        <button class="btn-icon" data-action="${action}" title="${title}" ${contextAttributes}>
+            ${createIcon(icon)}
+        </button>
+    `;
+}
+
+function updateGlobalSelectionActions(pageContext) {
+    const actionsContainer = document.getElementById('global-selection-actions');
+    if (!actionsContainer) return;
+
+    let buttonsHTML = '';
+    buttonsHTML += createSelectionActionButton('check-check', 'select-all-items', 'Pilih Semua / Batal Pilih');
+
+    if (pageContext === 'tagihan' || pageContext === 'pemasukan') {
+        buttonsHTML += createSelectionActionButton('trash-2', 'delete-selected-items', 'Hapus Item Terpilih');
+        buttonsHTML += createSelectionActionButton('list', 'open-selection-summary', 'Lihat Ringkasan');
+        if (pageContext === 'tagihan') {
+            buttonsHTML += createSelectionActionButton('message-square', 'forward-to-comments', 'Komentarkan Item Terpilih');
+        }
+    } else if (pageContext === 'recycleBin') {
+        buttonsHTML += createSelectionActionButton('rotate-ccw', 'restore-selected', 'Pulihkan Item Terpilih');
+        buttonsHTML += createSelectionActionButton('trash-2', 'delete-permanent-selected', 'Hapus Permanen');
+        buttonsHTML += createSelectionActionButton('list', 'open-selection-summary', 'Lihat Ringkasan');
+    }
+
+    actionsContainer.innerHTML = buttonsHTML;
+
+    const selectionBar = document.getElementById('selection-bar');
+    if (selectionBar) {
+        let closeBtn = selectionBar.querySelector('[data-action="close-selection-mode"]');
+        if (!closeBtn) {
+            const selectionInfo = selectionBar.querySelector('.selection-info');
+            if(selectionInfo){
+                closeBtn = document.createElement('button');
+                closeBtn.className = 'btn-icon close-selection-btn';
+                closeBtn.dataset.action = 'close-selection-mode';
+                closeBtn.title = 'Tutup Mode Seleksi';
+                closeBtn.innerHTML = createIcon('x', 24);
+                selectionInfo.prepend(closeBtn);
+            }
+        }
+    }
+}
+
 function getSelectionSummaryCardHTML() {
     const { selectionMode } = appState;
     if (!selectionMode.active || selectionMode.selectedIds.size === 0) return '';
@@ -130,6 +179,7 @@ export function _activateSelectionMode(pageContext) {
         }
          emit('ui.selection.updateCount');
     }
+    updateGlobalSelectionActions(appState.selectionMode.pageContext);
     let renderEvent = '';
     if (pageContext === 'tagihan') renderEvent = 'ui.tagihan.renderContent';
     else if (pageContext === 'pemasukan') renderEvent = 'ui.pemasukan.renderContent';

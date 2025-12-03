@@ -193,7 +193,11 @@ async function fetchPemasukanFromServer(isLoadMore = false) {
         const newItems = fetchedDocs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         if (isLoadMore) {
-            accumulatedItems = [...accumulatedItems, ...newItems];
+            const mergedMap = new Map(accumulatedItems.map(item => [item.id, item]));
+            for (const doc of newItems) {
+                mergedMap.set(doc.id, doc);
+            }
+            accumulatedItems = Array.from(mergedMap.values());
         } else {
             accumulatedItems = newItems;
         }
@@ -591,6 +595,7 @@ function initPemasukanPage() {
     pageObserverInstance = initInfiniteScroll('#sub-page-content');
     incomeInfiniteController = new AbortController();
     on('request-more-data', loadMorePemasukan, { signal: incomeInfiniteController.signal });
+    on('ui.pemasukan.openLoanReport', _openLoanReportModal);
 
     const refreshTransactions = () => {
         if(appState.activePage === 'pemasukan') {
@@ -671,6 +676,7 @@ function initPemasukanPage() {
         off('ui.pemasukan.renderContent', selectionRenderHandler);
         off('data.transaction.success', refreshTransactions);
         off('app.unload.pemasukan', cleanupPemasukan);
+        off('ui.pemasukan.openLoanReport', _openLoanReportModal);
     };
     off('app.unload.pemasukan', cleanupPemasukan);
     on('app.unload.pemasukan', cleanupPemasukan);
